@@ -36,6 +36,9 @@ import pathlib
 import argparse
 import typing
 import io
+import hyperon
+
+metta = hyperon.MeTTa()
 
 Label = str
 Var = str
@@ -281,6 +284,111 @@ class FrameStack(list[Frame]):
         vprint(18, 'Make assertion:', assertion)
         return assertion
 
+def record_apply_subst(subst: dict[str, list[str]],
+                       stmt: list[str],
+                       result: list[str]) -> None:
+    """
+    Insert a fully evaluated RecordSubst expression into MeTTa’s space, using:
+      (let*
+        (($x (py-dict (("t" ( "t" )) ...))) ...)
+        (add-atom &self (RecordSubst $x $y $z)))
+    so we can match it with (RecordSubst $x $y $z) in queries.
+    """
+
+    # 1. Convert Python's 'subst' into a (py-dict ...)
+    #    e.g. (py-dict (("var" ("tok1" "tok2")) ...))
+    def make_py_dict_expr(subst_dict: dict[str, list[str]]) -> str:
+        if not subst_dict:
+            return '(py-dict ())'
+        parts = []
+        for k, arr in subst_dict.items():
+            arr_quoted = " ".join(f'"{x}"' for x in arr)
+            # (("k" ( "x1" "x2" "x3" )))
+            parts.append(f'("{k}" ( {arr_quoted} ))')
+        return f'(py-dict ({ " ".join(parts) }))'
+
+    # 2. Convert 'stmt' and 'result' into (py-list ( "term" "(" "t" "+" "r" ) ...)
+    def make_py_list_expr(tokens: list[str]) -> str:
+        if not tokens:
+            return '(py-list ())'
+        quoted_toks = " ".join(f'"{t}"' for t in tokens)
+        return f'(py-list ( {quoted_toks} ))'
+
+    # Build the sub-expressions as strings
+    subst_expr  = make_py_dict_expr(subst)
+    stmt_expr   = make_py_list_expr(stmt)
+    result_expr = make_py_list_expr(result)
+
+    # 3. Construct a final MeTTa command that uses let* + add-atom:
+    #    e.g.
+    #      (let*
+    #        (($x (py-dict (("t" ("t")) ("r" ("0")))))
+    #         ($y (py-list ("term" "(" "t" "+" "r" ")")))
+    #         ($z (py-list ("term" "(" "t" "+" "0" ")"))))
+    #        (add-atom &self (RecordSubst $x $y $z)))
+    #
+    #    This ensures each piece is evaluated, and the final expression
+    #    is stored as an atom in &self. Then you can do:
+    #      !(match &self (RecordSubst $x $y $z) ($x $y $z))
+    #    and it should yield the correct triple.
+
+    metta_cmd = f"""(let*
+      (($sx {subst_expr})
+       ($sy {stmt_expr})
+       ($sz {result_expr}))
+      (add-atom &self (RecordSubst ($sx $sy $sz))))"""
+
+    vprint(99, "Recording subst via let*/add-atom:\n", metta_cmd)
+
+    # 4. Actually run that code in MeTTa
+    metta.run(metta_cmd)
+
+
+
+def store_subst_in_metta(stmt: list[str], subst: dict[str, list[str]], result: list[str]):
+    """
+    Store an expression of the form:
+      (ApplySubst
+         (Original "term" "(" "t" "+" "r" ")")
+         (Substitution
+            (Binding "t" "t")
+            (Binding "r" "0")
+         )
+         (Result "term" "(" "t" "+" "0" ")")
+      )
+    in the MeTTa space for easy pattern matching & logging.
+    Retrieve with pattern = E(S('ApplySubst'), V('o'), V('s'), V('r'))
+    """
+
+    # 1. Convert stmt to a quoted list of tokens.
+    def str_tokens(xs: list[str]) -> str:
+        return " ".join([f'"{x}"' for x in xs])
+
+    stmt_str = f'(Original {str_tokens(stmt)})'
+    
+    # 2. Convert the subst into a list of (Binding var expansions...).
+    #    Each expansions is also a list of strings.
+    bindings = []
+    for var, expansions in subst.items():
+        expansions_str = " ".join([f'"{tok}"' for tok in expansions])
+        binding_expr = f'(Binding "{var}" {expansions_str})'
+        bindings.append(binding_expr)
+    substs_str = " ".join(bindings)
+    substitution_expr = f'(Substitution {substs_str})'
+    
+    # 3. Convert result to a quoted list of tokens.
+    result_str = f'(Result {str_tokens(result)})'
+    
+    # 4. Combine into a single S-expression we can store in MeTTa.
+    expr = f'(ApplySubst {stmt_str} {substitution_expr} {result_str})'
+    
+    # 5. Actually insert into MeTTa’s space (unlike Lisp, you typically
+    #    want to store it for later pattern matching or logging).
+    #    Using "!" means we evaluate it, so it’ll appear as a result in
+    #    the run call, or just store it with no "!" to place it in the space.
+    vprint(99, 'Recording subst', expr)
+    metta.run(f'{expr}')
+
 
 def apply_subst(stmt: Stmt, subst: dict[Var, Stmt]) -> Stmt:
     """Return the token list resulting from the given substitution
@@ -293,6 +401,8 @@ def apply_subst(stmt: Stmt, subst: dict[Var, Stmt]) -> Stmt:
         else:
             result.append(tok)
     vprint(20, 'Applying subst', subst, 'to stmt', stmt, ':', result)
+    record_apply_subst(subst, stmt, result)
+    store_subst_in_metta(stmt, subst, result)
     return result
 
 
