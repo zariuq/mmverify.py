@@ -36,9 +36,44 @@ import pathlib
 import argparse
 import typing
 import io
+
+# Imports added by Zarathustra
+import re
 import hyperon
+from hyperon import E,V,S
 
 metta = hyperon.MeTTa()
+
+# A log of all the MeTTa commands run
+metta_log = []
+
+# Run and Log a MeTTa Command
+def mettarl(cmd: str):
+    metta_log.append(cmd)
+    return metta.run(cmd)
+
+def mettify(expr) -> str:
+    expr_str = str(expr)
+    # Remove commas
+    expr_str = expr_str.replace(",", "")
+    # Replace square brackets with parentheses
+    expr_str = expr_str.replace("[", "(")
+    expr_str = expr_str.replace("]", ")")
+    return expr_str
+
+with open('mmverify-utils.metta', 'r') as f:
+    MeTTa_Utils = f.read()
+
+# Because we run the MeTTa_Utils, we add it to the log to make it self-contained.
+MeTTa_Utils_Exprs = metta.parse_all(MeTTa_Utils)
+for expr in MeTTa_Utils_Exprs:
+    mettarl(str(expr))
+
+# The MeTTa 'stack' to mirror the Metamath one.
+mettarl('!(bind! &consts (new-space))')
+mettarl('!(bind! &stack (new-space))')
+mettarl('!(bind! &labels (new-space))')
+
 
 Label = str
 Var = str
@@ -218,6 +253,7 @@ class FrameStack(list[Frame]):
         frame.e.append(stmt)
         frame.e_labels[tuple(stmt)] = label
         # conversion to tuple since dictionary keys must be hashable
+        mettarl(f"!(add-atom &stack (EHyp {len(frame.f)} {len(frame.e)} {mettify(stmt)} {mettify(label)}))")
 
     def add_d(self, varlist: list[Var]) -> None:
         """Add a disjoint variable condition (ordered pair of variables) to
@@ -284,111 +320,96 @@ class FrameStack(list[Frame]):
         vprint(18, 'Make assertion:', assertion)
         return assertion
 
-def record_apply_subst(subst: dict[str, list[str]],
-                       stmt: list[str],
-                       result: list[str]) -> None:
+def metta_apply_subst(stmt: list[str], subst: dict[str, list[str]]) -> list[str]:
     """
-    Insert a fully evaluated RecordSubst expression into MeTTa’s space, using:
-      (let*
-        (($x (py-dict (("t" ( "t" )) ...))) ...)
-        (add-atom &self (RecordSubst $x $y $z)))
-    so we can match it with (RecordSubst $x $y $z) in queries.
+    Calls the MeTTa-side apply_subst function to do the rewriting in MeTTa,
+    then parses the result back into Python tokens.
     """
 
-    # 1. Convert Python's 'subst' into a (py-dict ...)
-    #    e.g. (py-dict (("var" ("tok1" "tok2")) ...))
-    def make_py_dict_expr(subst_dict: dict[str, list[str]]) -> str:
-        if not subst_dict:
-            return '(py-dict ())'
-        parts = []
-        for k, arr in subst_dict.items():
-            arr_quoted = " ".join(f'"{x}"' for x in arr)
-            # (("k" ( "x1" "x2" "x3" )))
-            parts.append(f'("{k}" ( {arr_quoted} ))')
-        return f'(py-dict ({ " ".join(parts) }))'
+    # 1. Convert 'stmt' to a MeTTa tuple of quoted tokens,
+    #    e.g.  ( "wff" "(" "P" "->" "Q" ")" )
+    stmt_metta = " ".join(f'"{t}"' for t in stmt)
+    stmt_expr = f'( {stmt_metta} )'
 
-    # 2. Convert 'stmt' and 'result' into (py-list ( "term" "(" "t" "+" "r" ) ...)
-    def make_py_list_expr(tokens: list[str]) -> str:
-        if not tokens:
-            return '(py-list ())'
-        quoted_toks = " ".join(f'"{t}"' for t in tokens)
-        return f'(py-list ( {quoted_toks} ))'
+    # 2. Convert 'subst' to a (py-dict (("var" ("token1" "token2"))...))
+    # -- Updated to store singletons as "tok" instead of ( "tok" ).
+    #    e.g.  (py-dict (("P" ( "(" "t" "+" "0" ")" "=" "t" )) ("Q" ( "t" "=" "t" ))))
+    dict_items = []
+    for k, expansions in subst.items():
+        if len(expansions) == 1:
+            dict_items.append(f'("{k}" "{expansions[0]}")')
+        else:
+            expansions_str = " ".join(f'"{tok}"' for tok in expansions)
+            dict_items.append(f'("{k}" ( {expansions_str} ))')
+    if dict_items:
+        dict_str = " ".join(dict_items)
+        subst_expr = f'(py-dict ({dict_str}))'
+    else:
+        subst_expr = '(py-dict ())'
 
-    # Build the sub-expressions as strings
-    subst_expr  = make_py_dict_expr(subst)
-    stmt_expr   = make_py_list_expr(stmt)
-    result_expr = make_py_list_expr(result)
+    # 3. Build the entire MeTTa call to "apply_subst"
+    #    We'll do an exclamation "!" to evaluate it and get the final output.
+    metta_code = f'!(apply_subst {stmt_expr} {subst_expr})'
 
-    # 3. Construct a final MeTTa command that uses let* + add-atom:
-    #    e.g.
-    #      (let*
-    #        (($x (py-dict (("t" ("t")) ("r" ("0")))))
-    #         ($y (py-list ("term" "(" "t" "+" "r" ")")))
-    #         ($z (py-list ("term" "(" "t" "+" "0" ")"))))
-    #        (add-atom &self (RecordSubst $x $y $z)))
-    #
-    #    This ensures each piece is evaluated, and the final expression
-    #    is stored as an atom in &self. Then you can do:
-    #      !(match &self (RecordSubst $x $y $z) ($x $y $z))
-    #    and it should yield the correct triple.
+    # 4. Run the code in MeTTa
+    result = mettarl(metta_code)
 
-    metta_cmd = f"""(let*
-      (($sx {subst_expr})
-       ($sy {stmt_expr})
-       ($sz {result_expr}))
-      (add-atom &self (RecordSubst ($sx $sy $sz))))"""
+    # The 'result' is typically a list-of-lists. For example:
+    #   [[("wff" "(" ("(" "t" "+" "0" ")" "=" "t") "->" ("t" "=" "t") ")")]]
+    # We want to parse out the tokens. Usually the top-level is a 2D structure:
+    #   [ [... the actual expression ...] ].
+    # So let's see if we can convert it to a Python list of strings.
 
-    vprint(99, "Recording subst via let*/add-atom:\n", metta_cmd)
+    if not result:
+        # If no result or something weird, return empty
+        return []
 
-    # 4. Actually run that code in MeTTa
-    metta.run(metta_cmd)
+    # 'result' might look like:
+    # [[("wff" "(" ("(" "t" "+" "0" ")" "=" "t") "->" ("t" "=" "t") ")")]]
 
+    vprint(99, 'MeTTa Substitution result', result, 'code', metta_code)
+    # The easiest is to do a small helper that descends the structure you get:
+    py_list = _extract_tokens(result[0][0])  # might be a tuple ExpressionAtom
+    return py_list
 
+LIST_OF_QUOTED = re.compile(r'^\(\s*(?:"[^"]+"\s*)+\)$')
 
-def store_subst_in_metta(stmt: list[str], subst: dict[str, list[str]], result: list[str]):
+def _extract_tokens(expr):
     """
-    Store an expression of the form:
-      (ApplySubst
-         (Original "term" "(" "t" "+" "r" ")")
-         (Substitution
-            (Binding "t" "t")
-            (Binding "r" "0")
-         )
-         (Result "term" "(" "t" "+" "0" ")")
-      )
-    in the MeTTa space for easy pattern matching & logging.
-    Retrieve with pattern = E(S('ApplySubst'), V('o'), V('s'), V('r'))
+    Flatten a MeTTa ExpressionAtom by calling expr.iterate(),
+    each child is turned into a string, then we do a small
+    regex check to see if it is:
+      - A parenthesized list of quotes, e.g. ("t" "0")
+      - A single quoted token, e.g. "t"
+      - Otherwise we keep the raw string.
     """
+    # If 'expr' doesn't have iterate(), fallback to str(expr).
+    try:
+        children = expr.iterate()
+    except AttributeError:
+        return [str(expr)]
 
-    # 1. Convert stmt to a quoted list of tokens.
-    def str_tokens(xs: list[str]) -> str:
-        return " ".join([f'"{x}"' for x in xs])
+    tokens = []
+    for child in children:
+        s = str(child).strip()
 
-    stmt_str = f'(Original {str_tokens(stmt)})'
-    
-    # 2. Convert the subst into a list of (Binding var expansions...).
-    #    Each expansions is also a list of strings.
-    bindings = []
-    for var, expansions in subst.items():
-        expansions_str = " ".join([f'"{tok}"' for tok in expansions])
-        binding_expr = f'(Binding "{var}" {expansions_str})'
-        bindings.append(binding_expr)
-    substs_str = " ".join(bindings)
-    substitution_expr = f'(Substitution {substs_str})'
-    
-    # 3. Convert result to a quoted list of tokens.
-    result_str = f'(Result {str_tokens(result)})'
-    
-    # 4. Combine into a single S-expression we can store in MeTTa.
-    expr = f'(ApplySubst {stmt_str} {substitution_expr} {result_str})'
-    
-    # 5. Actually insert into MeTTa’s space (unlike Lisp, you typically
-    #    want to store it for later pattern matching or logging).
-    #    Using "!" means we evaluate it, so it’ll appear as a result in
-    #    the run call, or just store it with no "!" to place it in the space.
-    vprint(99, 'Recording subst', expr)
-    metta.run(f'{expr}')
+        # 1. If s looks like ("foo" "bar"), let's parse them out with a regex
+        #    so ("t") => ["t"], ("t" "0") => ["t","0"]
+        if LIST_OF_QUOTED.match(s):
+            # Extract everything inside ( ... ) then find all "..."
+            inside = s[1:-1].strip()   # remove outer parentheses
+            found = re.findall(r'"([^"]+)"', inside)
+            if found:
+                tokens.extend(found)
+                continue
 
+        # 2. If it's exactly "something", remove the outer quotes
+        if len(s) >= 2 and s[0] == '"' and s[-1] == '"':
+            s = s[1:-1]
+
+        tokens.append(s)
+
+    return tokens
 
 def apply_subst(stmt: Stmt, subst: dict[Var, Stmt]) -> Stmt:
     """Return the token list resulting from the given substitution
@@ -401,8 +422,10 @@ def apply_subst(stmt: Stmt, subst: dict[Var, Stmt]) -> Stmt:
         else:
             result.append(tok)
     vprint(20, 'Applying subst', subst, 'to stmt', stmt, ':', result)
-    record_apply_subst(subst, stmt, result)
-    store_subst_in_metta(stmt, subst, result)
+    # record_apply_subst(subst, stmt, result)
+    # store_subst_in_metta(stmt, subst, result)
+    metta_result = metta_apply_subst(stmt, subst)
+    assert result == metta_result, f"Metta-Py Mismatch! {result} != {metta_result}"
     return result
 
 
@@ -527,6 +550,7 @@ class MM:
                         '$f must have length two but is {}'.format(stmt))
                 self.add_f(stmt[0], stmt[1], label)
                 self.labels[label] = ('$f', [stmt[0], stmt[1]])
+                mettarl(f"!(add-atom &labels (FHyp {len(self.fs)} {label} {mettify(self.labels[label])}))")
                 label = None
             elif tok == '$e':
                 if not label:
@@ -534,6 +558,7 @@ class MM:
                 stmt = self.read_non_p_stmt(tok, toks)
                 self.fs.add_e(stmt, label)
                 self.labels[label] = ('$e', stmt)
+                mettarl(f"!(add-atom &labels (EHyp {len(self.fs)} {label} {mettify(self.labels[label])}))")
                 label = None
             elif tok == '$a':
                 if not label:
@@ -541,6 +566,7 @@ class MM:
                 self.labels[label] = (
                     '$a', self.fs.make_assertion(
                         self.read_non_p_stmt(tok, toks)))
+                mettarl(f"!(add-atom &labels (Assertion {len(self.fs)} {label} {mettify(self.labels[label])}))")
                 label = None
             elif tok == '$p':
                 if not label:
@@ -551,6 +577,7 @@ class MM:
                     vprint(2, 'Verify:', label)
                     self.verify(f_hyps, e_hyps, conclusion, proof)
                 self.labels[label] = ('$p', (dvs, f_hyps, e_hyps, conclusion))
+                mettarl(f"!(add-atom &labels (Proof {len(self.fs)} {label} {mettify(self.labels[label])}))")
                 label = None
             elif tok == '$d':
                 self.fs.add_d(self.read_non_p_stmt(tok, toks))
@@ -810,3 +837,11 @@ if __name__ == '__main__':
     mm.read(Toks(db_file))
     vprint(1, 'No errors were found.')
     # mm.dump()
+
+    # Write the MeTTa log :)
+    with open('mettamath.metta', 'w') as out:
+        for line in metta_log:
+            out.write(line)
+            if not line.endswith('\n'):
+                out.write('\n')
+
