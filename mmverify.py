@@ -331,9 +331,9 @@ def metta_apply_subst(stmt: list[str], subst: dict[str, list[str]]) -> list[str]
     stmt_metta = " ".join(f'"{t}"' for t in stmt)
     stmt_expr = f'( {stmt_metta} )'
 
-    # 2. Convert 'subst' to a (py-dict (("var" ("token1" "token2"))...))
+    # 2. Convert 'subst' to a (Substitution (("var" ("token1" "token2" ...))...))
     # -- Updated to store singletons as "tok" instead of ( "tok" ).
-    #    e.g.  (py-dict (("P" ( "(" "t" "+" "0" ")" "=" "t" )) ("Q" ( "t" "=" "t" ))))
+    #    e.g.  (Substitution (("P" ( "(" "t" "+" "0" ")" "=" "t" )) ("Q" ( "t" "=" "t" ))))
     dict_items = []
     for k, expansions in subst.items():
         if len(expansions) == 1:
@@ -346,6 +346,11 @@ def metta_apply_subst(stmt: list[str], subst: dict[str, list[str]]) -> list[str]
         subst_expr = f'(py-dict ({dict_str}))'
     else:
         subst_expr = '(py-dict ())'
+    # if dict_items:
+    #     dict_str = " ".join(dict_items)
+    #     subst_expr = f'(Substitution ({dict_str}))'
+    # else:
+    #     subst_expr = '(Substitution ())'
 
     # 3. Build the entire MeTTa call to "apply_subst"
     #    We'll do an exclamation "!" to evaluate it and get the final output.
