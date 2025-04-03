@@ -5,6 +5,12 @@
 ;;                                                                     ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(: match-atom (-> Expression Atom Atom %Undefined$))
+(= (match-atom $expr $pattern $rewrite)
+   (if-decons-expr $expr $head $tail (let $pattern $head $rewrite) (empty)))
+(= (match-atom $expr $pattern $rewrite)
+   (if-decons-expr $expr $head $tail (match-atom $tail $pattern $rewrite) (empty)))
+
 ; 2s eval time
 (= (apply_subst_tok $tok $subst)
   (case ((py-dot $subst get) $tok)
@@ -28,7 +34,10 @@
 ;   (map-atom $stmt $tok (apply_subst_tok $subst $tok)))
 
 ; 16s eval time
+;; Somehow broken with both types.  And with none.
+; AssertionError: Metta-Py Mismatch! ['term', '0'] != ['get-subst', '{}', 'term', 'get-subst', '{}', '0']
 ; (: match-atom (-> Expression $a $a $a))
+; (: match-atom (-> Expression Atom Atom %Undefined$))
 ; (= (match-atom $expr $pattern $rewrite)
 ;    (if-decons-expr $expr $head $tail (let $pattern $head $rewrite) (empty)))
 ; (= (match-atom $expr $pattern $rewrite)
@@ -68,4 +77,3 @@
 
 ; (= (apply_subst $stmt $subst)
 ;   (map-atom $stmt $tok (apply_subst_tok $subst $tok)))
-

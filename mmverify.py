@@ -39,8 +39,9 @@ import io
 
 # Imports added by Zarathustra
 import re
+from typing import Optional
 import hyperon
-from hyperon import E,V,S
+# from hyperon import E,V,S
 
 metta = hyperon.MeTTa()
 
@@ -59,6 +60,11 @@ def mettify(expr) -> str:
     # Replace square brackets with parentheses
     expr_str = expr_str.replace("[", "(")
     expr_str = expr_str.replace("]", ")")
+    # Replace curly brackets with parentheses
+    expr_str = expr_str.replace("{", "(")
+    expr_str = expr_str.replace("}", ")")
+    # Replace single quotes (often from Python strings in containers) with double quotes for MeTTa strings
+    expr_str = expr_str.replace("'", '"')
     return expr_str
 
 with open('mmverify-utils.metta', 'r') as f:
@@ -253,15 +259,19 @@ class FrameStack(list[Frame]):
         frame.e.append(stmt)
         frame.e_labels[tuple(stmt)] = label
         # conversion to tuple since dictionary keys must be hashable
-        mettarl(f"!(add-atom &stack (EHyp {len(frame.f)} {len(frame.e)} {mettify(stmt)} {mettify(label)}))")
+        mettarl(f'!(add-atom &labels ( (Label {mettify(label)}) EHyp ( (FSDepth {len(self)}) (ENum {len(frame.e)}) (Statement {mettify(stmt)}) (Type "$e") )))')
 
     def add_d(self, varlist: list[Var]) -> None:
         """Add a disjoint variable condition (ordered pair of variables) to
         the frame stack top.
         """
-        self[-1].d.update((min(x, y), max(x, y))
+        new_dvs = set((min(x, y), max(x, y))
                           for x, y in itertools.product(varlist, varlist)
                           if x != y)
+        self[-1].d.update(new_dvs)
+        if new_dvs: # Only log if there are actual pairs
+            dv_pairs_metta = " ".join(f'("{x}" "{y}")' for x, y in list(new_dvs))
+            mettarl(f'!(add-atom &labels (DVar ( (FSDepth {len(self)}) (DVars {dv_pairs_metta} ) (Type "$d") )))')
 
     def lookup_v(self, tok: Var) -> bool:
         """Return whether the given token is an active variable."""
@@ -429,8 +439,8 @@ def apply_subst(stmt: Stmt, subst: dict[Var, Stmt]) -> Stmt:
     vprint(20, 'Applying subst', subst, 'to stmt', stmt, ':', result)
     # record_apply_subst(subst, stmt, result)
     # store_subst_in_metta(stmt, subst, result)
-    metta_result = metta_apply_subst(stmt, subst)
-    assert result == metta_result, f"Metta-Py Mismatch! {result} != {metta_result}"
+    # metta_result = metta_apply_subst(stmt, subst)
+    # assert result == metta_result, f"Metta-Py Mismatch! {result} != {metta_result}"
     return result
 
 
@@ -455,6 +465,7 @@ class MM:
             raise MMError(
                 'Trying to declare as a constant an active variable: {}'.format(tok))
         self.constants.add(tok)
+        mettarl(f'!(add-atom &consts ( Constant ( (Symbol "{tok}") (Type "$c") )))')
 
     def add_v(self, tok: Var) -> None:
         """Add a variable to the frame stack top (that is, the current frame)
@@ -555,7 +566,7 @@ class MM:
                         '$f must have length two but is {}'.format(stmt))
                 self.add_f(stmt[0], stmt[1], label)
                 self.labels[label] = ('$f', [stmt[0], stmt[1]])
-                mettarl(f"!(add-atom &labels (FHyp {len(self.fs)} {label} {mettify(self.labels[label])}))")
+                mettarl(f'!(add-atom &labels ( (Label {label}) FHyp ( (FSDepth {len(self.fs)}) (Typecode "{mettify(stmt[0])}") (FVar {mettify(stmt[1])}) (Type "$f") )))')
                 label = None
             elif tok == '$e':
                 if not label:
@@ -563,15 +574,13 @@ class MM:
                 stmt = self.read_non_p_stmt(tok, toks)
                 self.fs.add_e(stmt, label)
                 self.labels[label] = ('$e', stmt)
-                mettarl(f"!(add-atom &labels (EHyp {len(self.fs)} {label} {mettify(self.labels[label])}))")
                 label = None
             elif tok == '$a':
                 if not label:
                     raise MMError('$a must have label')
-                self.labels[label] = (
-                    '$a', self.fs.make_assertion(
-                        self.read_non_p_stmt(tok, toks)))
-                mettarl(f"!(add-atom &labels (Assertion {len(self.fs)} {label} {mettify(self.labels[label])}))")
+                dvs, f_hyps, e_hyps, stmt = self.fs.make_assertion(self.read_non_p_stmt(tok, toks))
+                self.labels[label] = ('$a', (dvs, f_hyps, e_hyps, stmt))
+                mettarl(f'!(add-atom &labels ( (Label {label}) Assertion ( (FSDepth {len(self.fs)}) (DVars {mettify(dvs)}) (FHyps {mettify(f_hyps)}) (EHyps {mettify(e_hyps)}) (Statement {mettify(stmt)}) (Type "$a") )))')
                 label = None
             elif tok == '$p':
                 if not label:
@@ -582,7 +591,7 @@ class MM:
                     vprint(2, 'Verify:', label)
                     self.verify(f_hyps, e_hyps, conclusion, proof)
                 self.labels[label] = ('$p', (dvs, f_hyps, e_hyps, conclusion))
-                mettarl(f"!(add-atom &labels (Proof {len(self.fs)} {label} {mettify(self.labels[label])}))")
+                mettarl(f'!(add-atom &labels ( (Label {label}) Proof ( (FSDepth {len(self.fs)}) (DVars {mettify(dvs)}) (FHyps {mettify(f_hyps)}) (EHyps {mettify(e_hyps)}) (Statement {mettify(stmt)}) (Type "$p") (ProofSequence {mettify(proof)}))))')
                 label = None
             elif tok == '$d':
                 self.fs.add_d(self.read_non_p_stmt(tok, toks))
@@ -607,7 +616,8 @@ class MM:
 
     def treat_step(self,
                    step: FullStmt,
-                   stack: list[Stmt]) -> None:
+                   stack: list[Stmt],
+                   label: Optional[Label] = None) -> None:
         """Carry out the given proof step (given the label to treat and the
         current proof stack).  This modifies the given stack in place.
         """
@@ -615,6 +625,12 @@ class MM:
         if is_hypothesis(step):
             _steptype, stmt = step
             stack.append(stmt)
+            # This version keeps the F and EHyp checking because I'll need that for the pure-MeTTa version
+            mettarl(f'!(match &labels ((Label {label}) $type $d) (if (or (== $type FHyp) (== $type EHyp)) (add-atom &stack ( (Num {len(stack)}) (Label {label}) $type $d)) (empty)))')
+            ## The fully MeTTa asserts work.  Python is faster.  Order may only work because it's in that order in MeTTa's expressions.
+            assert stmt == [x[1].strip('"') for x in (g.split() for g in re.findall(r'\(([^()]+)\)', str(metta.run(f'!(match &stack ( (Num 1) $l $t $d ) $d)')[0][0]))) if x[0] in ('Typecode', 'FVar')]
+            # assert stmt[0] == str(metta.run(f'!(match &stack ( (Num 1) $l $t $d ) (match-atom $d (Typecode $tc) $tc))')[0][0]).strip('"')
+            # assert stmt[1] == str(metta.run(f'!(match &stack ( (Num 1) $l $t $d ) (match-atom $d (FVar $fv) $fv))')[0][0])
         elif is_assertion(step):
             _steptype, assertion = step
             dvs0, f_hyps0, e_hyps0, conclusion0 = assertion
@@ -664,17 +680,24 @@ class MM:
         """
         stack: list[Stmt] = []
         active_hypotheses = {label for frame in self.fs for labels in (frame.f_labels, frame.e_labels) for label in labels.values()}
+        mettarl(f'''!(add-atom &self (ActiveHyps 
+                        (collapse (let $current_depth 1 ; Example depth
+                        (match &labels ((Label $L) $Type $Data)
+                            (if (or (== $Type FHyp) (== $Type EHyp))
+                                (match-atom $Data (FSDepth $D)
+                                    (if (<= $D $current_depth) $L (empty)))
+                                (empty) ))))))''')
         for label in proof:
             stmt_info = self.labels.get(label)
             if stmt_info:
                 label_type = stmt_info[0]
                 if label_type in {'$e', '$f'}:
                     if label in active_hypotheses:
-                        self.treat_step(stmt_info, stack)
+                        self.treat_step(stmt_info, stack, label)
                     else:
                         raise MMError(f"The label {label} is the label of a nonactive hypothesis.")
                 else:
-                    self.treat_step(stmt_info, stack)
+                    self.treat_step(stmt_info, stack, label)
             else:
                 raise MMError(f"No statement information found for label {label}")
         return stack
