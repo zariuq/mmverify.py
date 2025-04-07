@@ -54,6 +54,8 @@ def mettarl(cmd: str):
     return metta.run(cmd)
 
 def mettify(expr) -> str:
+    if expr == set():
+        return "()"
     expr_str = str(expr)
     # Remove commas
     expr_str = expr_str.replace(",", "")
@@ -76,9 +78,11 @@ for expr in MeTTa_Utils_Exprs:
     mettarl(str(expr))
 
 # The MeTTa 'stack' to mirror the Metamath one.
-mettarl('!(bind! &consts (new-space))')
-mettarl('!(bind! &stack (new-space))')
-mettarl('!(bind! &labels (new-space))')
+mettarl('!(bind! &consts (new-space))') # Constanst
+mettarl('!(bind! &stack (new-space))') # Stack in treat_proof
+mettarl('!(bind! &labels (new-space))') # Labels
+mettarl('!(bind! &subst (new-space))') # Substitution dict
+mettarl('!(bind! &wm (new-space))') # Working Memory (safer than &self, easier to wipe, etc.)
 
 
 Label = str
@@ -634,8 +638,49 @@ class MM:
         elif is_assertion(step):
             _steptype, assertion = step
             dvs0, f_hyps0, e_hyps0, conclusion0 = assertion
+            # metta_dvs0 = {tuple(part.strip() for part in str(t).strip('"()').split(',')) for t in metta.run(f'!(match &labels ((Label {label}) Assertion $Data) (match-atom $Data (DVars $dvs) (match-atom $dvs ($x $y) (format-args ({{}},{{}}) ($x $y)))))')[0]}
+            # assert dvs0 == metta_dvs0
             npop = len(f_hyps0) + len(e_hyps0)
             sp = len(stack) - npop
+            mout = mettarl(f'''!(match &labels ((Label {label}) Assertion $Data)
+                (let*
+                    (
+                    (() (match-atom $Data (DVars $dvars) (add-atom &wm (DVars $dvars))))
+                    (() (match-atom $Data (FHyps $fhyps) (add-atom &wm (FHypse $fhyps))))
+                    (() (match-atom $Data (EHyps $ehyps) (add-atom &wm (EHypse $ehyps))))
+                    (() (match-atom $Data (Statement $statement) (add-atom &wm (Statement $statement))))
+                    )
+                    ($dvars $fhyps $ehyps $statement)))''')[0]
+            print(mout)
+            def top_groups(s): s=s.strip()[1:-1];g=[];d=0;st=0;[(d:=d+1,st:=i if d==1 else st) if c=='(' else(d:=d-1,g.append(s[st:i+1]) if d==0 else None) if c==')' else None for i,c in enumerate(s)];return g
+            groups = top_groups(str(mout[0])); 
+            mdvs0 = set(re.findall(r'"([^"]+)"', groups[0])); 
+            mf_hyps0 = [tuple(re.findall(r'"([^"]+)"', g)) for g in top_groups(groups[1])]; 
+            me_hyps0 = [list(re.findall(r'"([^"]+)"', g)) for g in top_groups(groups[2])]            
+            mconclusion0 = re.findall(r'"([^"]+)"', groups[3])
+            print(mdvs0, mf_hyps0, me_hyps0, mconclusion0)
+            print(assertion)
+            assert dvs0 == mdvs0
+            assert f_hyps0 == mf_hyps0
+            assert e_hyps0 == me_hyps0
+            assert conclusion0 == mconclusion0
+            # print(f'stack: {stack}')
+            # mout = mettarl(f'''!(match &labels ((Label {label}) Assertion $Data)
+            #     (let*
+            #       ( ($lenf (match-atom $Data (FHyps $fhyps) (size-atom $fhyps))) 
+            #         ($lene (match-atom $Data (EHyps $ehyps) (size-atom $ehyps)))
+            #         ($npop (+ $lenf $lene))
+            #         ($slen (let $nums (collapse (let $nums (match &stack ( (Num $n) $l $t $d ) $n) $nums)) (max-atom $nums)))
+            #         ($sp   (- $slen $npop))) 
+            #         (if (< $sp 0)
+            #         (let $error (format-args (Stack underflow: proof step requires too many ({{}}) hypotheses.\nData is lf: {{}} vs {len(f_hyps0)}, le: {{}} vs {len(e_hyps0)}, slen: {{}} vs {len(stack)}, sp: {{}} vs {sp} ) ($npop $lenf $lene $slen $sp) ) (Error ((Label {label}) Assertion $Data) $error))
+            #         (let () (add-atom &wm (sp $sp)) ($lenf $lene $npop $slen $sp)))))''')
+            # print(assertion)
+            # print(f'label {label}, sp: {sp}, npop:{npop}, assertion: {assertion}, metta: {metta.run('!(match &wm (sp $sp) $sp)')}')
+            # print(f'mout: {mout}')
+            # # print(f'metta stack size: {metta.run(f'!(let $nums (collapse (let $nums (match &stack ( (Num $n) $l $t $d ) $n) $nums)) (max-atom $nums))')}')
+            # metta_sp = int(float(str(metta.run('!(match &wm (sp $sp) $sp)')[0][0])))
+            # assert sp == metta_sp
             if sp < 0:
                 raise MMError(
                     ("Stack underflow: proof step {} requires too many " +
@@ -680,7 +725,7 @@ class MM:
         """
         stack: list[Stmt] = []
         active_hypotheses = {label for frame in self.fs for labels in (frame.f_labels, frame.e_labels) for label in labels.values()}
-        mettarl(f'''!(add-atom &self (ActiveHyps 
+        mettarl(f'''!(add-atom &wm (ActiveHyps 
                         (collapse (let $current_depth 1 ; Example depth
                         (match &labels ((Label $L) $Type $Data)
                             (if (or (== $Type FHyp) (== $Type EHyp))
