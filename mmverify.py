@@ -69,21 +69,109 @@ def mettify(expr) -> str:
     expr_str = expr_str.replace("'", '"')
     return expr_str
 
-with open('mmverify-utils.metta', 'r') as f:
-    MeTTa_Utils = f.read()
-
-# Because we run the MeTTa_Utils, we add it to the log to make it self-contained.
-MeTTa_Utils_Exprs = metta.parse_all(MeTTa_Utils)
-for expr in MeTTa_Utils_Exprs:
-    mettarl(str(expr))
-
 # The MeTTa 'stack' to mirror the Metamath one.
+# Now some utils reference these, so I should define them first.
 mettarl('!(bind! &consts (new-space))') # Constanst
 mettarl('!(bind! &stack (new-space))') # Stack in treat_proof
 mettarl('!(bind! &labels (new-space))') # Labels
 mettarl('!(bind! &subst (new-space))') # Substitution dict
 mettarl('!(bind! &wm (new-space))') # Working Memory (safer than &self, easier to wipe, etc.)
 
+# Ok, I think I ran into a weird parse_all bug.  Will try just running them here
+# MeTTa Utils:
+# mettarl(f'(= (empty-space $space) (match $space $atom (remove-atom $space $atom)))')
+
+# mettarl(f'''(: match-atom (-> Expression Atom Atom %Undefined$))
+#     (= (match-atom $expr $pattern $rewrite)
+#     (if-decons-expr $expr $head $tail (let $pattern $head $rewrite) (empty)))
+#     (= (match-atom $expr $pattern $rewrite)
+#     (if-decons-expr $expr $head $tail (match-atom $tail $pattern $rewrite) (empty)))''')
+
+# mettarl(f'''(= (update-atom $space $atom $update_pattern)
+#   (match $space $atom (let () (add-atom $space $update_pattern) (remove-atom $space $atom))))''')
+
+# mettarl(f'''(= (add-subst ($typecode $var))
+#   (let*
+#     (
+#       ($sp (match &wm (sp $sp) $sp))
+#       ($entry (match &stack ((Num $sp) $s) $s))
+#       (($entry0 $entry1:) (decons-atom $entry))
+#     ) (if (== $entry0 $typecode)
+#         (let* 
+#           (
+#             (() (add-atom &subst ($var $entry1:)))
+#             (() (update-atom &wm (sp $n) (sp (+ $n 1))))
+#           ) ($var $entry1:))
+#         (Error ( (sp $sp) (entry $entry) (typecode $typecode) (var $var) ) "Proof stack entry does not match floating hypothesis."))))''')
+
+# mettarl(f'''(= (apply_subst_tok $tok $subst)
+#   (case ((py-dot $subst get) $tok)
+#     ((() $tok) ;; If the token ($tok) is not in the substitution-binding dictionary ($subst), keep it as is.
+#     ($sub_tok $sub_tok)) ;; If the token ($tok) is in the dictionry ($subst), then return the substituted token ($sub_tok)
+#   ))''')
+
+# mettarl(f'''(= (apply_subst $stmt $subst)
+#   (map-atom $stmt $tok (apply_subst_tok $tok $subst)))''')
+
+# I was using parse_all() but it was buggy.  ChatGPT provided o solution that seems to work.
+def parse_metta_expressions(filename, comment_char=';', encoding='utf-8'):
+    """
+    Return a list of top-level MeTTa expressions from a file, one expression
+    per balanced set of parentheses. Lines are stripped and anything following
+    `comment_char` is removed.  Empty lines are ignored.
+
+    :param filename: Name/path of the MeTTa source file to parse.
+    :param comment_char: Character that indicates a comment, default is semicolon (;).
+    :param encoding: File encoding.
+    :return: List of top-level expressions as strings.
+    """
+    expressions = []
+    current_expr_lines = []
+    paren_depth = 0
+
+    with open(filename, 'r', encoding=encoding) as f:
+        for raw_line in f:
+            # 1) Strip comments
+            line = raw_line.split(comment_char, 1)[0].strip()
+            if not line:
+                continue  # skip empty or all-comment lines
+
+            # 2) Scan for parentheses balance
+            for ch in line:
+                if ch == '(':
+                    paren_depth += 1
+                elif ch == ')':
+                    paren_depth -= 1
+
+            # Collect the (possibly partial) expression in a buffer
+            current_expr_lines.append(line)
+
+            # 3) Once balanced, we commit the accumulated lines
+            if paren_depth == 0:
+                expr = ' '.join(current_expr_lines)
+                expressions.append(expr)
+                current_expr_lines = []
+
+    # Optional: handle leftover unclosed parentheses if desired
+    if paren_depth != 0 and current_expr_lines:
+        # e.g. raise an error or just keep the partial expression
+        # raise ValueError("Unclosed parentheses in the last expression.")
+        pass
+
+    return expressions
+
+# I think parse_all did the following GroundingSpace bug.
+# (= (add-subst ($typecode $var)) (let* (($sp (match GroundingSpace-0x5a1ce405a438 (sp $sp) $sp)) ($entry (match GroundingSpace-0x5a1ce40adb18 ((Num $sp) $s) $s)) (($entry0 $entry1:) (decons-atom $entry))) (if (== $entry0 $typecode) (let* ((() (add-atom GroundingSpace-0x5a1ce3f66878 ($var $entry1:))) (() (update-atom GroundingSpace-0x5a1ce405a438 (sp $n) (sp (+ $n 1))))) ($var $entry1:)) (Error ((sp $sp) (entry $entry) (typecode $typecode) (var $var)) "Proof stack entry does not match floating hypothesis."))))
+# with open('mmverify-utils.metta', 'r') as f:
+#     MeTTa_Utils = f.read()
+
+# Because we run the MeTTa_Utils, we add it to the log to make it self-contained.
+# MeTTa_Utils_Exprs = metta.parse_all(MeTTa_Utils)
+
+MeTTa_Utils_Exprs = parse_metta_expressions('mmverify-utils.metta')
+print("\n\n".join(MeTTa_Utils_Exprs))
+for expr in MeTTa_Utils_Exprs:
+    mettarl(str(expr))
 
 Label = str
 Var = str
@@ -570,7 +658,7 @@ class MM:
                         '$f must have length two but is {}'.format(stmt))
                 self.add_f(stmt[0], stmt[1], label)
                 self.labels[label] = ('$f', [stmt[0], stmt[1]])
-                mettarl(f'!(add-atom &labels ( (Label {label}) FHyp ( (FSDepth {len(self.fs)}) (Typecode "{mettify(stmt[0])}") (FVar {mettify(stmt[1])}) (Type "$f") )))')
+                mettarl(f'!(add-atom &labels ( (Label {label}) FHyp ( (FSDepth {len(self.fs)}) (Typecode "{mettify(stmt[0])}") (FVar "{mettify(stmt[1])}") (Type "$f") )))')
                 label = None
             elif tok == '$e':
                 if not label:
@@ -629,12 +717,20 @@ class MM:
         if is_hypothesis(step):
             _steptype, stmt = step
             stack.append(stmt)
+            # Ok, because apply_subst just has the statement, let's try only putting that on the stack!
+            # mettarl(f'!(match &labels ((Label {label}) FHyp $d) (match-atom $d (Typecode $t) (match-atom $d (FVar $v) (add-atom &stack ((Num {len(stack) - 1}) ($t $v))))))')
+            # mettarl(f'!(match &labels ((Label {label}) EHyp $d) (match-atom $d (Statement $s) (add-atom &stack ((Num {len(stack) - 1}) $s))))')
+            mettarl(f'''!(match &labels ((Label {label}) $type $d) (case $type
+                ((FHyp (match-atom $d (Typecode $t) (match-atom $d (FVar $v) (add-atom &stack ((Num {len(stack) - 1}) ($t $v))))))
+                (EHyp (match-atom $d (Statement $s) (add-atom &stack ((Num {len(stack) - 1}) $s)))))))''')
             # This version keeps the F and EHyp checking because I'll need that for the pure-MeTTa version
-            mettarl(f'!(match &labels ((Label {label}) $type $d) (if (or (== $type FHyp) (== $type EHyp)) (add-atom &stack ( (Num {len(stack)}) (Label {label}) $type $d)) (empty)))')
+            # mettarl(f'!(match &labels ((Label {label}) $type $d) (if (or (== $type FHyp) (== $type EHyp)) (add-atom &stack ( (Num {len(stack) - 1}) (Label {label}) $type $d)) (empty)))')
             ## The fully MeTTa asserts work.  Python is faster.  Order may only work because it's in that order in MeTTa's expressions.
-            assert stmt == [x[1].strip('"') for x in (g.split() for g in re.findall(r'\(([^()]+)\)', str(metta.run(f'!(match &stack ( (Num 1) $l $t $d ) $d)')[0][0]))) if x[0] in ('Typecode', 'FVar')]
-            # assert stmt[0] == str(metta.run(f'!(match &stack ( (Num 1) $l $t $d ) (match-atom $d (Typecode $tc) $tc))')[0][0]).strip('"')
-            # assert stmt[1] == str(metta.run(f'!(match &stack ( (Num 1) $l $t $d ) (match-atom $d (FVar $fv) $fv))')[0][0])
+            mout = metta.run(f'!(match &stack ((Num {len(stack) - 1}) $stmt) $stmt)')[0]
+            assert stmt == [a or b for (a,b) in re.findall(r'"([^"]+)"|([^\s"()]+)', re.sub(r'^[\[\(]+|[\]\)]+$', '', str(mout)))], f"Stack mismatch: got {mout}, expected {stmt}"
+            # assert stmt == [x[1].strip('"') for x in (g.split() for g in re.findall(r'\(([^()]+)\)', str(metta.run(f'!(match &stack ( (Num {len(stack) - 1}) $l $t $d ) $d)')[0][0]))) if x[0] in ('Typecode', 'FVar')]
+            # assert stmt[0] == str(metta.run(f'!(match &stack ( (Num {len(stack) - 1}) $l $t $d ) (match-atom $d (Typecode $tc) $tc))')[0][0]).strip('"')
+            # assert stmt[1] == str(metta.run(f'!(match &stack ( (Num {len(stack) - 1}) $l $t $d ) (match-atom $d (FVar $fv) $fv))')[0][0])
         elif is_assertion(step):
             _steptype, assertion = step
             dvs0, f_hyps0, e_hyps0, conclusion0 = assertion
@@ -642,36 +738,33 @@ class MM:
             # assert dvs0 == metta_dvs0
             npop = len(f_hyps0) + len(e_hyps0)
             sp = len(stack) - npop
+            # Add mdvs0, mf_hyps0, me_hyps0, mconclusion0 to &wm based on the label.  #Verified sort of correct.
             mout = mettarl(f'''!(match &labels ((Label {label}) Assertion $Data)
                 (let*
                     (
                     (() (match-atom $Data (DVars $dvars) (add-atom &wm (DVars $dvars))))
-                    (() (match-atom $Data (FHyps $fhyps) (add-atom &wm (FHypse $fhyps))))
-                    (() (match-atom $Data (EHyps $ehyps) (add-atom &wm (EHypse $ehyps))))
+                    (() (match-atom $Data (FHyps $fhyps) (add-atom &wm (FHyps $fhyps))))
+                    (() (match-atom $Data (EHyps $ehyps) (add-atom &wm (EHyps $ehyps))))
                     (() (match-atom $Data (Statement $statement) (add-atom &wm (Statement $statement))))
-                    )
-                    ($dvars $fhyps $ehyps $statement)))''')[0]
-            print(mout)
-            def top_groups(s): s=s.strip()[1:-1];g=[];d=0;st=0;[(d:=d+1,st:=i if d==1 else st) if c=='(' else(d:=d-1,g.append(s[st:i+1]) if d==0 else None) if c==')' else None for i,c in enumerate(s)];return g
-            groups = top_groups(str(mout[0])); 
-            mdvs0 = set(re.findall(r'"([^"]+)"', groups[0])); 
-            mf_hyps0 = [tuple(re.findall(r'"([^"]+)"', g)) for g in top_groups(groups[1])]; 
-            me_hyps0 = [list(re.findall(r'"([^"]+)"', g)) for g in top_groups(groups[2])]            
-            mconclusion0 = re.findall(r'"([^"]+)"', groups[3])
-            print(mdvs0, mf_hyps0, me_hyps0, mconclusion0)
-            print(assertion)
-            assert dvs0 == mdvs0
-            assert f_hyps0 == mf_hyps0
-            assert e_hyps0 == me_hyps0
-            assert conclusion0 == mconclusion0
+                    ) ($dvars $fhyps $ehyps $statement)))''')[0]
+            # Verified correct!
+            # top=lambda s:(s:=s.strip()[1:-1],g:=[],d:=0,st:=0,[(d:=d+1,st:=i if d==1 else st) if c=='(' else(d:=d-1,g.append(s[st:i+1]) if d==0 else None) if c==')' else None for i,c in enumerate(s)],g)[-1]
+            # mdvs0, mf_hyps0, me_hyps0, mconclusion0 = (set(re.findall(r'"([^"]+)"', (grps:=top(str(mout[0])))[0])), [tuple(re.findall(r'"([^"]+)"', x)) for x in top(grps[1])], [list(re.findall(r'"([^"]+)"', x)) for x in top(grps[2])],  re.findall(r'"([^"]+)"', grps[3]))
+            # assert (mdvs0, mf_hyps0, me_hyps0, mconclusion0) == (dvs0, f_hyps0, e_hyps0, conclusion0), f"Mismatch in label={label}"
+            # Can't check this yet because we'd need to remove elements from the stack
+            mout = mettarl(f'''!(let*
+                (
+                    ($lf (match &wm (FHyps $fhyps) (size-atom $fhyps)))
+                    ($le (match &wm (EHyps $ehyps) (size-atom $ehyps)))
+                    ($npop (- $lf $le))
+                    ($ls (let $nums (collapse (match &stack ( (Num $n) $s ) $n)) (+ 1 (max-atom $nums))))
+                    ($sp (- $ls $npop))
+                    (() (if (< $sp 0) (Error ()"Stack underflow: proof step," {label} ", requires too many hypotheses," $npop) ()))
+                    (() (add-atom &wm (npop $npop)))
+                    (() (add-atom &wm (sp $sp)))
+                ) ($lf $le $npop $ls $sp))''')
             # print(f'stack: {stack}')
-            # mout = mettarl(f'''!(match &labels ((Label {label}) Assertion $Data)
-            #     (let*
-            #       ( ($lenf (match-atom $Data (FHyps $fhyps) (size-atom $fhyps))) 
-            #         ($lene (match-atom $Data (EHyps $ehyps) (size-atom $ehyps)))
-            #         ($npop (+ $lenf $lene))
-            #         ($slen (let $nums (collapse (let $nums (match &stack ( (Num $n) $l $t $d ) $n) $nums)) (max-atom $nums)))
-            #         ($sp   (- $slen $npop))) 
+            # old version parts:
             #         (if (< $sp 0)
             #         (let $error (format-args (Stack underflow: proof step requires too many ({{}}) hypotheses.\nData is lf: {{}} vs {len(f_hyps0)}, le: {{}} vs {len(e_hyps0)}, slen: {{}} vs {len(stack)}, sp: {{}} vs {sp} ) ($npop $lenf $lene $slen $sp) ) (Error ((Label {label}) Assertion $Data) $error))
             #         (let () (add-atom &wm (sp $sp)) ($lenf $lene $npop $slen $sp)))))''')
@@ -688,6 +781,7 @@ class MM:
                         step,
                         npop))
             subst: dict[Var, Stmt] = {}
+            mettarl(f'!(empty-space &subst)')
             for typecode, var in f_hyps0:
                 entry = stack[sp]
                 if entry[0] != typecode:
@@ -696,6 +790,8 @@ class MM:
                          "hypothesis ({}, {}).").format(entry, typecode, var))
                 subst[var] = entry[1:]
                 sp += 1
+            mout = mettarl(f'!(match &wm (FHyps $fhyps) (map-atom $fhyps $fhyp (add-subst $fhyp)))')
+            print(f'subst: {mout}')
             vprint(15, 'Substitution to apply:', subst)
             for h in e_hyps0:
                 entry = stack[sp]
@@ -715,8 +811,20 @@ class MM:
                     if x0 == y0 or not self.fs.lookup_d(x0, y0):
                         raise MMError("Disjoint variable violation: " +
                                       "{} , {}".format(x0, y0))
-            del stack[len(stack) - npop:]
-            stack.append(apply_subst(conclusion0, subst))
+            # print(f'lstack: {len(stack)}, npop: {npop}, diff: {len(stack) - npop}')
+            to_del = len(stack) - npop # formerly sp
+            del stack[to_del:]
+            mout = metta.run 
+            mettarl(f'!(match &stack ( (Num $n) $s ) (if (>= $n {to_del}) (remove-atom &stack ( (Num $n) $s )) (empty)))') # Just use Python
+            # mettarl(f'!(match &wm (sp $sp) (match &stack ( (Num $n) $s) (if (>= $n $sp) (remove-atom &stack ( (Num $n) $s )) (empty))))')
+            # print(f'freshly deleted stack: {[(f"Num {i}", stack[i]) for i in range(len(stack))]}')
+            # mstack = metta.run(f'!(match &stack $s $s)')[0]
+            # print(f'freshly deleted mstack: {mstack}')
+            mettarl(f'!(empty-space &wm)') # Empties the wm space
+            #mettarl(f'!(match &wm $x (remove-atom &wm $x))') # Empties the working memory space
+            new_conclusion = apply_subst(conclusion0, subst)
+            stack.append(new_conclusion)
+            mettarl(f'!(add-atom &stack ((Num {len(stack) - 1}) {mettify(new_conclusion)}))')
         vprint(12, 'Proof stack:', stack)
 
     def treat_normal_proof(self, proof: list[str]) -> list[Stmt]:
@@ -725,7 +833,7 @@ class MM:
         """
         stack: list[Stmt] = []
         active_hypotheses = {label for frame in self.fs for labels in (frame.f_labels, frame.e_labels) for label in labels.values()}
-        mettarl(f'''!(add-atom &wm (ActiveHyps 
+        mettarl(f'''!(add-atom &labels (ActiveHyps 
                         (collapse (let $current_depth 1 ; Example depth
                         (match &labels ((Label $L) $Type $Data)
                             (if (or (== $Type FHyp) (== $Type EHyp))
@@ -745,6 +853,12 @@ class MM:
                     self.treat_step(stmt_info, stack, label)
             else:
                 raise MMError(f"No statement information found for label {label}")
+            # print(f'stack: {[(f"Num {i}", stack[i]) for i in range(len(stack))]}')
+            # print(f'stack: {stack}')
+            # mstack = metta.run(f'!(match &stack $s $s)')[0]
+            # print(f'mstack: {mstack}')
+            # parsed_mstack = [[a or b for (a,b) in re.findall(r'"([^"]+)"|([^\s"()]+)', re.search(r'\(Num\s+\d+\)\s*\((.*)\)', str(expr)).group(1))] for expr in metta.run('!(match &stack $s $s)')[0]]
+            # assert parsed_mstack == stack, f"Mismatch in MeTTa vs. Python: {parsed_mstack} vs. {stack}"
         return stack
     
     def treat_compressed_proof(

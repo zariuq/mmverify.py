@@ -5,11 +5,32 @@
 ;;                                                                     ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(= (empty-space $space) (match $space $atom (remove-atom $space $atom)))
+
 (: match-atom (-> Expression Atom Atom %Undefined$))
 (= (match-atom $expr $pattern $rewrite)
    (if-decons-expr $expr $head $tail (let $pattern $head $rewrite) (empty)))
 (= (match-atom $expr $pattern $rewrite)
    (if-decons-expr $expr $head $tail (match-atom $tail $pattern $rewrite) (empty)))
+
+(= (update-atom $space $atom $update_pattern)
+  (match $space $atom (let () (add-atom $space $update_pattern) (remove-atom $space $atom))))
+
+(= (add-subst ($typecode $var))
+  (let*
+    (
+      ($sp (match &wm (sp $sp) $sp))
+      ($entry (match &stack ((Num $sp) $s) $s))
+      (($entry0 $entry1:) (decons-atom $entry))
+    ) (if (== $entry0 $typecode)
+        (let* 
+          (
+            (() (add-atom &subst ($var $entry1:)))
+            (() (update-atom &wm (sp $n) (sp (+ $n 1))))
+          ) ($var $entry1:))
+        (Error ( (sp $sp) (entry $entry) (typecode $typecode) (var $var) ) "Proof stack entry does not match floating hypothesis."))))
+
+; !(update-atom' &wm (sp $n) (sp (+ $n 1)))
 
 ; 2s eval time
 (= (apply_subst_tok $tok $subst)
