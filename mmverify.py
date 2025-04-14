@@ -169,7 +169,6 @@ def parse_metta_expressions(filename, comment_char=';', encoding='utf-8'):
 # MeTTa_Utils_Exprs = metta.parse_all(MeTTa_Utils)
 
 MeTTa_Utils_Exprs = parse_metta_expressions('mmverify-utils.metta')
-print("\n\n".join(MeTTa_Utils_Exprs))
 for expr in MeTTa_Utils_Exprs:
     mettarl(str(expr))
 
@@ -756,7 +755,7 @@ class MM:
                 (
                     ($lf (match &wm (FHyps $fhyps) (size-atom $fhyps)))
                     ($le (match &wm (EHyps $ehyps) (size-atom $ehyps)))
-                    ($npop (- $lf $le))
+                    ($npop (+ $lf $le))
                     ($ls (let $nums (collapse (match &stack ( (Num $n) $s ) $n)) (+ 1 (max-atom $nums))))
                     ($sp (- $ls $npop))
                     (() (if (< $sp 0) (Error ()"Stack underflow: proof step," {label} ", requires too many hypotheses," $npop) ()))
@@ -768,12 +767,12 @@ class MM:
             #         (if (< $sp 0)
             #         (let $error (format-args (Stack underflow: proof step requires too many ({{}}) hypotheses.\nData is lf: {{}} vs {len(f_hyps0)}, le: {{}} vs {len(e_hyps0)}, slen: {{}} vs {len(stack)}, sp: {{}} vs {sp} ) ($npop $lenf $lene $slen $sp) ) (Error ((Label {label}) Assertion $Data) $error))
             #         (let () (add-atom &wm (sp $sp)) ($lenf $lene $npop $slen $sp)))))''')
-            # print(assertion)
-            # print(f'label {label}, sp: {sp}, npop:{npop}, assertion: {assertion}, metta: {metta.run('!(match &wm (sp $sp) $sp)')}')
+            print(f'assertion: {assertion}')
+            print(f'label {label}, sp: {sp}, npop:{npop}, assertion: {assertion}, metta: {metta.run('!(match &wm (sp $sp) $sp)')}')
             # print(f'mout: {mout}')
             # # print(f'metta stack size: {metta.run(f'!(let $nums (collapse (let $nums (match &stack ( (Num $n) $l $t $d ) $n) $nums)) (max-atom $nums))')}')
-            # metta_sp = int(float(str(metta.run('!(match &wm (sp $sp) $sp)')[0][0])))
-            # assert sp == metta_sp
+            metta_sp = int(float(str(metta.run('!(match &wm (sp $sp) $sp)')[0][0])))
+            assert sp == metta_sp
             if sp < 0:
                 raise MMError(
                     ("Stack underflow: proof step {} requires too many " +
@@ -782,6 +781,7 @@ class MM:
                         npop))
             subst: dict[Var, Stmt] = {}
             mettarl(f'!(empty-space &subst)')
+            print(f'')
             for typecode, var in f_hyps0:
                 entry = stack[sp]
                 if entry[0] != typecode:
@@ -791,7 +791,12 @@ class MM:
                 subst[var] = entry[1:]
                 sp += 1
             mout = mettarl(f'!(match &wm (FHyps $fhyps) (map-atom $fhyps $fhyp (add-subst $fhyp)))')
-            print(f'subst: {mout}')
+            print(f'subst: {subst}')
+            print(f'msubst: {mout}')
+            for var, py_val in subst.items():
+                me_val = re.findall(r'"([^"]+)"', str(
+                    metta.run(f'!(match &subst ("{var}" $rest) $rest)')[0]))
+                assert me_val == py_val, f"{var}: {me_val} != {py_val}"
             vprint(15, 'Substitution to apply:', subst)
             for h in e_hyps0:
                 entry = stack[sp]
@@ -853,10 +858,10 @@ class MM:
                     self.treat_step(stmt_info, stack, label)
             else:
                 raise MMError(f"No statement information found for label {label}")
-            # print(f'stack: {[(f"Num {i}", stack[i]) for i in range(len(stack))]}')
+            print(f'stack: {[(f"Num {i}", stack[i]) for i in range(len(stack))]}')
             # print(f'stack: {stack}')
-            # mstack = metta.run(f'!(match &stack $s $s)')[0]
-            # print(f'mstack: {mstack}')
+            mstack = metta.run(f'!(match &stack $s $s)')[0]
+            print(f'mstack: {mstack}')
             # parsed_mstack = [[a or b for (a,b) in re.findall(r'"([^"]+)"|([^\s"()]+)', re.search(r'\(Num\s+\d+\)\s*\((.*)\)', str(expr)).group(1))] for expr in metta.run('!(match &stack $s $s)')[0]]
             # assert parsed_mstack == stack, f"Mismatch in MeTTa vs. Python: {parsed_mstack} vs. {stack}"
         return stack
