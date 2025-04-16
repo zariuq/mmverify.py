@@ -71,7 +71,7 @@ def mettify(expr) -> str:
 
 # The MeTTa 'stack' to mirror the Metamath one.
 # Now some utils reference these, so I should define them first.
-mettarl('!(bind! &consts (new-space))') # Constanst
+# mettarl('!(bind! &consts (new-space))') # Constanst
 mettarl('!(bind! &stack (new-space))') # Stack in treat_proof
 mettarl('!(bind! &frames (new-space))') # Labels
 mettarl('!(bind! &subst (new-space))') # Substitution dict
@@ -361,7 +361,7 @@ class FrameStack(list[Frame]):
                           if x != y)
         self[-1].d.update(new_dvs)
         for x, y in new_dvs:
-            mettarl(f'!(add-atom &frames (DVar ("{x}" "{y}") ( (FSDepth {len(self)}) (Type "$d") )))')
+            mettarl(f'!(unify &frames (DVar ("{x}" "{y}") $_) () (add-atom &frames (DVar ("{x}" "{y}") ( (FSDepth {len(self)}) (Type "$d") ))))')
         # if new_dvs: # Only log if there are actual pairs
             # dv_pairs_metta = " ".join(f'("{x}" "{y}")' for x, y in list(new_dvs))
             # mettarl(f'!(add-atom &frames (DVar ( (FSDepth {len(self)}) (DVars {dv_pairs_metta} ) (Type "$d") )))')
@@ -558,7 +558,7 @@ class MM:
             raise MMError(
                 'Trying to declare as a constant an active variable: {}'.format(tok))
         self.constants.add(tok)
-        mettarl(f'!(add-atom &consts ( Constant ( (Symbol "{tok}") (Type "$c") )))')
+        mettarl(f'!(add-atom &frames ( Constant "{tok}" ( (FSDepth {len(self.fs)}) (Type "$c") )))')
 
     def add_v(self, tok: Var) -> None:
         """Add a variable to the frame stack top (that is, the current frame)
@@ -570,6 +570,7 @@ class MM:
             raise MMError(
                 'var already declared as constant: {}'.format(tok))
         self.fs[-1].v.add(tok)
+        mettarl(f'!(add-atom &frames (Var "{tok}" ( (FSDepth {len(self.fs)}) (Type "$v") )))')
 
     def add_f(self, typecode: Const, var: Var, label: Label) -> None:
         """Add a floating hypothesis (ordered pair (variable, typecode)) to
@@ -705,6 +706,7 @@ class MM:
             else:
                 raise MMError("Unknown token: '{}'.".format(tok))
             tok = toks.readc()
+        mettarl(f'!(match &frames ($1 $2 $Data) (match-atom $Data (FSDepth {len(self.fs)}) (remove-atom &frames ($1 $2 $3))))')
         self.fs.pop()
 
     def treat_step(self,
