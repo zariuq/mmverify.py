@@ -32,15 +32,57 @@
 
 ; !(update-atom' &wm (sp $n) (sp (+ $n 1)))
 
-; 2s eval time
-(= (apply_subst_tok $tok $subst)
-  (case ((py-dot $subst get) $tok)
-    ((() $tok) ;; If the token ($tok) is not in the substitution-binding dictionary ($subst), keep it as is.
-    ($sub_tok $sub_tok)) ;; If the token ($tok) is in the dictionry ($subst), then return the substituted token ($sub_tok)
-  ))
+(= (to-list $expr)
+   (if (== $expr ()) Nil
+     (Cons (car-atom $expr)
+         (to-list (cdr-atom $expr)))))
 
-(= (apply_subst $stmt $subst)
-  (map-atom $stmt $tok (apply_subst_tok $tok $subst)))
+(= (to-list' $expr $tail)
+   (if (== $expr ()) $tail
+     (Cons (car-atom $expr)
+         (to-list' (cdr-atom $expr) $tail))))
+
+(= (flatten-list Nil) Nil)
+(= (flatten-list (Cons $head $tail))
+  (case (get-metatype $head)
+    ((Expression (to-list' $head (flatten-list $tail)))
+     ($_ (Cons $head (flatten-list $tail))))))
+
+; (: from-list (-> (List $a) Expression))
+(= (from-list Nil) ())
+(= (from-list (Cons $head $tail))
+   (let $tail-list (from-list $tail)
+    (cons-atom $head $tail-list)))
+
+(= (flatten-expr $expr) (from-list (flatten-list (to-list $expr))))
+
+(= (apply_subst_tok $tok)
+  (let $res (unify &subst ($tok $sub) $sub $tok) $res))
+
+(= (apply_subst $stmt)
+    (flatten-expr (map-atom $stmt $tok (apply_subst_tok $tok))))
+
+(= (check_subst $ehyp)
+  (let* 
+    (
+      ($sp (match &wm (sp $sp) $sp))
+      ($entry (match &stack ((Num $sp) $s) $s))
+      ($subst_h (apply_subst $ehyp))
+    ) (if (== $entry $subst_h)
+        (let () (update-atom &wm (sp $n) (sp (+ $n 1))) $subst_h)
+        (Error ( (sp $sp) (entry $entry) (ehyp $ehyp) (subst_h $subst_h) ) "Proof stack entry does not match essential hypothesis."))))
+
+; !(match &wm (EHyps $ehyps) (map-atom $ehyps $ehyp (check_subst $ehyp)))
+
+; 2s eval time
+; (= (apply_subst_tok $tok $subst)
+;   (case ((py-dot $subst get) $tok)
+;     ((() $tok) ;; If the token ($tok) is not in the substitution-binding dictionary ($subst), keep it as is.
+;     ($sub_tok $sub_tok)) ;; If the token ($tok) is in the dictionry ($subst), then return the substituted token ($sub_tok)
+;   ))
+
+; (= (apply_subst $stmt $subst)
+;   (map-atom $stmt $tok (apply_subst_tok $tok $subst)))
 
 ; 18s eval time
 ; (= (get-subst (Substitution $subst) $tok)

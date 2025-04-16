@@ -73,7 +73,7 @@ def mettify(expr) -> str:
 # Now some utils reference these, so I should define them first.
 mettarl('!(bind! &consts (new-space))') # Constanst
 mettarl('!(bind! &stack (new-space))') # Stack in treat_proof
-mettarl('!(bind! &labels (new-space))') # Labels
+mettarl('!(bind! &frames (new-space))') # Labels
 mettarl('!(bind! &subst (new-space))') # Substitution dict
 mettarl('!(bind! &wm (new-space))') # Working Memory (safer than &self, easier to wipe, etc.)
 
@@ -350,7 +350,7 @@ class FrameStack(list[Frame]):
         frame.e.append(stmt)
         frame.e_labels[tuple(stmt)] = label
         # conversion to tuple since dictionary keys must be hashable
-        mettarl(f'!(add-atom &labels ( (Label {mettify(label)}) EHyp ( (FSDepth {len(self)}) (ENum {len(frame.e)}) (Statement {mettify(stmt)}) (Type "$e") )))')
+        mettarl(f'!(add-atom &frames ( (Label {mettify(label)}) EHyp ( (FSDepth {len(self)}) (ENum {len(frame.e)}) (Statement {mettify(stmt)}) (Type "$e") )))')
 
     def add_d(self, varlist: list[Var]) -> None:
         """Add a disjoint variable condition (ordered pair of variables) to
@@ -360,9 +360,11 @@ class FrameStack(list[Frame]):
                           for x, y in itertools.product(varlist, varlist)
                           if x != y)
         self[-1].d.update(new_dvs)
-        if new_dvs: # Only log if there are actual pairs
-            dv_pairs_metta = " ".join(f'("{x}" "{y}")' for x, y in list(new_dvs))
-            mettarl(f'!(add-atom &labels (DVar ( (FSDepth {len(self)}) (DVars {dv_pairs_metta} ) (Type "$d") )))')
+        for x, y in new_dvs:
+            mettarl(f'!(add-atom &frames (DVar ("{x}" "{y}") ( (FSDepth {len(self)}) (Type "$d") )))')
+        # if new_dvs: # Only log if there are actual pairs
+            # dv_pairs_metta = " ".join(f'("{x}" "{y}")' for x, y in list(new_dvs))
+            # mettarl(f'!(add-atom &frames (DVar ( (FSDepth {len(self)}) (DVars {dv_pairs_metta} ) (Type "$d") )))')
 
     def lookup_v(self, tok: Var) -> bool:
         """Return whether the given token is an active variable."""
@@ -657,7 +659,7 @@ class MM:
                         '$f must have length two but is {}'.format(stmt))
                 self.add_f(stmt[0], stmt[1], label)
                 self.labels[label] = ('$f', [stmt[0], stmt[1]])
-                mettarl(f'!(add-atom &labels ( (Label {label}) FHyp ( (FSDepth {len(self.fs)}) (Typecode "{mettify(stmt[0])}") (FVar "{mettify(stmt[1])}") (Type "$f") )))')
+                mettarl(f'!(add-atom &frames ( (Label {label}) FHyp ( (FSDepth {len(self.fs)}) (Typecode "{mettify(stmt[0])}") (FVar "{mettify(stmt[1])}") (Type "$f") )))')
                 label = None
             elif tok == '$e':
                 if not label:
@@ -671,7 +673,7 @@ class MM:
                     raise MMError('$a must have label')
                 dvs, f_hyps, e_hyps, stmt = self.fs.make_assertion(self.read_non_p_stmt(tok, toks))
                 self.labels[label] = ('$a', (dvs, f_hyps, e_hyps, stmt))
-                mettarl(f'!(add-atom &labels ( (Label {label}) Assertion ( (FSDepth {len(self.fs)}) (DVars {mettify(dvs)}) (FHyps {mettify(f_hyps)}) (EHyps {mettify(e_hyps)}) (Statement {mettify(stmt)}) (Type "$a") )))')
+                mettarl(f'!(add-atom &frames ( (Label {label}) Assertion ( (FSDepth {len(self.fs)}) (DVars {mettify(dvs)}) (FHyps {mettify(f_hyps)}) (EHyps {mettify(e_hyps)}) (Statement {mettify(stmt)}) (Type "$a") )))')
                 label = None
             elif tok == '$p':
                 if not label:
@@ -682,7 +684,7 @@ class MM:
                     vprint(2, 'Verify:', label)
                     self.verify(f_hyps, e_hyps, conclusion, proof)
                 self.labels[label] = ('$p', (dvs, f_hyps, e_hyps, conclusion))
-                mettarl(f'!(add-atom &labels ( (Label {label}) Proof ( (FSDepth {len(self.fs)}) (DVars {mettify(dvs)}) (FHyps {mettify(f_hyps)}) (EHyps {mettify(e_hyps)}) (Statement {mettify(stmt)}) (Type "$p") (ProofSequence {mettify(proof)}))))')
+                mettarl(f'!(add-atom &frames ( (Label {label}) Proof ( (FSDepth {len(self.fs)}) (DVars {mettify(dvs)}) (FHyps {mettify(f_hyps)}) (EHyps {mettify(e_hyps)}) (Statement {mettify(stmt)}) (Type "$p") (ProofSequence {mettify(proof)}))))')
                 label = None
             elif tok == '$d':
                 self.fs.add_d(self.read_non_p_stmt(tok, toks))
@@ -717,13 +719,14 @@ class MM:
             _steptype, stmt = step
             stack.append(stmt)
             # Ok, because apply_subst just has the statement, let's try only putting that on the stack!
-            # mettarl(f'!(match &labels ((Label {label}) FHyp $d) (match-atom $d (Typecode $t) (match-atom $d (FVar $v) (add-atom &stack ((Num {len(stack) - 1}) ($t $v))))))')
-            # mettarl(f'!(match &labels ((Label {label}) EHyp $d) (match-atom $d (Statement $s) (add-atom &stack ((Num {len(stack) - 1}) $s))))')
-            mettarl(f'''!(match &labels ((Label {label}) $type $d) (case $type
+            # mettarl(f'!(match &frames ((Label {label}) FHyp $d) (match-atom $d (Typecode $t) (match-atom $d (FVar $v) (add-atom &stack ((Num {len(stack) - 1}) ($t $v))))))')
+            # mettarl(f'!(match &frames ((Label {label}) EHyp $d) (match-atom $d (Statement $s) (add-atom &stack ((Num {len(stack) - 1}) $s))))')
+            print(f'is_hype stack (len: {len(stack)}): {stack}')
+            mettarl(f'''!(match &frames ((Label {label}) $type $d) (case $type
                 ((FHyp (match-atom $d (Typecode $t) (match-atom $d (FVar $v) (add-atom &stack ((Num {len(stack) - 1}) ($t $v))))))
                 (EHyp (match-atom $d (Statement $s) (add-atom &stack ((Num {len(stack) - 1}) $s)))))))''')
             # This version keeps the F and EHyp checking because I'll need that for the pure-MeTTa version
-            # mettarl(f'!(match &labels ((Label {label}) $type $d) (if (or (== $type FHyp) (== $type EHyp)) (add-atom &stack ( (Num {len(stack) - 1}) (Label {label}) $type $d)) (empty)))')
+            # mettarl(f'!(match &frames ((Label {label}) $type $d) (if (or (== $type FHyp) (== $type EHyp)) (add-atom &stack ( (Num {len(stack) - 1}) (Label {label}) $type $d)) (empty)))')
             ## The fully MeTTa asserts work.  Python is faster.  Order may only work because it's in that order in MeTTa's expressions.
             mout = metta.run(f'!(match &stack ((Num {len(stack) - 1}) $stmt) $stmt)')[0]
             assert stmt == [a or b for (a,b) in re.findall(r'"([^"]+)"|([^\s"()]+)', re.sub(r'^[\[\(]+|[\]\)]+$', '', str(mout)))], f"Stack mismatch: got {mout}, expected {stmt}"
@@ -733,12 +736,12 @@ class MM:
         elif is_assertion(step):
             _steptype, assertion = step
             dvs0, f_hyps0, e_hyps0, conclusion0 = assertion
-            # metta_dvs0 = {tuple(part.strip() for part in str(t).strip('"()').split(',')) for t in metta.run(f'!(match &labels ((Label {label}) Assertion $Data) (match-atom $Data (DVars $dvs) (match-atom $dvs ($x $y) (format-args ({{}},{{}}) ($x $y)))))')[0]}
+            # metta_dvs0 = {tuple(part.strip() for part in str(t).strip('"()').split(',')) for t in metta.run(f'!(match &frames ((Label {label}) Assertion $Data) (match-atom $Data (DVars $dvs) (match-atom $dvs ($x $y) (format-args ({{}},{{}}) ($x $y)))))')[0]}
             # assert dvs0 == metta_dvs0
             npop = len(f_hyps0) + len(e_hyps0)
             sp = len(stack) - npop
             # Add mdvs0, mf_hyps0, me_hyps0, mconclusion0 to &wm based on the label.  #Verified sort of correct.
-            mout = mettarl(f'''!(match &labels ((Label {label}) Assertion $Data)
+            mout = mettarl(f'''!(match &frames ((Label {label}) Assertion $Data)
                 (let*
                     (
                     (() (match-atom $Data (DVars $dvars) (add-atom &wm (DVars $dvars))))
@@ -768,7 +771,7 @@ class MM:
             #         (let $error (format-args (Stack underflow: proof step requires too many ({{}}) hypotheses.\nData is lf: {{}} vs {len(f_hyps0)}, le: {{}} vs {len(e_hyps0)}, slen: {{}} vs {len(stack)}, sp: {{}} vs {sp} ) ($npop $lenf $lene $slen $sp) ) (Error ((Label {label}) Assertion $Data) $error))
             #         (let () (add-atom &wm (sp $sp)) ($lenf $lene $npop $slen $sp)))))''')
             print(f'assertion: {assertion}')
-            print(f'label {label}, sp: {sp}, npop:{npop}, assertion: {assertion}, metta: {metta.run('!(match &wm (sp $sp) $sp)')}')
+            print(f'label {label}, sp: {sp}, npop:{npop}, assertion: {assertion}, metta sp: {metta.run('!(match &wm (sp $sp) $sp)')}')
             # print(f'mout: {mout}')
             # # print(f'metta stack size: {metta.run(f'!(let $nums (collapse (let $nums (match &stack ( (Num $n) $l $t $d ) $n) $nums)) (max-atom $nums))')}')
             metta_sp = int(float(str(metta.run('!(match &wm (sp $sp) $sp)')[0][0])))
@@ -781,7 +784,6 @@ class MM:
                         npop))
             subst: dict[Var, Stmt] = {}
             mettarl(f'!(empty-space &subst)')
-            print(f'')
             for typecode, var in f_hyps0:
                 entry = stack[sp]
                 if entry[0] != typecode:
@@ -798,6 +800,7 @@ class MM:
                     metta.run(f'!(match &subst ("{var}" $rest) $rest)')[0]))
                 assert me_val == py_val, f"{var}: {me_val} != {py_val}"
             vprint(15, 'Substitution to apply:', subst)
+            mtest_subst = []
             for h in e_hyps0:
                 entry = stack[sp]
                 subst_h = apply_subst(h, subst)
@@ -806,7 +809,14 @@ class MM:
                                    "essential hypothesis {}.")
                                   .format(entry, subst_h))
                 sp += 1
+                mtest_subst.append(subst_h)
+            mout = mettarl(f'!(match &wm (EHyps $ehyps) (map-atom $ehyps $ehyp (check_subst $ehyp)))')
+            if mtest_subst:
+                print(f'py_subst_hs: {mtest_subst}')
+                print(f'check_susbt_hs: {mout}')
+                # TODO: test if desired... the MeTTa should be checking the equality!
             for x, y in dvs0:
+                mettarl(f'!(println "disjoint vars be here!")')
                 vprint(16, 'dist', x, y, subst[x], subst[y])
                 x_vars = self.fs.find_vars(subst[x])
                 y_vars = self.fs.find_vars(subst[y])
@@ -825,11 +835,15 @@ class MM:
             # print(f'freshly deleted stack: {[(f"Num {i}", stack[i]) for i in range(len(stack))]}')
             # mstack = metta.run(f'!(match &stack $s $s)')[0]
             # print(f'freshly deleted mstack: {mstack}')
-            mettarl(f'!(empty-space &wm)') # Empties the wm space
-            #mettarl(f'!(match &wm $x (remove-atom &wm $x))') # Empties the working memory space
             new_conclusion = apply_subst(conclusion0, subst)
             stack.append(new_conclusion)
-            mettarl(f'!(add-atom &stack ((Num {len(stack) - 1}) {mettify(new_conclusion)}))')
+            mout = mettarl(f'!(let $new_conclusion (match &wm (Statement $stmt) (apply_subst $stmt)) (let () (add-atom &stack ((Num {len(stack) - 1}) $new_conclusion)) $new_conclusion))')
+            print(f'new_conclusion: {new_conclusion}')
+            print(f'mnew_conclusion: {mout}')
+            assert new_conclusion == [a or b for (a,b) in re.findall(r'"([^"]+)"|([^\s"()]+)', str(mout[0][0]))], "Mismatch in new_conclusion"
+            # mettarl(f'!(add-atom &stack ((Num {len(stack) - 1}) {mettify(new_conclusion)}))')
+            mettarl(f'!(empty-space &wm)') # Empties the wm space
+            #mettarl(f'!(match &wm $x (remove-atom &wm $x))') # Empties the working memory space
         vprint(12, 'Proof stack:', stack)
 
     def treat_normal_proof(self, proof: list[str]) -> list[Stmt]:
@@ -838,9 +852,9 @@ class MM:
         """
         stack: list[Stmt] = []
         active_hypotheses = {label for frame in self.fs for labels in (frame.f_labels, frame.e_labels) for label in labels.values()}
-        mettarl(f'''!(add-atom &labels (ActiveHyps 
+        mettarl(f'''!(add-atom &frames (ActiveHyps 
                         (collapse (let $current_depth 1 ; Example depth
-                        (match &labels ((Label $L) $Type $Data)
+                        (match &frames ((Label $L) $Type $Data)
                             (if (or (== $Type FHyp) (== $Type EHyp))
                                 (match-atom $Data (FSDepth $D)
                                     (if (<= $D $current_depth) $L (empty)))
@@ -961,6 +975,7 @@ class MM:
             raise MMError(("Stack entry {} does not match proved " +
                           " assertion {}.").format(stack[0], conclusion))
         vprint(3, 'Correct proof!')
+        mettarl(f'!(empty-space &stack)')
 
     def dump(self) -> None:
         """Print the labels of the database."""
