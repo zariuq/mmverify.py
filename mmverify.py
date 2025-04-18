@@ -724,20 +724,23 @@ class MM:
             for x, y in dvs0:
                 mettarl(f'!(println "disjoint vars be here!")')
                 ## do the check first to raise the error :D
-                mout = mettarl(f'''!(let ($x_vars $y_vars)
-                    (match &wm (DVars $dvs0) 
-                        (map-atom $dvs0 $d 
-                        (let ($d1 $d2) $d 
+                mout = mettarl(f'''!(match &wm (DVars $dvs0) 
+                    (map-atom $dvs0 $d 
+                        (let ($d1 $d2) $d ;; the for x, y in dvs0
+                        (let ($x_vars $y_vars)
                             (match &subst ($d1 $sub1) 
                             (match &subst ($d2 $sub2) 
-                                ((find_vars $sub1) (find_vars $sub2)))))))
-                    (map-pairs $x_vars $_yvars dv_check))''')
+                                ((find_vars $sub1) (find_vars $sub2)))) 
+                        (map-pairs $x_vars $y_vars dv_check)))))''')
                 print(f'DV Check: {mout}')
                 vprint(16, 'dist', x, y, subst[x], subst[y])
                 x_vars = self.fs.find_vars(subst[x])
                 y_vars = self.fs.find_vars(subst[y])
                 vprint(16, 'V(x) =', x_vars)
                 vprint(16, 'V(y) =', y_vars)
+                print(f'dis:, {x}, {y}, subst: {subst[x]}, {subst[y]}')
+                print(f'V(x) = {x_vars}')
+                print(f'V(y) = {y_vars}')
                 for x0, y0 in itertools.product(x_vars, y_vars):
                     if x0 == y0 or not self.fs.lookup_d(x0, y0):
                         raise MMError("Disjoint variable violation: " +

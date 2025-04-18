@@ -91,9 +91,7 @@
         (== $x $y)
         (not (lookup_d $x $y)))
       (Error ($x $y) "Disjoint variable violation.")
-      (empty)))
-
-
+      ()))
 
 ; !(match &wm (EHyps $ehyps) (map-atom $ehyps $ehyp (check_subst $ehyp)))
 
