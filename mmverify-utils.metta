@@ -72,6 +72,29 @@
         (let () (update-atom &wm (sp $n) (sp (+ $n 1))) $subst_h)
         (Error ( (sp $sp) (entry $entry) (ehyp $ehyp) (subst_h $subst_h) ) "Proof stack entry does not match essential hypothesis."))))
 
+;; DV check
+(= (map-pairs $list1 $list2 $fn)
+   (map-atom $list1 $v1
+     (map-atom $list2 $v2
+       ($fn $v1 $v2))))
+
+(= (find_vars $stmt)
+  (filter-atom $stmt $tok (unify &frames (Var $tok $_) True False)))
+
+(= (orient_pair $x $y)
+   (((py-atom min) $x $y) ((py-atom max) $x $y))) 
+
+(= (lookup_d $x $y) (let ($x' $y') (orient_pair $x $y) (unify &frames (DVar ($x' $y') $_) True False)))
+
+(= (dv_check $x $y)
+  (if (or
+        (== $x $y)
+        (not (lookup_d $x $y)))
+      (Error ($x $y) "Disjoint variable violation.")
+      (empty)))
+
+
+
 ; !(match &wm (EHyps $ehyps) (map-atom $ehyps $ehyp (check_subst $ehyp)))
 
 ; 2s eval time

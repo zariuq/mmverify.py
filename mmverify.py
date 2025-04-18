@@ -423,102 +423,6 @@ class FrameStack(list[Frame]):
         vprint(18, 'Make assertion:', assertion)
         return assertion
 
-def metta_apply_subst(stmt: list[str], subst: dict[str, list[str]]) -> list[str]:
-    """
-    Calls the MeTTa-side apply_subst function to do the rewriting in MeTTa,
-    then parses the result back into Python tokens.
-    """
-
-    # 1. Convert 'stmt' to a MeTTa tuple of quoted tokens,
-    #    e.g.  ( "wff" "(" "P" "->" "Q" ")" )
-    stmt_metta = " ".join(f'"{t}"' for t in stmt)
-    stmt_expr = f'( {stmt_metta} )'
-
-    # 2. Convert 'subst' to a (Substitution (("var" ("token1" "token2" ...))...))
-    # -- Updated to store singletons as "tok" instead of ( "tok" ).
-    #    e.g.  (Substitution (("P" ( "(" "t" "+" "0" ")" "=" "t" )) ("Q" ( "t" "=" "t" ))))
-    dict_items = []
-    for k, expansions in subst.items():
-        if len(expansions) == 1:
-            dict_items.append(f'("{k}" "{expansions[0]}")')
-        else:
-            expansions_str = " ".join(f'"{tok}"' for tok in expansions)
-            dict_items.append(f'("{k}" ( {expansions_str} ))')
-    if dict_items:
-        dict_str = " ".join(dict_items)
-        subst_expr = f'(py-dict ({dict_str}))'
-    else:
-        subst_expr = '(py-dict ())'
-    # if dict_items:
-    #     dict_str = " ".join(dict_items)
-    #     subst_expr = f'(Substitution ({dict_str}))'
-    # else:
-    #     subst_expr = '(Substitution ())'
-
-    # 3. Build the entire MeTTa call to "apply_subst"
-    #    We'll do an exclamation "!" to evaluate it and get the final output.
-    metta_code = f'!(apply_subst {stmt_expr} {subst_expr})'
-
-    # 4. Run the code in MeTTa
-    result = mettarl(metta_code)
-
-    # The 'result' is typically a list-of-lists. For example:
-    #   [[("wff" "(" ("(" "t" "+" "0" ")" "=" "t") "->" ("t" "=" "t") ")")]]
-    # We want to parse out the tokens. Usually the top-level is a 2D structure:
-    #   [ [... the actual expression ...] ].
-    # So let's see if we can convert it to a Python list of strings.
-
-    if not result:
-        # If no result or something weird, return empty
-        return []
-
-    # 'result' might look like:
-    # [[("wff" "(" ("(" "t" "+" "0" ")" "=" "t") "->" ("t" "=" "t") ")")]]
-
-    vprint(99, 'MeTTa Substitution result', result, 'code', metta_code)
-    # The easiest is to do a small helper that descends the structure you get:
-    py_list = _extract_tokens(result[0][0])  # might be a tuple ExpressionAtom
-    return py_list
-
-LIST_OF_QUOTED = re.compile(r'^\(\s*(?:"[^"]+"\s*)+\)$')
-
-def _extract_tokens(expr):
-    """
-    Flatten a MeTTa ExpressionAtom by calling expr.iterate(),
-    each child is turned into a string, then we do a small
-    regex check to see if it is:
-      - A parenthesized list of quotes, e.g. ("t" "0")
-      - A single quoted token, e.g. "t"
-      - Otherwise we keep the raw string.
-    """
-    # If 'expr' doesn't have iterate(), fallback to str(expr).
-    try:
-        children = expr.iterate()
-    except AttributeError:
-        return [str(expr)]
-
-    tokens = []
-    for child in children:
-        s = str(child).strip()
-
-        # 1. If s looks like ("foo" "bar"), let's parse them out with a regex
-        #    so ("t") => ["t"], ("t" "0") => ["t","0"]
-        if LIST_OF_QUOTED.match(s):
-            # Extract everything inside ( ... ) then find all "..."
-            inside = s[1:-1].strip()   # remove outer parentheses
-            found = re.findall(r'"([^"]+)"', inside)
-            if found:
-                tokens.extend(found)
-                continue
-
-        # 2. If it's exactly "something", remove the outer quotes
-        if len(s) >= 2 and s[0] == '"' and s[-1] == '"':
-            s = s[1:-1]
-
-        tokens.append(s)
-
-    return tokens
-
 def apply_subst(stmt: Stmt, subst: dict[Var, Stmt]) -> Stmt:
     """Return the token list resulting from the given substitution
     (dictionary) applied to the given statement (token list).
@@ -819,6 +723,16 @@ class MM:
                 # TODO: test if desired... the MeTTa should be checking the equality!
             for x, y in dvs0:
                 mettarl(f'!(println "disjoint vars be here!")')
+                ## do the check first to raise the error :D
+                mout = mettarl(f'''!(let ($x_vars $y_vars)
+                    (match &wm (DVars $dvs0) 
+                        (map-atom $dvs0 $d 
+                        (let ($d1 $d2) $d 
+                            (match &subst ($d1 $sub1) 
+                            (match &subst ($d2 $sub2) 
+                                ((find_vars $sub1) (find_vars $sub2)))))))
+                    (map-pairs $x_vars $_yvars dv_check))''')
+                print(f'DV Check: {mout}')
                 vprint(16, 'dist', x, y, subst[x], subst[y])
                 x_vars = self.fs.find_vars(subst[x])
                 y_vars = self.fs.find_vars(subst[y])
