@@ -93,71 +93,56 @@
       (Error ($x $y) "Disjoint variable violation.")
       ()))
 
-; !(match &wm (EHyps $ehyps) (map-atom $ehyps $ehyp (check_subst $ehyp)))
+(= (check_dvs $dvs0)
+    (map-atom $dvs0 $d 
+      (let ($d1 $d2) $d ;; the for x, y in dvs0
+      (let ($x_vars $y_vars)
+          (match &subst ($d1 $sub1) 
+          (match &subst ($d2 $sub2) 
+              ((find_vars $sub1) (find_vars $sub2)))) 
+      (map-pairs $x_vars $y_vars dv_check)))))
 
-; 2s eval time
-; (= (apply_subst_tok $tok $subst)
-;   (case ((py-dot $subst get) $tok)
-;     ((() $tok) ;; If the token ($tok) is not in the substitution-binding dictionary ($subst), keep it as is.
-;     ($sub_tok $sub_tok)) ;; If the token ($tok) is in the dictionry ($subst), then return the substituted token ($sub_tok)
-;   ))
+;; treat_step outputs non-deterministically ## To debug
+(= (treat_assertion $label $Data)
+    (let*
+      (
+        (() (match-atom $Data (DVars $dvars) (add-atom &wm (DVars $dvars))))
+        (() (match-atom $Data (FHyps $fhyps) (add-atom &wm (FHyps $fhyps))))
+        (() (match-atom $Data (EHyps $ehyps) (add-atom &wm (EHyps $ehyps))))
+        (() (match-atom $Data (Statement $statement) (add-atom &wm (Statement $statement))))
+        ($lf (match &wm (FHyps $fhyps) (size-atom $fhyps)))
+        ($le (match &wm (EHyps $ehyps) (size-atom $ehyps)))
+        ($npop (+ $lf $le))
+        ($ls (let $nums (collapse (match &stack ( (Num $n) $s ) $n)) (+ 1 (max-atom $nums))))
+        ($sp (- $ls $npop))
+        (() (println! ($ls $npop $sp)))
+        (() (if (< $sp 0) (Error ()"Stack underflow: proof step," {label} ", requires too many hypotheses," $npop) ()))
+        (() (add-atom &wm (npop $npop)))
+        (() (add-atom &wm (sp $sp)))
+        (() (empty-space &subst))
+        ($_subst_list (match &wm (FHyps $fhyps) (map-atom $fhyps $fhyp (add-subst $fhyp))))
+        (() (println! $_subst_list))
+        ($_empty_return_values1 (match &wm (EHyps $ehyps) (map-atom $ehyps $ehyp (check_subst $ehyp)))) ;; Not sure how to match [() () ()], lol
+        ($_empty_return_values2 (match &wm (DVars $dvs0) (check_dvs $dvs0)))
+        (() (match &stack ( (Num $n) $s ) (if (>= $n $sp) (remove-atom &stack ( (Num $n) $s )) (empty))))
+        ($new_conclusion (let $new_conclusion (match &wm (Statement $stmt) (apply_subst $stmt)) (let () (add-atom &stack ((Num $sp) $new_conclusion)) $new_conclusion)))
+        ; ($new_conclusion (match &wm (Statement $stmt) (apply_subst $stmt)) (let () (add-atom &stack ((Num $sp) $new_conclusion)))) ;; These testing returns will be dropped sooner or later, yo
+        (() (println! $new_conclusion))
+        (() (empty-space &wm))
+      ) ())) ;;($dvars $fhyps $ehyps $statement $lf $le $npop $ls $sp $_subst_list $new_conclusion)))
 
-; (= (apply_subst $stmt $subst)
-;   (map-atom $stmt $tok (apply_subst_tok $tok $subst)))
-
-; 18s eval time
-; (= (get-subst (Substitution $subst) $tok)
-;   (let ($key $value) (superpose $subst) (if (== $key $tok) $value Empty)))
-
-; (= (apply_subst_tok $subst $tok)
-;   (case (get-subst $subst $tok)
-;     (( Empty $tok )
-;      ( $sub $sub ))))
-
-; (= (apply_subst $stmt $subst)
-;   (map-atom $stmt $tok (apply_subst_tok $subst $tok)))
-
-; 16s eval time
-;; Somehow broken with both types.  And with none.
-; AssertionError: Metta-Py Mismatch! ['term', '0'] != ['get-subst', '{}', 'term', 'get-subst', '{}', '0']
-; (: match-atom (-> Expression $a $a $a))
-; (: match-atom (-> Expression Atom Atom %Undefined$))
-; (= (match-atom $expr $pattern $rewrite)
-;    (if-decons-expr $expr $head $tail (let $pattern $head $rewrite) (empty)))
-; (= (match-atom $expr $pattern $rewrite)
-;    (if-decons-expr $expr $head $tail (match-atom $tail $pattern $rewrite) (empty)))
-
-; (= (get-subst (Substitution $subst) $tok)
-;    (match-atom $subst ($tok $sub) $sub))
-
-; (= (apply_subst_tok $subst $tok)
-;   (case (get-subst $subst $tok)
-;     (( Empty $tok )
-;      ( $sub $sub ))))
-
-; (= (apply_subst $stmt $subst)
-;   (map-atom $stmt $tok (apply_subst_tok $subst $tok)))
-
-;; 19s
-; (: match' (-> (List Atom) $a $a $a))
-; (= (match' Nil $pattern $rewrite) (empty))
-; (= (match' (Cons $head $tail) $pattern $rewrite) (let $pattern $head $rewrite))
-; (= (match' (Cons $head $tail) $pattern $rewrite) (match' $tail $pattern $rewrite))
-
-; (= (to-list $expr)
-;    (if (== $expr ()) Nil
-;      (Cons (car-atom $expr)
-;          (to-list (cdr-atom $expr)))
-;    )
-; )
-
-; (= (get-subst (Substitution $subst) $tok)
-;    (match' (to-list $subst) ($tok $sub) $sub))
-
-; (= (apply_subst_tok $subst $tok)
-;   (case (get-subst $subst $tok)
-;     (( Empty $tok )
-;      ( $sub $sub ))))
-
-; (= (apply_subst $stmt $subst)
-;   (map-atom $stmt $tok (apply_subst_tok $subst $tok)))
+(= (treat_step $label) 
+    (let*
+      (
+        (($Type $Data) (match &frames ((Label $label) $Type $Data) ($Type $Data)))
+        ($stack_len (let $nums (collapse (match &stack ( (Num $n) $s ) $n)) (+ 1 (max-atom $nums)))) ;; Stack length is used in all cases.
+        (() (println! ($Data)))
+      )
+      (case $Type
+        (
+          (FHyp (match-atom $Data (Typecode $t) (match-atom $Data (FVar $v) (add-atom &stack ((Num $stack_len) ($t $v)))))) 
+          (EHyp (match-atom $Data (Statement $s) (add-atom &stack ((Num $stack_len}) $s))))
+          (Assertion (treat_assertion $label $Data))
+          (Proof (treat_assertion $label $Data))
+        ))
+      ))

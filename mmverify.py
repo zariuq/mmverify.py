@@ -474,7 +474,7 @@ class MM:
             raise MMError(
                 'var already declared as constant: {}'.format(tok))
         self.fs[-1].v.add(tok)
-        mettarl(f'!(add-atom &frames (Var "{tok}" ( (FSDepth {len(self.fs)}) (Type "$v") )))')
+        mettarl(f'!(add-atom &frames ( Var "{tok}" ( (FSDepth {len(self.fs)}) (Type "$v") )))')
 
     def add_f(self, typecode: Const, var: Var, label: Label) -> None:
         """Add a floating hypothesis (ordered pair (variable, typecode)) to
@@ -613,6 +613,9 @@ class MM:
         mettarl(f'!(match &frames ($1 $2 $Data) (match-atom $Data (FSDepth {len(self.fs)}) (remove-atom &frames ($1 $2 $3))))')
         self.fs.pop()
 
+# (= (treat_step $label) 
+#     ())
+
     def treat_step(self,
                    step: FullStmt,
                    stack: list[Stmt],
@@ -620,7 +623,7 @@ class MM:
         """Carry out the given proof step (given the label to treat and the
         current proof stack).  This modifies the given stack in place.
         """
-        vprint(10, 'Proof step:', step)
+        vprint(10, 'Proof  step:', step)
         if is_hypothesis(step):
             _steptype, stmt = step
             stack.append(stmt)
@@ -724,14 +727,15 @@ class MM:
             for x, y in dvs0:
                 mettarl(f'!(println "disjoint vars be here!")')
                 ## do the check first to raise the error :D
-                mout = mettarl(f'''!(match &wm (DVars $dvs0) 
-                    (map-atom $dvs0 $d 
-                        (let ($d1 $d2) $d ;; the for x, y in dvs0
-                        (let ($x_vars $y_vars)
-                            (match &subst ($d1 $sub1) 
-                            (match &subst ($d2 $sub2) 
-                                ((find_vars $sub1) (find_vars $sub2)))) 
-                        (map-pairs $x_vars $y_vars dv_check)))))''')
+                mout = mettarl(f'!(match &wm (DVars $dvs0) (check_dvs $dvs0))')
+                # mout = mettarl(f'''!(match &wm (DVars $dvs0) 
+                #     (map-atom $dvs0 $d 
+                #         (let ($d1 $d2) $d ;; the for x, y in dvs0
+                #         (let ($x_vars $y_vars)
+                #             (match &subst ($d1 $sub1) 
+                #             (match &subst ($d2 $sub2) 
+                #                 ((find_vars $sub1) (find_vars $sub2)))) 
+                #         (map-pairs $x_vars $y_vars dv_check)))))''')
                 print(f'DV Check: {mout}')
                 vprint(16, 'dist', x, y, subst[x], subst[y])
                 x_vars = self.fs.find_vars(subst[x])
