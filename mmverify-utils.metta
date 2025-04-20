@@ -5,7 +5,14 @@
 ;;                                                                     ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(= (empty-space $space) (match $space $atom (remove-atom $space $atom)))
+; (= (empty-space $space) (match $space $atom (remove-atom $space $atom)))
+; (= (empty-space2 $space) (unify $space $atom (remove-atom $space $atom) ())) ;; Doesn't work at all
+(= (empty-space $space) (unique (case (match $space $atom (remove-atom $space $atom)) ( (Empty () ) ( () () ) ))))
+
+(= (remove_from_stack $stack_ptr $stack_len)
+  (if (> $stack_len $stack_ptr)
+    (let () (match &stack ( (Num $stack_ptr) $s ) (remove-atom &stack ( (Num $stack_ptr) $s ))) (remove_from_stack (+ 1 $stack_ptr) $stack_len))
+    ()))
 
 (: match-atom (-> Expression Atom Atom %Undefined$))
 (= (match-atom $expr $pattern $rewrite)
@@ -103,7 +110,7 @@
       (map-pairs $x_vars $y_vars dv_check)))))
 
 ;; treat_step outputs non-deterministically ## To debug
-(= (treat_assertion $label $Data)
+(= (treat_assertion $label $Data $stack_len)
     (let*
       (
         (() (match-atom $Data (DVars $dvars) (add-atom &wm (DVars $dvars))))
@@ -113,36 +120,49 @@
         ($lf (match &wm (FHyps $fhyps) (size-atom $fhyps)))
         ($le (match &wm (EHyps $ehyps) (size-atom $ehyps)))
         ($npop (+ $lf $le))
-        ($ls (let $nums (collapse (match &stack ( (Num $n) $s ) $n)) (+ 1 (max-atom $nums))))
-        ($sp (- $ls $npop))
-        (() (println! ($ls $npop $sp)))
-        (() (if (< $sp 0) (Error ()"Stack underflow: proof step," {label} ", requires too many hypotheses," $npop) ()))
+        ; ($ls (case (collapse (match &stack ( (Num $n) $s ) $n)) ( ( () 0 ) ( $nums (+ 1 (max-atom $nums))) ))) 
+        ($sp (- $stack_len $npop))
+        (() (println! (stack_len: $stack_len , npop: $npop , sp: $sp , if_comp: (< $sp 0))))
+        (() (if (< $sp 0) (Error ((label $label) (npop $npop)) "Stack underflow: proof step requires too many hypotheses") ()))
+        (() (println! "Eval test 1"))
         (() (add-atom &wm (npop $npop)))
+        (() (println! "Eval test 2"))
         (() (add-atom &wm (sp $sp)))
+        (() (println! "Eval test 3"))
         (() (empty-space &subst))
+        (() (println! "Eval test 4"))
         ($_subst_list (match &wm (FHyps $fhyps) (map-atom $fhyps $fhyp (add-subst $fhyp))))
-        (() (println! $_subst_list))
+        (() (println! "Eval test 5"))
+        (() (println! (substs: $_subst_list)))
         ($_empty_return_values1 (match &wm (EHyps $ehyps) (map-atom $ehyps $ehyp (check_subst $ehyp)))) ;; Not sure how to match [() () ()], lol
+        (() (println! "Eval test 6"))
         ($_empty_return_values2 (match &wm (DVars $dvs0) (check_dvs $dvs0)))
-        (() (match &stack ( (Num $n) $s ) (if (>= $n $sp) (remove-atom &stack ( (Num $n) $s )) (empty))))
+        (() (println! (check_dvs: $_empty_return_values2)))
+        (() (println! "Eval test 7"))
+        ; (() (remove_from_stack $sp $stack_len)) ;; This version seems slower than the one with unique.
+        (() (unique (match &stack ( (Num $n) $s ) (if (>= $n $sp) (remove-atom &stack ( (Num $n) $s )) ())))) ;; I think this is the line introducing weird non-determinism in, lol, which order to remove the stack entries?
+        (() (println! "Eval test 8"))
         ($new_conclusion (let $new_conclusion (match &wm (Statement $stmt) (apply_subst $stmt)) (let () (add-atom &stack ((Num $sp) $new_conclusion)) $new_conclusion)))
-        ; ($new_conclusion (match &wm (Statement $stmt) (apply_subst $stmt)) (let () (add-atom &stack ((Num $sp) $new_conclusion)))) ;; These testing returns will be dropped sooner or later, yo
-        (() (println! $new_conclusion))
+        (() (println! (new_conclusion: $new_conclusion)))
         (() (empty-space &wm))
-      ) ())) ;;($dvars $fhyps $ehyps $statement $lf $le $npop $ls $sp $_subst_list $new_conclusion)))
+      ) ())) ;;($dvars $fhyps $ehyps $statement $lf $le $npop $stack_len $sp $_subst_list $new_conclusion)))
 
 (= (treat_step $label) 
     (let*
       (
+        (() (println! (»»» treating label $label)))
         (($Type $Data) (match &frames ((Label $label) $Type $Data) ($Type $Data)))
-        ($stack_len (let $nums (collapse (match &stack ( (Num $n) $s ) $n)) (+ 1 (max-atom $nums)))) ;; Stack length is used in all cases.
-        (() (println! ($Data)))
+        ($stack_len (case (collapse (match &stack ( (Num $n) $s ) $n)) ( ( () 0 ) ( $nums (+ 1 (max-atom $nums))) ))) ;; Stack length is used in all cases.
+        (() (println! ($label data: $Data)))
       )
       (case $Type
         (
           (FHyp (match-atom $Data (Typecode $t) (match-atom $Data (FVar $v) (add-atom &stack ((Num $stack_len) ($t $v)))))) 
           (EHyp (match-atom $Data (Statement $s) (add-atom &stack ((Num $stack_len}) $s))))
-          (Assertion (treat_assertion $label $Data))
-          (Proof (treat_assertion $label $Data))
+          (Assertion (treat_assertion $label $Data $stack_len))
+          (Proof (treat_assertion $label $Data $stack_len))
         ))
       ))
+
+
+      

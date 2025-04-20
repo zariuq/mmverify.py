@@ -610,13 +610,68 @@ class MM:
             else:
                 raise MMError("Unknown token: '{}'.".format(tok))
             tok = toks.readc()
-        mettarl(f'!(match &frames ($1 $2 $Data) (match-atom $Data (FSDepth {len(self.fs)}) (remove-atom &frames ($1 $2 $3))))')
+        mettarl(f'!(match &frames ($1 $2 $Data) (match-atom $Data (FSDepth {len(self.fs)}) (remove-atom &frames ($1 $2 $Data))))')
         self.fs.pop()
 
 # (= (treat_step $label) 
 #     ())
 
+
     def treat_step(self,
+                   step: FullStmt,
+                   stack: list[Stmt],
+                   label: Optional[Label] = None) -> None:
+        """Carry out the given proof step (given the label to treat and the
+        current proof stack).  This modifies the given stack in place.
+        """
+        vprint(10, 'Proof step:', step)
+        if is_hypothesis(step):
+            _steptype, stmt = step
+            stack.append(stmt)
+        elif is_assertion(step):
+            _steptype, assertion = step
+            dvs0, f_hyps0, e_hyps0, conclusion0 = assertion
+            npop = len(f_hyps0) + len(e_hyps0)
+            sp = len(stack) - npop
+            if sp < 0:
+                raise MMError(
+                    ("Stack underflow: proof step {} requires too many " +
+                     "({}) hypotheses.").format(
+                        step,
+                        npop))
+            subst: dict[Var, Stmt] = {}
+            for typecode, var in f_hyps0:
+                entry = stack[sp]
+                if entry[0] != typecode:
+                    raise MMError(
+                        ("Proof stack entry {} does not match floating " +
+                         "hypothesis ({}, {}).").format(entry, typecode, var))
+                subst[var] = entry[1:]
+                sp += 1
+            vprint(15, 'Substitution to apply:', subst)
+            for h in e_hyps0:
+                entry = stack[sp]
+                subst_h = apply_subst(h, subst)
+                if entry != subst_h:
+                    raise MMError(("Proof stack entry {} does not match " +
+                                   "essential hypothesis {}.")
+                                  .format(entry, subst_h))
+                sp += 1
+            for x, y in dvs0:
+                vprint(16, 'dist', x, y, subst[x], subst[y])
+                x_vars = self.fs.find_vars(subst[x])
+                y_vars = self.fs.find_vars(subst[y])
+                vprint(16, 'V(x) =', x_vars)
+                vprint(16, 'V(y) =', y_vars)
+                for x0, y0 in itertools.product(x_vars, y_vars):
+                    if x0 == y0 or not self.fs.lookup_d(x0, y0):
+                        raise MMError("Disjoint variable violation: " +
+                                      "{} , {}".format(x0, y0))
+            del stack[len(stack) - npop:]
+            stack.append(apply_subst(conclusion0, subst))
+        vprint(12, 'Proof stack:', stack)
+
+    def mtreat_step(self,
                    step: FullStmt,
                    stack: list[Stmt],
                    label: Optional[Label] = None) -> None:
@@ -769,32 +824,44 @@ class MM:
             #mettarl(f'!(match &wm $x (remove-atom &wm $x))') # Empties the working memory space
         vprint(12, 'Proof stack:', stack)
 
+# Uh, fuck, lol, "Example depth" -- fuck you AI Assistants.
+# frame in self.fs actually just means "for all frames", right?
+# Which in MeTTa just means we don't need to worry about it!
+# !(union (match &frames ((Label $label) FHyp $Data) $label) (match &frames ((Label $label) EHyp $Data) $label))
+# (= (treat_normal_proof $proof))
+
     def treat_normal_proof(self, proof: list[str]) -> list[Stmt]:
         """Return the proof stack once the given normal proof has been
         processed.
         """
         stack: list[Stmt] = []
         active_hypotheses = {label for frame in self.fs for labels in (frame.f_labels, frame.e_labels) for label in labels.values()}
-        mettarl(f'''!(add-atom &frames (ActiveHyps 
-                        (collapse (let $current_depth 1 ; Example depth
-                        (match &frames ((Label $L) $Type $Data)
-                            (if (or (== $Type FHyp) (== $Type EHyp))
-                                (match-atom $Data (FSDepth $D)
-                                    (if (<= $D $current_depth) $L (empty)))
-                                (empty) ))))))''')
+        mout = mettarl(f'!(union (match &frames ((Label $label) FHyp $Data) $label) (match &frames ((Label $label) EHyp $Data) $label))')
+        print(f'active_hypotheses = {active_hypotheses}')
+        print(f'mactive_hypotheses = {mout}')
+        # mettarl(f'''!(add-atom &frames (ActiveHyps 
+        #                 (collapse (let $current_depth 1 ; Example depth
+        #                 (match &frames ((Label $L) $Type $Data)
+        #                     (if (or (== $Type FHyp) (== $Type EHyp))
+        #                         (match-atom $Data (FSDepth $D)
+        #                             (if (<= $D $current_depth) $L (empty)))
+        #                         (empty) ))))))''')
         for label in proof:
+            # Moving this before the Python to catch DV checks before it throws an error!
+            # mout = mettarl(f'!(treat_step {label})')
+            # print(f'treat_step mout: {mout}')
             stmt_info = self.labels.get(label)
             if stmt_info:
                 label_type = stmt_info[0]
                 if label_type in {'$e', '$f'}:
                     if label in active_hypotheses:
-                        self.treat_step(stmt_info, stack, label)
+                        self.mtreat_step(stmt_info, stack, label)
                     else:
                         raise MMError(f"The label {label} is the label of a nonactive hypothesis.")
                 else:
-                    self.treat_step(stmt_info, stack, label)
+                    self.mtreat_step(stmt_info, stack, label)
             else:
-                raise MMError(f"No statement information found for label {label}")
+                raise MMError(f"No statement information found for label {label}")            
             print(f'stack: {[(f"Num {i}", stack[i]) for i in range(len(stack))]}')
             # print(f'stack: {stack}')
             mstack = metta.run(f'!(match &stack $s $s)')[0]
@@ -867,6 +934,11 @@ class MM:
                      (set(), [], [], stmt)),
                     stack)
         return stack
+
+## So treat_normal_proof is only called once.
+## Its argument is the "proof"
+
+# (= (treat_normal_proof $proof))
 
     def verify(
             self,
