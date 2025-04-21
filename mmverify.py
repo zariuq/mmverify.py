@@ -462,7 +462,8 @@ class MM:
             raise MMError(
                 'Trying to declare as a constant an active variable: {}'.format(tok))
         self.constants.add(tok)
-        mettarl(f'!(add-atom &frames ( Constant "{tok}" ( (FSDepth {len(self.fs)}) (Type "$c") )))')
+        # mettarl(f'!(add-atom &frames ( Constant "{tok}" ( (FSDepth {len(self.fs)}) (Type "$c") )))')
+        mettarl(f' !(add-atom &frames ( Constant "{tok}" (Type "$c") ))')
 
     def add_v(self, tok: Var) -> None:
         """Add a variable to the frame stack top (that is, the current frame)
@@ -578,7 +579,7 @@ class MM:
                     raise MMError('$a must have label')
                 dvs, f_hyps, e_hyps, stmt = self.fs.make_assertion(self.read_non_p_stmt(tok, toks))
                 self.labels[label] = ('$a', (dvs, f_hyps, e_hyps, stmt))
-                mettarl(f'!(add-atom &frames ( (Label {label}) Assertion ( (FSDepth {len(self.fs)}) (DVars {mettify(dvs)}) (FHyps {mettify(f_hyps)}) (EHyps {mettify(e_hyps)}) (Statement {mettify(stmt)}) (Type "$a") )))')
+                mettarl(f'!(add-atom &frames ( (Label {label}) Assertion ( (DVars {mettify(dvs)}) (FHyps {mettify(f_hyps)}) (EHyps {mettify(e_hyps)}) (Statement {mettify(stmt)}) (Type "$a") )))')
                 label = None
             elif tok == '$p':
                 if not label:
@@ -589,7 +590,7 @@ class MM:
                     vprint(2, 'Verify:', label)
                     self.verify(f_hyps, e_hyps, conclusion, proof)
                 self.labels[label] = ('$p', (dvs, f_hyps, e_hyps, conclusion))
-                mettarl(f'!(add-atom &frames ( (Label {label}) Proof ( (FSDepth {len(self.fs)}) (DVars {mettify(dvs)}) (FHyps {mettify(f_hyps)}) (EHyps {mettify(e_hyps)}) (Statement {mettify(stmt)}) (Type "$p") (ProofSequence {mettify(proof)}))))')
+                mettarl(f'!(add-atom &frames ( (Label {label}) Proof ( (DVars {mettify(dvs)}) (FHyps {mettify(f_hyps)}) (EHyps {mettify(e_hyps)}) (Statement {mettify(stmt)}) (Type "$p") (ProofSequence {mettify(proof)}))))')
                 label = None
             elif tok == '$d':
                 self.fs.add_d(self.read_non_p_stmt(tok, toks))
@@ -848,18 +849,18 @@ class MM:
         #                         (empty) ))))))''')
         for label in proof:
             # Moving this before the Python to catch DV checks before it throws an error!
-            # mout = mettarl(f'!(treat_step {label})')
-            # print(f'treat_step mout: {mout}')
+            mout = mettarl(f'!(treat_step {label})')
+            print(f'treat_step mout: {mout}')
             stmt_info = self.labels.get(label)
             if stmt_info:
                 label_type = stmt_info[0]
                 if label_type in {'$e', '$f'}:
                     if label in active_hypotheses:
-                        self.mtreat_step(stmt_info, stack, label)
+                        self.treat_step(stmt_info, stack, label)
                     else:
                         raise MMError(f"The label {label} is the label of a nonactive hypothesis.")
                 else:
-                    self.mtreat_step(stmt_info, stack, label)
+                    self.treat_step(stmt_info, stack, label)
             else:
                 raise MMError(f"No statement information found for label {label}")            
             print(f'stack: {[(f"Num {i}", stack[i]) for i in range(len(stack))]}')
