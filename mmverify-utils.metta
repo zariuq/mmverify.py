@@ -25,19 +25,19 @@
 (= (update-atom $space $atom $update_pattern)
   (match $space $atom (let () (add-atom $space $update_pattern) (remove-atom $space $atom))))
 
-(= (add-subst ($typecode $var))
-  (let*
-    (
-      ($sp (match &wm (sp $sp) $sp))
-      ($entry (match &stack ((Num $sp) $s) $s))
-      (($entry0 $entry1:) (decons-atom $entry))
-    ) (if (== $entry0 $typecode)
-        (let* 
-          (
-            (() (add-atom &subst ($var $entry1:)))
-            (() (update-atom &wm (sp $n) (sp (+ $n 1))))
-          ) ($var $entry1:))
-        (Error ( (sp $sp) (entry $entry) (typecode $typecode) (var $var) ) "Proof stack entry does not match floating hypothesis."))))
+; (= (add-subst ($typecode $var))
+;   (let*
+;     (
+;       ($sp (match &wm (sp $sp) $sp))
+;       ($entry (match &stack ((Num $sp) $s) $s))
+;       (($entry0 $entry1:) (decons-atom $entry))
+;     ) (if (== $entry0 $typecode)
+;         (let* 
+;           (
+;             (() (add-atom &subst ($var $entry1:)))
+;             (() (update-atom &wm (sp $n) (sp (+ $n 1))))
+;           ) ($var $entry1:))
+;         (Error ( (sp $sp) (entry $entry) (typecode $typecode) (var $var) ) "Proof stack entry does not match floating hypothesis."))))
 
 (= (add-subst $subst ($typecode $var))
   (let*
@@ -79,21 +79,21 @@
 
 (= (flatten-expr $expr) (from-list (flatten-list (to-list $expr))))
 
-(= (apply_subst_tok $tok)
-  (let $res (unify &subst ($tok $sub) $sub $tok) $res))
+; (= (apply_subst_tok $tok)
+;   (let $res (unify &subst ($tok $sub) $sub $tok) $res))
 
-(= (apply_subst $stmt)
-    (flatten-expr (map-atom $stmt $tok (apply_subst_tok $tok))))
+; (= (apply_subst $stmt)
+;     (flatten-expr (map-atom $stmt $tok (apply_subst_tok $tok))))
 
-(= (check_subst $ehyp)
-  (let* 
-    (
-      ($sp (match &wm (sp $sp) $sp))
-      ($entry (match &stack ((Num $sp) $s) $s))
-      ($subst_h (apply_subst $ehyp))
-    ) (if (== $entry $subst_h)
-        (let () (update-atom &wm (sp $n) (sp (+ $n 1))) $subst_h)
-        (Error ( (sp $sp) (entry $entry) (ehyp $ehyp) (subst_h $subst_h) ) "Proof stack entry does not match essential hypothesis."))))
+; (= (check_subst $ehyp)
+;   (let* 
+;     (
+;       ($sp (match &wm (sp $sp) $sp))
+;       ($entry (match &stack ((Num $sp) $s) $s))
+;       ($subst_h (apply_subst $ehyp))
+;     ) (if (== $entry $subst_h)
+;         (let () (update-atom &wm (sp $n) (sp (+ $n 1))) $subst_h)
+;         (Error ( (sp $sp) (entry $entry) (ehyp $ehyp) (subst_h $subst_h) ) "Proof stack entry does not match essential hypothesis."))))
 
 (= (apply_subst_tok $subst $tok)
   (let $res (unify $subst ($tok $sub) $sub $tok) $res))
@@ -132,14 +132,14 @@
       (Error ($x $y) "Disjoint variable violation.")
       ()))
 
-(= (check_dvs $dvs0)
-    (map-atom $dvs0 $d 
-      (let ($d1 $d2) $d ;; the for x, y in dvs0
-      (let ($x_vars $y_vars)
-          (match &subst ($d1 $sub1) 
-          (match &subst ($d2 $sub2) 
-              ((find_vars $sub1) (find_vars $sub2)))) 
-      (map-pairs $x_vars $y_vars dv_check)))))
+; (= (check_dvs $dvs0)
+;     (map-atom $dvs0 $d 
+;       (let ($d1 $d2) $d ;; the for x, y in dvs0
+;       (let ($x_vars $y_vars)
+;           (match &subst ($d1 $sub1) 
+;           (match &subst ($d2 $sub2) 
+;               ((find_vars $sub1) (find_vars $sub2)))) 
+;       (map-pairs $x_vars $y_vars dv_check)))))
 
 (= (check_dvs $subst $dvs0)
     (map-atom $dvs0 $d 
@@ -202,18 +202,27 @@
         (() (empty-space &wm))
       ) ())) ;;($dvars $fhyps $ehyps $statement $lf $le $npop $stack_len $sp $_subst_list $new_conclusion)))
 
+(= (treat_hypothesis $label $Type $Data $stack_len)
+  (unify &frames (ActiveHyp $label) 
+    (case $Type
+      (
+        (FHyp (match-atom $Data (Typecode $t) (match-atom $Data (FVar $v) (add-atom &stack ((Num $stack_len) ($t $v)))))) 
+        (EHyp (match-atom $Data (Statement $s) (add-atom &stack ((Num $stack_len}) $s))))
+      )) 
+    (Error (label $label) "The label is the label of a nonactive hypothesis.")))
+
 (= (treat_step $label) 
     (let*
       (
         (() (println! (»»» treating label $label)))
-        (($Type $Data) (match &frames ((Label $label) $Type $Data) ($Type $Data)))
+        (($Type $Data) (unify &frames ((Label $label) $Type $Data) ($Type $Data) (Error (label $label) "No statement  information found for label")))
         ($stack_len (case (collapse (match &stack ( (Num $n) $s ) $n)) ( ( () 0 ) ( $nums (+ 1 (max-atom $nums))) ))) ;; Stack length is used in all cases.
         (() (println! ($label data: $Data)))
       )
       (case $Type
         (
-          (FHyp (match-atom $Data (Typecode $t) (match-atom $Data (FVar $v) (add-atom &stack ((Num $stack_len) ($t $v)))))) 
-          (EHyp (match-atom $Data (Statement $s) (add-atom &stack ((Num $stack_len}) $s))))
+          (FHyp (treat_hypothesis $label $Type $Data $stack_len)) 
+          (EHyp (treat_hypothesis $label $Type $Data $stack_len)) 
           (Assertion (treat_assertion $label $Data $stack_len))
           (Proof (treat_assertion $label $Data $stack_len))
         ))
