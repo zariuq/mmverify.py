@@ -178,8 +178,9 @@
         (() (println! "Eval test 2"))
         (() (add-atom &wm (sp $sp)))
         (() (println! "Eval test 3"))
-        (() (empty-space &subst))
-        ($subst &subst)
+        ; (() (empty-space &subst))
+        ($subst (new-space))
+        ; ($subst &subst)
         (() (println! "Eval test 4"))
         ($_subst_list (map-atom $fhyps $fhyp (add-subst $subst $fhyp)))
         ; ($_subst_list (match &wm (FHyps $fhyps) (map-atom $fhyps $fhyp (add-subst $fhyp))))
@@ -188,13 +189,13 @@
         ($_empty_return_values1 (map-atom $ehyps $ehyp (check_subst $subst $ehyp))) ;; Not sure how to match [() () ()], lol 
         ; ($_empty_return_values1 (match &wm (EHyps $ehyps) (map-atom $ehyps $ehyp (check_subst $ehyp)))) ;; Not sure how to match [() () ()], lol
         (() (println! "Eval test 6"))
-        ($_empty_return_values2 (check_dvs $dvars))
+        ($_empty_return_values2 (check_dvs $subst $dvars))
         (() (println! (check_dvs: $_empty_return_values2)))
         (() (println! "Eval test 7"))
         ; (() (remove_from_stack $sp $stack_len)) ;; This version seems slower than the one with unique.
         (() (unique (match &stack ( (Num $n) $s ) (if (>= $n $sp) (remove-atom &stack ( (Num $n) $s )) ())))) ;; I think this is the line introducing weird non-determinism in, lol, which order to remove the stack entries?
         (() (println! "Eval test 8"))
-        ($new_conclusion (let $new_conclusion (apply_subst $statement) (let () (add-atom &stack ((Num $sp) $new_conclusion)) $new_conclusion)))
+        ($new_conclusion (let $new_conclusion (apply_subst $subst $statement) (let () (add-atom &stack ((Num $sp) $new_conclusion)) $new_conclusion)))
         ; ($new_conclusion (let $new_conclusion (match &wm (Statement $stmt) (apply_subst $stmt)) (let () (add-atom &stack ((Num $sp) $new_conclusion)) $new_conclusion)))
         (() (println! (new_conclusion: $new_conclusion)))
         ; (() (remove-pattern &wm (sp $sp)))

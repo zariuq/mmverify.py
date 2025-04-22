@@ -74,7 +74,7 @@ def mettify(expr) -> str:
 # mettarl('!(bind! &consts (new-space))') # Constanst
 mettarl('!(bind! &stack (new-space))') # Stack in treat_proof
 mettarl('!(bind! &frames (new-space))') # Labels
-mettarl('!(bind! &subst (new-space))') # Substitution dict
+# mettarl('!(bind! &subst (new-space))') # Substitution dict
 mettarl('!(bind! &wm (new-space))') # Working Memory (safer than &self, easier to wipe, etc.)
 
 # Ok, I think I ran into a weird parse_all bug.  Will try just running them here
