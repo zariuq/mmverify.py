@@ -867,8 +867,9 @@ class MM:
             # print(f'stack: {stack}')
             mstack = metta.run(f'!(match &stack $s $s)')[0]
             print(f'mstack: {mstack}')
+            parsed_mstack = [[a or b for (a,b) in re.findall(r'"([^"]+)"|([^\s"()]+)', re.sub(r'\(Num\s+\d+(?:\.\d+)?\)\s*', '', str(expr)))] for expr in metta.run('!(match &stack $s $s)')[0]]
             # parsed_mstack = [[a or b for (a,b) in re.findall(r'"([^"]+)"|([^\s"()]+)', re.search(r'\(Num\s+\d+\)\s*\((.*)\)', str(expr)).group(1))] for expr in metta.run('!(match &stack $s $s)')[0]]
-            # assert parsed_mstack == stack, f"Mismatch in MeTTa vs. Python: {parsed_mstack} vs. {stack}"
+            assert parsed_mstack == stack, f"Mismatch in MeTTa vs. Python: {parsed_mstack} vs. {stack}"
         return stack
     
     def treat_compressed_proof(

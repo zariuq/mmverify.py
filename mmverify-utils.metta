@@ -39,20 +39,19 @@
           ) ($var $entry1:))
         (Error ( (sp $sp) (entry $entry) (typecode $typecode) (var $var) ) "Proof stack entry does not match floating hypothesis."))))
 
-; (= (add-subst $subst ($typecode $var))
-;   (let*
-;     (
-;       ($sp (match &wm (sp $sp) $sp))
-;       ($entry (match &stack ((Num $sp) $s) $s))
-;       (($entry0 $entry1:) (decons-atom $entry))
-;     ) (if (== $entry0 $typecode)
-;         (let* 
-;           (
-;             (() (add-atom $subst ($var $entry1:)))
-;             (() (update-atom &wm (sp $n) (sp (+ $n 1))))
-;           ) ($var $entry1:))
-;         (Error ( (sp $sp) (entry $entry) (typecode $typecode) (var $var) ) "Proof stack entry does not match floating hypothesis."))))
-
+(= (add-subst $subst ($typecode $var))
+  (let*
+    (
+      ($sp (match &wm (sp $sp) $sp))
+      ($entry (match &stack ((Num $sp) $s) $s))
+      (($entry0 $entry1:) (decons-atom $entry))
+    ) (if (== $entry0 $typecode)
+        (let* 
+          (
+            (() (add-atom $subst ($var $entry1:)))
+            (() (update-atom &wm (sp $n) (sp (+ $n 1))))
+          ) ($var $entry1:))
+        (Error ( (sp $sp) (entry $entry) (typecode $typecode) (var $var) ) "Proof stack entry does not match floating hypothesis."))))
 
 ; !(update-atom' &wm (sp $n) (sp (+ $n 1)))
 
@@ -96,6 +95,22 @@
         (let () (update-atom &wm (sp $n) (sp (+ $n 1))) $subst_h)
         (Error ( (sp $sp) (entry $entry) (ehyp $ehyp) (subst_h $subst_h) ) "Proof stack entry does not match essential hypothesis."))))
 
+(= (apply_subst_tok $subst $tok)
+  (let $res (unify $subst ($tok $sub) $sub $tok) $res))
+
+(= (apply_subst $subst $stmt)
+    (flatten-expr (map-atom $stmt $tok (apply_subst_tok $subst $tok))))
+
+(= (check_subst $subst $ehyp)
+  (let* 
+    (
+      ($sp (match &wm (sp $sp) $sp))
+      ($entry (match &stack ((Num $sp) $s) $s))
+      ($subst_h (apply_subst $subst $ehyp))
+    ) (if (== $entry $subst_h)
+        (let () (update-atom &wm (sp $n) (sp (+ $n 1))) $subst_h)
+        (Error ( (sp $sp) (entry $entry) (ehyp $ehyp) (subst_h $subst_h) ) "Proof stack entry does not match essential hypothesis."))))
+
 ;; DV check
 (= (map-pairs $list1 $list2 $fn)
    (map-atom $list1 $v1
@@ -126,14 +141,14 @@
               ((find_vars $sub1) (find_vars $sub2)))) 
       (map-pairs $x_vars $y_vars dv_check)))))
 
-; (= (check_dvs $subst $dvs0)
-;     (map-atom $dvs0 $d 
-;       (let ($d1 $d2) $d ;; the for x, y in dvs0
-;       (let ($x_vars $y_vars)
-;           (match $subst ($d1 $sub1) 
-;           (match $subst ($d2 $sub2) 
-;               ((find_vars $sub1) (find_vars $sub2)))) 
-;       (map-pairs $x_vars $y_vars dv_check)))))
+(= (check_dvs $subst $dvs0)
+    (map-atom $dvs0 $d 
+      (let ($d1 $d2) $d ;; the for x, y in dvs0
+      (let ($x_vars $y_vars)
+          (match $subst ($d1 $sub1) 
+          (match $subst ($d2 $sub2) 
+              ((find_vars $sub1) (find_vars $sub2)))) 
+      (map-pairs $x_vars $y_vars dv_check)))))
 
 ;; treat_step outputs non-deterministically ## To debug
 (= (treat_assertion $label $Data $stack_len)
@@ -164,13 +179,13 @@
         (() (add-atom &wm (sp $sp)))
         (() (println! "Eval test 3"))
         (() (empty-space &subst))
-        ; ($subst &subst)
+        ($subst &subst)
         (() (println! "Eval test 4"))
-        ($_subst_list (map-atom $fhyps $fhyp (add-subst $fhyp)))
+        ($_subst_list (map-atom $fhyps $fhyp (add-subst $subst $fhyp)))
         ; ($_subst_list (match &wm (FHyps $fhyps) (map-atom $fhyps $fhyp (add-subst $fhyp))))
         (() (println! "Eval test 5"))
         (() (println! (substs: $_subst_list)))
-        ($_empty_return_values1 (map-atom $ehyps $ehyp (check_subst $ehyp))) ;; Not sure how to match [() () ()], lol 
+        ($_empty_return_values1 (map-atom $ehyps $ehyp (check_subst $subst $ehyp))) ;; Not sure how to match [() () ()], lol 
         ; ($_empty_return_values1 (match &wm (EHyps $ehyps) (map-atom $ehyps $ehyp (check_subst $ehyp)))) ;; Not sure how to match [() () ()], lol
         (() (println! "Eval test 6"))
         ($_empty_return_values2 (check_dvs $dvars))
