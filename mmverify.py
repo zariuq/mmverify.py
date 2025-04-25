@@ -829,7 +829,7 @@ class MM:
 # !(unify &frames (ActiveHyp xf) True (Error (label $label) "The label is the label of a nonactive hypothesis."))
 # But we only do this for $e and $f, so is there a need to do this check here vs later?
 
-    def treat_normal_proof(self, proof: list[str]) -> list[Stmt]:
+    def treat_normal_proof_with_treat_step_in_metta(self, proof: list[str]) -> list[Stmt]:
         """Return the proof stack once the given normal proof has been
         processed.
         """
@@ -872,6 +872,57 @@ class MM:
             parsed_mstack = [[a or b for (a,b) in re.findall(r'"([^"]+)"|([^\s"()]+)', re.sub(r'\(Num\s+\d+(?:\.\d+)?\)\s*', '', str(expr)))] for expr in metta.run('!(match &stack $s $s)')[0]]
             # parsed_mstack = [[a or b for (a,b) in re.findall(r'"([^"]+)"|([^\s"()]+)', re.search(r'\(Num\s+\d+\)\s*\((.*)\)', str(expr)).group(1))] for expr in metta.run('!(match &stack $s $s)')[0]]
             assert parsed_mstack == stack, f"Mismatch in MeTTa vs. Python: {parsed_mstack} vs. {stack}"
+        # mettarl('!(match &frames (ActiveHyp $ActiveHyp) (remove-atom &frames (ActiveHyp $ActiveHyp)))') # Dump the active hypotheses!
+        mettarl('!(remove-pattern &frames (ActiveHyp $_))') # Remove all active hypotheses
+        return stack
+    
+
+    def treat_normal_proof(self, proof: list[str]) -> list[Stmt]:
+        """Return the proof stack once the given normal proof has been
+        processed.
+        """
+        print(f"command to run: !(treat_normal_proof {mettify(proof)})")
+        mout = mettarl(f"!(treat_normal_proof {mettify(proof)})")
+        print(f"tnm output: {mout}")
+        stack: list[Stmmt] = []
+        active_hypotheses = {label for frame in self.fs for labels in (frame.f_labels, frame.e_labels) for label in labels.values()}
+        # mettarl('!(match &frames ((Label $label) FHyp $Data) (add-atom &frames (ActiveHyp $label)))')
+        # mettarl('!(match &frames ((Label $label) EHyp $Data) (add-atom &frames (ActiveHyp $label)))')
+        # mettarl('!(let $label (union (match &frames ((Label $label) FHyp $Data) $label) (match &frames ((Label $label) EHyp $Data) $label)) (add-atom &frames (ActiveHyp $label)))')
+        # mettarl(f'!(add-atom &frames (ActiveHyps (union (match &frames ((Label $label) FHyp $Data) $label) (match &frames ((Label $label) EHyp $Data) $label))))')
+        mout = metta.run(f'!(match &frames (ActiveHyp $ActiveHyp) $ActiveHyp)')
+        print(f'active_hypotheses = {active_hypotheses}')
+        print(f'mactive_hypotheses = {mout}')
+        # mettarl(f'''!(add-atom &frames (ActiveHyps 
+        #                 (collapse (let $current_depth 1 ; Example depth
+        #                 (match &frames ((Label $L) $Type $Data)
+        #                     (if (or (== $Type FHyp) (== $Type EHyp))
+        #                         (match-atom $Data (FSDepth $D)
+        #                             (if (<= $D $current_depth) $L (empty)))
+        #                         (empty) ))))))''')
+        for label in proof:
+            # Moving this before the Python to catch DV checks before it throws an error!
+            # mout = mettarl(f'!(treat_step {label})')
+            # print(f'treat_step mout: {mout}')
+            stmt_info = self.labels.get(label)
+            if stmt_info:
+                label_type = stmt_info[0]
+                if label_type in {'$e', '$f'}:
+                    if label in active_hypotheses:
+                        self.treat_step(stmt_info, stack, label)
+                    else:
+                        raise MMError(f"The label {label} is the label of a nonactive hypothesis.")
+                else:
+                    self.treat_step(stmt_info, stack, label)
+            else:
+                raise MMError(f"No statement information found for label {label}")    
+        print(f'stack: {[(f"Num {i}", stack[i]) for i in range(len(stack))]}')
+        # print(f'stack: {stack}')
+        mstack = metta.run(f'!(match &stack $s $s)')[0]
+        print(f'mstack: {mstack}')
+        parsed_mstack = [[a or b for (a,b) in re.findall(r'"([^"]+)"|([^\s"()]+)', re.sub(r'\(Num\s+\d+(?:\.\d+)?\)\s*', '', str(expr)))] for expr in metta.run('!(match &stack $s $s)')[0]]
+        # parsed_mstack = [[a or b for (a,b) in re.findall(r'"([^"]+)"|([^\s"()]+)', re.search(r'\(Num\s+\d+\)\s*\((.*)\)', str(expr)).group(1))] for expr in metta.run('!(match &stack $s $s)')[0]]
+        assert parsed_mstack == stack, f"Mismatch in MeTTa vs. Python: {parsed_mstack} vs. {stack}"
         # mettarl('!(match &frames (ActiveHyp $ActiveHyp) (remove-atom &frames (ActiveHyp $ActiveHyp)))') # Dump the active hypotheses!
         mettarl('!(remove-pattern &frames (ActiveHyp $_))') # Remove all active hypotheses
         return stack

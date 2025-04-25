@@ -5,9 +5,19 @@
 ;;                                                                     ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+; (: transform (-> Atom Atom %Undefined%))
+; (: transform_ (-> Atom Atom %Undefined%))
+; (= (transform_ $pattern $query) (match &self $pattern (let $_ (add-atom &self $query) $query)))
+; (= (transform $pattern $query) (match &self $pattern $query))
+; (= (? $pattern) (transform $pattern $pattern))
+
+(: umatch (-> hyperon::space::DynSpace Atom Atom %Undefined%))
+(= (umatch $space $pattern $query) (unique (case (match $space $pattern $query) ( (Empty () ) ( () () ) ))))
+
 ; (= (empty-space $space) (match $space $atom (remove-atom $space $atom)))
 ; (= (empty-space2 $space) (unify $space $atom (remove-atom $space $atom) ())) ;; Doesn't work at all
-(= (empty-space $space) (unique (case (match $space $atom (remove-atom $space $atom)) ( (Empty () ) ( () () ) ))))
+; (= (empty-space $space) (unique (case (match $space $atom (remove-atom $space $atom)) ( (Empty () ) ( () () ) ))))
+(= (empty-space $space) (umatch $space $atom (remove-atom $space $atom)))
 
 (= (remove-pattern $space $pattern) (match $space $pattern (remove-atom $space $pattern)))
 
@@ -173,19 +183,18 @@
         ($sp (- $stack_len $npop))
         (() (println! (stack_len: $stack_len , npop: $npop , sp: $sp , if_comp: (< $sp 0))))
         (() (if (< $sp 0) (Error ((label $label) (npop $npop)) "Stack underflow: proof step requires too many hypotheses") ()))
-        (() (println! "Eval test 1"))
+        (() (println! "Eval test 1 & 2"))
         ; (() (add-atom &wm (npop $npop))) ;; Seems unused
-        (() (println! "Eval test 2"))
         (() (add-atom &wm (sp $sp)))
         (() (println! "Eval test 3"))
         ; (() (empty-space &subst))
         ($subst (new-space))
         ; ($subst &subst)
-        (() (println! "Eval test 4"))
+        (() (println! ("Eval test 4" fhyps: $fhyps)))
         ($_subst_list (map-atom $fhyps $fhyp (add-subst $subst $fhyp)))
         ; ($_subst_list (match &wm (FHyps $fhyps) (map-atom $fhyps $fhyp (add-subst $fhyp))))
-        (() (println! "Eval test 5"))
         (() (println! (substs: $_subst_list)))
+        (() (println! ("Eval test 5" ehyps: $ehyps)))
         ($_empty_return_values1 (map-atom $ehyps $ehyp (check_subst $subst $ehyp))) ;; Not sure how to match [() () ()], lol 
         ; ($_empty_return_values1 (match &wm (EHyps $ehyps) (map-atom $ehyps $ehyp (check_subst $ehyp)))) ;; Not sure how to match [() () ()], lol
         (() (println! "Eval test 6"))
@@ -228,5 +237,19 @@
         ))
       ))
 
+(= (treat_normal_proof $proof)
+    (let*
+      (
+        (() (println! (Got Proof: $proof)))
+        (() (empty-space &stack)) ;; stack: list[Stmmt] = []
+        (() (println! "tnm 2"))
+        ;; active_hypotheses = {label for frame in self.fs for labels in (frame.f_labels, frame.e_labels) for label in labels.values()}
+        (() (umatch &frames ((Label $label) FHyp $Data) (add-atom &frames (ActiveHyp $label))))
+        (() (println! "tnm 3"))
+        (() (umatch &frames ((Label $label) EHyp $Data) (add-atom &frames (ActiveHyp $label))))
+        (() (println! "tnm 4"))
+      )
+      (map-atom $proof $label (treat_step (parse $label)))))
+      ; (for-each-in-atom $proof treat_step)))
 
       
