@@ -876,8 +876,7 @@ class MM:
         mettarl('!(remove-pattern &frames (ActiveHyp $_))') # Remove all active hypotheses
         return stack
     
-
-    def treat_normal_proof(self, proof: list[str]) -> list[Stmt]:
+    def treat_normal_proof_with_pure_metta_treat_normal_proof_call(self, proof: list[str]) -> list[Stmt]:
         """Return the proof stack once the given normal proof has been
         processed.
         """
@@ -927,6 +926,28 @@ class MM:
         mettarl('!(remove-pattern &frames (ActiveHyp $_))') # Remove all active hypotheses
         return stack
     
+    def treat_normal_proof(self, proof: list[str]) -> list[Stmt]:
+        """Return the proof stack once the given normal proof has been
+        processed.
+        """
+        stack: list[Stmmt] = []
+        active_hypotheses = {label for frame in self.fs for labels in (frame.f_labels, frame.e_labels) for label in labels.values()}
+        for label in proof:
+            stmt_info = self.labels.get(label)
+            if stmt_info:
+                label_type = stmt_info[0]
+                if label_type in {'$e', '$f'}:
+                    if label in active_hypotheses:
+                        self.treat_step(stmt_info, stack, label)
+                    else:
+                        raise MMError(f"The label {label} is the label of a nonactive hypothesis.")
+                else:
+                    self.treat_step(stmt_info, stack, label)
+            else:
+                raise MMError(f"No statement information found for label {label}")    
+        mettarl('!(remove-pattern &frames (ActiveHyp $_))') # Remove all active hypotheses
+        return stack
+
     def treat_compressed_proof(
             self,
             f_hyps: list[Fhyp],
@@ -992,11 +1013,6 @@ class MM:
                     stack)
         return stack
 
-## So treat_normal_proof is only called once.
-## Its argument is the "proof"
-
-# (= (treat_normal_proof $proof))
-
     def verify(
             self,
             f_hyps: list[Fhyp],
@@ -1027,7 +1043,16 @@ class MM:
             raise MMError(("Stack entry {} does not match proved " +
                           " assertion {}.").format(stack[0], conclusion))
         vprint(3, 'Correct proof!')
-        mettarl(f'!(empty-space &stack)')
+        # print(f'Verify command to run: !(verify {mettify(proof)} {mettify(conclusion)})')
+        mout = mettarl(f'!(verify {mettify(proof)} {mettify(conclusion)})')
+        print(f'Output of verify: {mout}')
+        if mout and mout[0]:
+            metta_result = [a or b for (a,b) in re.findall(r'"([^"]+)"|([^\s"()]+)', 
+                            re.sub(r'^[\[\(]+|[\]\)]+$', '', str(mout[0][0])))]
+            assert metta_result == conclusion, f"MeTTa result {metta_result} != Python conclusion {conclusion}"
+        else:
+            raise AssertionError(f"Empty result from MeTTa verification: {mout}")
+        # mettarl(f'!(empty-space &stack)')
 
     def dump(self) -> None:
         """Print the labels of the database."""

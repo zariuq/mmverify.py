@@ -248,8 +248,23 @@
         (() (println! "tnm 3"))
         (() (umatch &frames ((Label $label) EHyp $Data) (add-atom &frames (ActiveHyp $label))))
         (() (println! "tnm 4"))
+        ($_empty_return_values (map-atom $proof $label (treat_step (parse $label))))
       )
-      (map-atom $proof $label (treat_step (parse $label)))))
-      ; (for-each-in-atom $proof treat_step)))
+      (remove-pattern &frames (ActiveHyp $_))))
 
+(= (verify $proof $conclusion)
+    (let*
+      (
+        (() (println! (Verifying conclusion $conclusion of proof $proof)))
+        ($_empty_return_values (treat_normal_proof $proof))
+        ($stack_expr (collapse (match &stack ( (Num  $n) $f) $f)))
+        (() (if (== () $stack_expr) (Error (assertion: $conclusion) "Empty stack at end of proof.") ()))  
+        (() (if (> (size-atom $stack_expr) 1) (Error ((assertion: $conclusion) (stack: $stack_expr)) "Stack has more than one entry at end of proof.") ()))
+        ($stack_top (car-atom $stack_expr))
+        (() (println! (Comparing: $stack_top "==" $conclusion)))
+        (() (if (== $conclusion $stack_top) () (Error ((assertion: $conclusion) (stack: $stack_expr)) "Stack entry does not match proved assertion.")))
+        ; (() (if (not (== $conclusion (car-atom $stack_expr))) (Error ((assertion: $conclusion) (stack: $stack_expr)) "Stack entry does not match proved assertion.") ()))
+        (() (println! "Correct proof!"))
+        (() (empty-space &stack))
+      ) ($stack_top)))
       
