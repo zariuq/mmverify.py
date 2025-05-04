@@ -107,7 +107,7 @@
       ($entry (match &stack ((Num $sp) $s) $s))
       ($subst_h (apply_subst $subst $ehyp))
     ) (if (== $entry $subst_h)
-        (let () (update-atom &wm (sp $n) (sp (+ $n 1))) $subst_h)
+        (update-atom &wm (sp $n) (sp (+ $n 1)))
         (Error ( (sp $sp) (entry $entry) (ehyp $ehyp) (subst_h $subst_h) ) "Proof stack entry does not match essential hypothesis."))))
 
 ;; Disjoint Variable Check Section
@@ -166,7 +166,6 @@
         ($fhyps (match-atom' $Data (FHyps $fhyps) $fhyps ))
         ($ehyps (match-atom' $Data (EHyps $ehyps) $ehyps ))
         ($statement (match-atom' $Data (Statement $statement) $statement ))
-        (() (println! (assertion data: $dvars $fhyps $ehyps $statement)))
         ($lf (size-atom $fhyps))
         ($le (size-atom $ehyps))
         ($npop (+ $lf $le))
@@ -176,7 +175,7 @@
         (() (add-atom &wm (sp $sp)))
         ($subst (new-space)) ; ($subst &subst)
         ($_subst_list (map-atom $fhyps $fhyp (add-subst $subst $fhyp)))
-        (() (collapse_empties (map-atom $ehyps $ehyp (check_subst $subst $ehyp)))) ;; Not sure how to match [() () ()], lol 
+        (() (collapse_empties (map-atom $ehyps $ehyp (check_subst $subst $ehyp)))) 
         ($_empty_return_values (check_dvs $subst $dvars)) ;; I don't like this *idc about the return value* part.
         (() (ematch &stack ( (Num $n) $s ) (if (>= $n $sp) (remove-atom &stack ( (Num $n) $s )) ()))) 
         ($new_conclusion (let $new_conclusion (apply_subst $subst $statement) (let () (add-atom &stack ((Num $sp) $new_conclusion)) $new_conclusion)))
@@ -228,7 +227,9 @@
         ;; active_hypotheses = {label for frame in self.fs for labels in (frame.f_labels, frame.e_labels) for label in labels.values()}
         (() (ematch &frames ((Label $label) FHyp $Data) (add-atom &frames (ActiveHyp $label))))
         (() (ematch &frames ((Label $label) EHyp $Data) (add-atom &frames (ActiveHyp $label))))
-        (() (collapse_empties (map-atom $proof $label (treat_step (parse $label)))))
+        ; (() (collapse_empties (map-atom $proof $label (treat_step (parse $label)))))
+        ($_ (map-atom $proof $label (treat_step (parse $label))))
+        (() (println! "Eval: finished mapping proof."))
       )
       (remove-pattern &frames (ActiveHyp $_))))
 
@@ -241,7 +242,9 @@
       (
         (() (println! (Verifying conclusion $conclusion of proof $proof)))
         (() (treat_normal_proof $proof))
+        (() (println! "Eval: finished treat_normal_proof"))
         ($stack_expr (collapse (match &stack ( (Num  $n) $f) $f)))
+        (() (println! "Got stack top"))
         (() (if (== () $stack_expr) (Error (assertion: $conclusion) "Empty stack at end of proof.") ()))  
         (() (if (> (size-atom $stack_expr) 1) (Error ((assertion: $conclusion) (stack: $stack_expr)) "Stack has more than one entry at end of proof.") ()))
         ($stack_top (car-atom $stack_expr))
