@@ -945,7 +945,6 @@ class MM:
                     self.treat_step(stmt_info, stack, label)
             else:
                 raise MMError(f"No statement information found for label {label}")    
-        mettarl('!(remove-pattern &frames (ActiveHyp $_))') # Remove all active hypotheses
         return stack
 
     def treat_compressed_proof(
@@ -1028,6 +1027,7 @@ class MM:
         if proof[0] == '(':  # compressed format
             stack = self.treat_compressed_proof(f_hyps, e_hyps, proof)
         else:  # normal format
+            # stack = self.treat_normal_proof_with_treat_step_in_metta(proof)
             stack = self.treat_normal_proof(proof)
         vprint(10, 'Stack at end of proof:', stack)
         if not stack:
@@ -1043,7 +1043,7 @@ class MM:
             raise MMError(("Stack entry {} does not match proved " +
                           " assertion {}.").format(stack[0], conclusion))
         vprint(3, 'Correct proof!')
-        # print(f'Verify command to run: !(verify {mettify(proof)} {mettify(conclusion)})')
+        print(f'Verify command to run: !(verify {mettify(proof)} {mettify(conclusion)})')
         mout = mettarl(f'!(verify {mettify(proof)} {mettify(conclusion)})')
         print(f'Output of verify: {mout}')
         if mout and mout[0]:

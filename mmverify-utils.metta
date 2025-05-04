@@ -11,15 +11,43 @@
 ; (= (transform $pattern $query) (match &self $pattern $query))
 ; (= (? $pattern) (transform $pattern $pattern))
 
-(: umatch (-> hyperon::space::DynSpace Atom Atom %Undefined%))
-(= (umatch $space $pattern $query) (unique (case (match $space $pattern $query) ( (Empty () ) ( () () ) ))))
+;; Problem: I think the (empty) kills things.  So use  match-atom'.  And define match'
+;; Versions  with this case trick.  That umatch will call, too.
+;; Oh, if unify doesn't work in the empty-space2 case, then we shouldn't use it.  Let's be careful.
+;; Seeing the below, I don't think we don't need the case anymore?
+; > !(collapse (match &stack ( (Fum $n) $s ) $s))
+; [()]
+; > !(collapse (match &stack ( (Num $n) $s ) $s))
+; [(("formula" "x") ("formula" "y"))]
+
+(: match' (-> hyperon::space::DynSpace Atom Atom %Undefined%))
+; (= (match' $space $pattern $query) (unify $space $pattern $query ()))
+(= (match' $space $pattern $query) (collapse (match $space $pattern $query)))
+
+(= (collapse_empties $expr)
+  (foldl-atom $expr () $x $acc (if (== $x $acc) () (Error ($x not_equal_to $acc) "I should only receive ()s"))))
+
+;; Replacing umatch, only to use for rewrites that return ()s
+(: ematch (-> hyperon::space::DynSpace Atom Atom %Undefined%))
+(= (ematch $space $pattern $query) (collapse_empties (match' $space $pattern $query)))
+
+; > !(collapse (match &stack ( (Num $n) $s ) (add-atom &self $s)))
+; [(() () ())]
+; > !(collapse_empties (collapse (match &stack ( (Num $n) $s ) (add-atom &self $s))))
+; [()]
+
+;; Then umatch should go...
+
+; (: umatch (-> hyperon::space::DynSpace Atom Atom %Undefined%))
+; ; (= (umatch $space $pattern $query) (unique (case (match $space $pattern $query) ( (Empty () ) ( $q $q ) ))))
+; (= (umatch $space $pattern $query) (unique (match' $space $pattern $query)))
 
 ; (= (empty-space $space) (match $space $atom (remove-atom $space $atom)))
 ; (= (empty-space2 $space) (unify $space $atom (remove-atom $space $atom) ())) ;; Doesn't work at all
 ; (= (empty-space $space) (unique (case (match $space $atom (remove-atom $space $atom)) ( (Empty () ) ( () () ) ))))
-(= (empty-space $space) (umatch $space $atom (remove-atom $space $atom)))
+(= (empty-space $space) (ematch $space $atom (remove-atom $space $atom)))
 
-(= (remove-pattern $space $pattern) (match $space $pattern (remove-atom $space $pattern)))
+(= (remove-pattern $space $pattern) (ematch $space $pattern (remove-atom $space $pattern)))
 
 (= (remove_from_stack $stack_ptr $stack_len)
   (if (> $stack_len $stack_ptr)
@@ -31,6 +59,10 @@
    (if-decons-expr $expr $head $tail (let $pattern $head $rewrite) (empty)))
 (= (match-atom $expr $pattern $rewrite)
    (if-decons-expr $expr $head $tail (match-atom $tail $pattern $rewrite) (empty)))
+
+;; Will this work?
+(: match-atom' (-> Expression Atom Atom %Undefined$))
+(= (match-atom' $expr $pattern $rewrite) (case (match-atom $expr $pattern $rewrite) ( (Empty () ) ( $q $q ) )))
 
 (= (update-atom $space $atom $update_pattern)
   (match $space $atom (let () (add-atom $space $update_pattern) (remove-atom $space $atom))))
@@ -52,7 +84,9 @@
 (= (add-subst $subst ($typecode $var))
   (let*
     (
+      (() (println! (addsubst $typecode $var)))
       ($sp (match &wm (sp $sp) $sp))
+      (() (println! (sp $sp)))
       ($entry (match &stack ((Num $sp) $s) $s))
       (($entry0 $entry1:) (decons-atom $entry))
     ) (if (== $entry0 $typecode)
@@ -154,24 +188,24 @@
 (= (check_dvs $subst $dvs0)
     (map-atom $dvs0 $d 
       (let ($d1 $d2) $d ;; the for x, y in dvs0
-      (let ($x_vars $y_vars)
+        (let ($x_vars $y_vars)
           (match $subst ($d1 $sub1) 
-          (match $subst ($d2 $sub2) 
+            (match $subst ($d2 $sub2) 
               ((find_vars $sub1) (find_vars $sub2)))) 
-      (map-pairs $x_vars $y_vars dv_check)))))
+          (map-pairs $x_vars $y_vars dv_check)))))
 
 ;; treat_step outputs non-deterministically ## To debug
 (= (treat_assertion $label $Data $stack_len)
     (let*
       (
-        ($dvars (match-atom $Data (DVars $dvars) $dvars ))
-        ($fhyps (match-atom $Data (FHyps $fhyps) $fhyps ))
-        ($ehyps (match-atom $Data (EHyps $ehyps) $ehyps ))
-        ($statement (match-atom $Data (Statement $statement) $statement ))
-        ; ($dvs0' (match-atom $Data (DVars $dvars) $dvars)) ;; Looks like the vars are matched from the above statements, so it's all good?
-        ; ($fhyps' (match-atom $Data (FHyps $fhyps) $fhyps))
-        ; ($ehyps' (match-atom $Data (EHyps $ehyps) $ehyps))
-        ; ($stmt' (match-atom $Data (Statement $statement) $statement))
+        ($dvars (match-atom' $Data (DVars $dvars) $dvars ))
+        ($fhyps (match-atom' $Data (FHyps $fhyps) $fhyps ))
+        ($ehyps (match-atom' $Data (EHyps $ehyps) $ehyps ))
+        ($statement (match-atom' $Data (Statement $statement) $statement ))
+        ; ($dvs0' (match-atom' $Data (DVars $dvars) $dvars)) ;; Looks like the vars are matched from the above statements, so it's all good?
+        ; ($fhyps' (match-atom' $Data (FHyps $fhyps) $fhyps))
+        ; ($ehyps' (match-atom' $Data (EHyps $ehyps) $ehyps))
+        ; ($stmt' (match-atom' $Data (Statement $statement) $statement))
         (() (println! (assertion data: $dvars $fhyps $ehyps $statement)))
         ; ($lf (match &wm (FHyps $fhyps) (size-atom $fhyps)))
         ; ($le (match &wm (EHyps $ehyps) (size-atom $ehyps)))
@@ -191,32 +225,43 @@
         ($subst (new-space))
         ; ($subst &subst)
         (() (println! ("Eval test 4" fhyps: $fhyps)))
+        (() (println! (subst_space_empty: (collapse (match $subst $s $s)))))
         ($_subst_list (map-atom $fhyps $fhyp (add-subst $subst $fhyp)))
         ; ($_subst_list (match &wm (FHyps $fhyps) (map-atom $fhyps $fhyp (add-subst $fhyp))))
         (() (println! (substs: $_subst_list)))
         (() (println! ("Eval test 5" ehyps: $ehyps)))
-        ($_empty_return_values1 (map-atom $ehyps $ehyp (check_subst $subst $ehyp))) ;; Not sure how to match [() () ()], lol 
+        (() (collapse_empties (map-atom $ehyps $ehyp (check_subst $subst $ehyp)))) ;; Not sure how to match [() () ()], lol 
         ; ($_empty_return_values1 (match &wm (EHyps $ehyps) (map-atom $ehyps $ehyp (check_subst $ehyp)))) ;; Not sure how to match [() () ()], lol
         (() (println! "Eval test 6"))
-        ($_empty_return_values2 (check_dvs $subst $dvars))
+        (() (println! (stackA: (collapse (match &stack $s $s)))))
+        ($_empty_return_values2 (check_dvs $subst $dvars)) ;; I don't like this *idc about the return value* part.
+        (() (println! (stackB: (collapse (match &stack $s $s)))))
         (() (println! (check_dvs: $_empty_return_values2)))
         (() (println! "Eval test 7"))
         ; (() (remove_from_stack $sp $stack_len)) ;; This version seems slower than the one with unique.
-        (() (unique (match &stack ( (Num $n) $s ) (if (>= $n $sp) (remove-atom &stack ( (Num $n) $s )) ())))) ;; I think this is the line introducing weird non-determinism in, lol, which order to remove the stack entries?
-        (() (println! "Eval test 8"))
+        (() (println! (stackC: (collapse (match &stack $s $s)))))
+        (()  (println! "Eval test 8A"))
+        ; (() (remove_from_stack $sp $stack_len))
+        ; ($_empty_return_values3 (collapse (match &stack ( (Num $n) $s ) (if (>= $n $sp) (remove-atom &stack ( (Num $n) $s )) ())))) ;; I think this is the line introducing weird non-determinism in, lol, which order to remove the stack entries?
+        (() (ematch &stack ( (Num $n) $s ) (if (>= $n $sp) (remove-atom &stack ( (Num $n) $s )) ()))) ;; I think this is the line introducing weird non-determinism in, lol, which order to remove the stack entries?
+        ;; Yes, idk how to deal with this non-determinism... wtf bros.  wtf.  It broke in HE 0.2.5 (after 0.2.3)
+        (() (println! "Eval test 8B"))
         ($new_conclusion (let $new_conclusion (apply_subst $subst $statement) (let () (add-atom &stack ((Num $sp) $new_conclusion)) $new_conclusion)))
         ; ($new_conclusion (let $new_conclusion (match &wm (Statement $stmt) (apply_subst $stmt)) (let () (add-atom &stack ((Num $sp) $new_conclusion)) $new_conclusion)))
         (() (println! (new_conclusion: $new_conclusion)))
         ; (() (remove-pattern &wm (sp $sp)))
+        (() (println! "Eval test 9A"))
         (() (empty-space &wm))
-      ) ())) ;;($dvars $fhyps $ehyps $statement $lf $le $npop $stack_len $sp $_subst_list $new_conclusion)))
+        (() (println! "Eval test 9B"))
+      ) (println! (stackEnd: (collapse (match &stack $s $s))))))
+      ;; ())) ;;($dvars $fhyps $ehyps $statement $lf $le $npop $stack_len $sp $_subst_list $new_conclusion)))
 
 (= (treat_hypothesis $label $Type $Data $stack_len)
   (unify &frames (ActiveHyp $label) 
     (case $Type
       (
-        (FHyp (match-atom $Data (Typecode $t) (match-atom $Data (FVar $v) (add-atom &stack ((Num $stack_len) ($t $v)))))) 
-        (EHyp (match-atom $Data (Statement $s) (add-atom &stack ((Num $stack_len}) $s))))
+        (FHyp (match-atom' $Data (Typecode $t) (match-atom' $Data (FVar $v) (add-atom &stack ((Num $stack_len) ($t $v)))))) 
+        (EHyp (match-atom' $Data (Statement $s) (add-atom &stack ((Num $stack_len}) $s))))
       )) 
     (Error (label $label) "The label is the label of a nonactive hypothesis.")))
 
@@ -244,11 +289,11 @@
         (() (empty-space &stack)) ;; stack: list[Stmmt] = []
         (() (println! "tnm 2"))
         ;; active_hypotheses = {label for frame in self.fs for labels in (frame.f_labels, frame.e_labels) for label in labels.values()}
-        (() (umatch &frames ((Label $label) FHyp $Data) (add-atom &frames (ActiveHyp $label))))
+        (() (ematch &frames ((Label $label) FHyp $Data) (add-atom &frames (ActiveHyp $label))))
         (() (println! "tnm 3"))
-        (() (umatch &frames ((Label $label) EHyp $Data) (add-atom &frames (ActiveHyp $label))))
+        (() (ematch &frames ((Label $label) EHyp $Data) (add-atom &frames (ActiveHyp $label))))
         (() (println! "tnm 4"))
-        ($_empty_return_values (map-atom $proof $label (treat_step (parse $label))))
+        (() (collapse_empties (map-atom $proof $label (treat_step (parse $label)))))
       )
       (remove-pattern &frames (ActiveHyp $_))))
 
@@ -256,7 +301,7 @@
     (let*
       (
         (() (println! (Verifying conclusion $conclusion of proof $proof)))
-        ($_empty_return_values (treat_normal_proof $proof))
+        (() (treat_normal_proof $proof))
         ($stack_expr (collapse (match &stack ( (Num  $n) $f) $f)))
         (() (if (== () $stack_expr) (Error (assertion: $conclusion) "Empty stack at end of proof.") ()))  
         (() (if (> (size-atom $stack_expr) 1) (Error ((assertion: $conclusion) (stack: $stack_expr)) "Stack has more than one entry at end of proof.") ()))
