@@ -50,6 +50,7 @@ metta_log = []
 
 # Run and Log a MeTTa Command
 def mettarl(cmd: str):
+    # print(cmd)
     metta_log.append(cmd)
     return metta.run(cmd)
 
@@ -81,7 +82,7 @@ def mettify(expr) -> str:
     # Handle strings (Metamath tokens)
     elif isinstance(expr, str):
         # Escape double quotes in tokens and wrap in double quotes
-        return f'"{expr.replace('"', '\\"')}"'
+        return f'"{expr.replace('\\', '\\\\').replace('"', '\\"')}"'
         
     # Handle collections recursively
     elif isinstance(expr, (list, tuple)):
@@ -593,7 +594,7 @@ class MM:
                         '$f must have length two but is {}'.format(stmt))
                 self.add_f(stmt[0], stmt[1], label)
                 self.labels[label] = ('$f', [stmt[0], stmt[1]])
-                mettarl(f'!(add-atom &frames ( (Label {label}) FHyp ( (FSDepth {len(self.fs)}) (Typecode {mettify(stmt[0])}) (FVar {mettify(stmt[1])}) (Type "$f") )))')
+                mettarl(f'!(add-atom &frames ( (Label {mettify(label)}) FHyp ( (FSDepth {len(self.fs)}) (Typecode {mettify(stmt[0])}) (FVar {mettify(stmt[1])}) (Type "$f") )))')
                 label = None
             elif tok == '$e':
                 if not label:
@@ -607,7 +608,7 @@ class MM:
                     raise MMError('$a must have label')
                 dvs, f_hyps, e_hyps, stmt = self.fs.make_assertion(self.read_non_p_stmt(tok, toks))
                 self.labels[label] = ('$a', (dvs, f_hyps, e_hyps, stmt))
-                mettarl(f'!(add-atom &frames ( (Label {label}) Assertion ( (DVars {mettify(dvs)}) (FHyps {mettify(f_hyps)}) (EHyps {mettify(e_hyps)}) (Statement {mettify(stmt)}) (Type "$a") )))')
+                mettarl(f'!(add-atom &frames ( (Label {mettify(label)}) Assertion ( (DVars {mettify(dvs)}) (FHyps {mettify(f_hyps)}) (EHyps {mettify(e_hyps)}) (Statement {mettify(stmt)}) (Type "$a") )))')
                 label = None
             elif tok == '$p':
                 if not label:
@@ -618,7 +619,7 @@ class MM:
                     vprint(2, 'Verify:', label)
                     self.verify(f_hyps, e_hyps, conclusion, proof)
                 self.labels[label] = ('$p', (dvs, f_hyps, e_hyps, conclusion))
-                mettarl(f'!(add-atom &frames ( (Label {label}) Proof ( (DVars {mettify(dvs)}) (FHyps {mettify(f_hyps)}) (EHyps {mettify(e_hyps)}) (Statement {mettify(stmt)}) (Type "$p") (ProofSequence {mettify(proof)}))))')
+                mettarl(f'!(add-atom &frames ( (Label {mettify(label)}) Proof ( (DVars {mettify(dvs)}) (FHyps {mettify(f_hyps)}) (EHyps {mettify(e_hyps)}) (Statement {mettify(stmt)}) (Type "$p") (ProofSequence {mettify(proof)}))))')
                 label = None
             elif tok == '$d':
                 self.fs.add_d(self.read_non_p_stmt(tok, toks))
@@ -708,14 +709,14 @@ class MM:
             _steptype, stmt = step
             stack.append(stmt)
             # Ok, because apply_subst just has the statement, let's try only putting that on the stack!
-            # mettarl(f'!(match &frames ((Label {label}) FHyp $d) (match-atom $d (Typecode $t) (match-atom $d (FVar $v) (add-atom &stack ((Num {len(stack) - 1}) ($t $v))))))')
-            # mettarl(f'!(match &frames ((Label {label}) EHyp $d) (match-atom $d (Statement $s) (add-atom &stack ((Num {len(stack) - 1}) $s))))')
+            # mettarl(f'!(match &frames ((Label {mettify(label)}) FHyp $d) (match-atom $d (Typecode $t) (match-atom $d (FVar $v) (add-atom &stack ((Num {len(stack) - 1}) ($t $v))))))')
+            # mettarl(f'!(match &frames ((Label {mettify(label)}) EHyp $d) (match-atom $d (Statement $s) (add-atom &stack ((Num {len(stack) - 1}) $s))))')
             print(f'is_hype stack (len: {len(stack)}): {stack}')
-            mettarl(f'''!(match &frames ((Label {label}) $type $d) (case $type
+            mettarl(f'''!(match &frames ((Label {mettify(label)}) $type $d) (case $type
                 ((FHyp (match-atom $d (Typecode $t) (match-atom $d (FVar $v) (add-atom &stack ((Num {len(stack) - 1}) ($t $v))))))
                 (EHyp (match-atom $d (Statement $s) (add-atom &stack ((Num {len(stack) - 1}) $s)))))))''')
             # This version keeps the F and EHyp checking because I'll need that for the pure-MeTTa version
-            # mettarl(f'!(match &frames ((Label {label}) $type $d) (if (or (== $type FHyp) (== $type EHyp)) (add-atom &stack ( (Num {len(stack) - 1}) (Label {label}) $type $d)) (empty)))')
+            # mettarl(f'!(match &frames ((Label {mettify(label)}) $type $d) (if (or (== $type FHyp) (== $type EHyp)) (add-atom &stack ( (Num {len(stack) - 1}) (Label {mettify(label)}) $type $d)) (empty)))')
             ## The fully MeTTa asserts work.  Python is faster.  Order may only work because it's in that order in MeTTa's expressions.
             mout = metta.run(f'!(match &stack ((Num {len(stack) - 1}) $stmt) $stmt)')[0]
             assert stmt == [a or b for (a,b) in re.findall(r'"([^"]+)"|([^\s"()]+)', re.sub(r'^[\[\(]+|[\]\)]+$', '', str(mout)))], f"Stack mismatch: got {mout}, expected {stmt}"
@@ -725,12 +726,12 @@ class MM:
         elif is_assertion(step):
             _steptype, assertion = step
             dvs0, f_hyps0, e_hyps0, conclusion0 = assertion
-            # metta_dvs0 = {tuple(part.strip() for part in str(t).strip('"()').split(',')) for t in metta.run(f'!(match &frames ((Label {label}) Assertion $Data) (match-atom $Data (DVars $dvs) (match-atom $dvs ($x $y) (format-args ({{}},{{}}) ($x $y)))))')[0]}
+            # metta_dvs0 = {tuple(part.strip() for part in str(t).strip('"()').split(',')) for t in metta.run(f'!(match &frames ((Label {mettify(label)}) Assertion $Data) (match-atom $Data (DVars $dvs) (match-atom $dvs ($x $y) (format-args ({{}},{{}}) ($x $y)))))')[0]}
             # assert dvs0 == metta_dvs0
             npop = len(f_hyps0) + len(e_hyps0)
             sp = len(stack) - npop
             # Add mdvs0, mf_hyps0, me_hyps0, mconclusion0 to &wm based on the label.  #Verified sort of correct.
-            mout = mettarl(f'''!(match &frames ((Label {label}) Assertion $Data)
+            mout = mettarl(f'''!(match &frames ((Label {mettify(label)}) Assertion $Data)
                 (let*
                     (
                     (() (match-atom $Data (DVars $dvars) (add-atom &wm (DVars $dvars))))
@@ -741,7 +742,7 @@ class MM:
             # Verified correct!
             # top=lambda s:(s:=s.strip()[1:-1],g:=[],d:=0,st:=0,[(d:=d+1,st:=i if d==1 else st) if c=='(' else(d:=d-1,g.append(s[st:i+1]) if d==0 else None) if c==')' else None for i,c in enumerate(s)],g)[-1]
             # mdvs0, mf_hyps0, me_hyps0, mconclusion0 = (set(re.findall(r'"([^"]+)"', (grps:=top(str(mout[0])))[0])), [tuple(re.findall(r'"([^"]+)"', x)) for x in top(grps[1])], [list(re.findall(r'"([^"]+)"', x)) for x in top(grps[2])],  re.findall(r'"([^"]+)"', grps[3]))
-            # assert (mdvs0, mf_hyps0, me_hyps0, mconclusion0) == (dvs0, f_hyps0, e_hyps0, conclusion0), f"Mismatch in label={label}"
+            # assert (mdvs0, mf_hyps0, me_hyps0, mconclusion0) == (dvs0, f_hyps0, e_hyps0, conclusion0), f"Mismatch in label={mettify(label)}"
             # Can't check this yet because we'd need to remove elements from the stack
             mout = mettarl(f'''!(let*
                 (
@@ -750,17 +751,17 @@ class MM:
                     ($npop (+ $lf $le))
                     ($ls (let $nums (collapse (match &stack ( (Num $n) $s ) $n)) (+ 1 (max-atom $nums))))
                     ($sp (- $ls $npop))
-                    (() (if (< $sp 0) (Error ()"Stack underflow: proof step," {label} ", requires too many hypotheses," $npop) ()))
+                    (() (if (< $sp 0) (Error ()"Stack underflow: proof step," {mettify(label)} ", requires too many hypotheses," $npop) ()))
                     (() (add-atom &wm (npop $npop)))
                     (() (add-atom &wm (sp $sp)))
                 ) ($lf $le $npop $ls $sp))''')
             # print(f'stack: {stack}')
             # old version parts:
             #         (if (< $sp 0)
-            #         (let $error (format-args (Stack underflow: proof step requires too many ({{}}) hypotheses.\nData is lf: {{}} vs {len(f_hyps0)}, le: {{}} vs {len(e_hyps0)}, slen: {{}} vs {len(stack)}, sp: {{}} vs {sp} ) ($npop $lenf $lene $slen $sp) ) (Error ((Label {label}) Assertion $Data) $error))
+            #         (let $error (format-args (Stack underflow: proof step requires too many ({{}}) hypotheses.\nData is lf: {{}} vs {len(f_hyps0)}, le: {{}} vs {len(e_hyps0)}, slen: {{}} vs {len(stack)}, sp: {{}} vs {sp} ) ($npop $lenf $lene $slen $sp) ) (Error ((Label {mettify(label)}) Assertion $Data) $error))
             #         (let () (add-atom &wm (sp $sp)) ($lenf $lene $npop $slen $sp)))))''')
             print(f'assertion: {assertion}')
-            print(f'label {label}, sp: {sp}, npop:{npop}, assertion: {assertion}, metta sp: {metta.run('!(match &wm (sp $sp) $sp)')}')
+            print(f'label {mettify(label)}, sp: {sp}, npop:{npop}, assertion: {assertion}, metta sp: {metta.run('!(match &wm (sp $sp) $sp)')}')
             # print(f'mout: {mout}')
             # # print(f'metta stack size: {metta.run(f'!(let $nums (collapse (let $nums (match &stack ( (Num $n) $l $t $d ) $n) $nums)) (max-atom $nums))')}')
             metta_sp = int(float(str(metta.run('!(match &wm (sp $sp) $sp)')[0][0])))
@@ -879,7 +880,7 @@ class MM:
         #                         (empty) ))))))''')
         for label in proof:
             # Moving this before the Python to catch DV checks before it throws an error!
-            mout = mettarl(f'!(treat_step {label})')
+            mout = mettarl(f'!(treat_step {mettify(label)})')
             print(f'treat_step mout: {mout}')
             stmt_info = self.labels.get(label)
             if stmt_info:
@@ -888,11 +889,11 @@ class MM:
                     if label in active_hypotheses:
                         self.treat_step(stmt_info, stack, label)
                     else:
-                        raise MMError(f"The label {label} is the label of a nonactive hypothesis.")
+                        raise MMError(f"The label {mettify(label)} is the label of a nonactive hypothesis.")
                 else:
                     self.treat_step(stmt_info, stack, label)
             else:
-                raise MMError(f"No statement information found for label {label}")    
+                raise MMError(f"No statement information found for label {mettify(label)}")    
             print(f'stack: {[(f"Num {i}", stack[i]) for i in range(len(stack))]}')
             # print(f'stack: {stack}')
             mstack = metta.run(f'!(match &stack $s $s)')[0]
@@ -929,7 +930,7 @@ class MM:
         #                         (empty) ))))))''')
         for label in proof:
             # Moving this before the Python to catch DV checks before it throws an error!
-            # mout = mettarl(f'!(treat_step {label})')
+            # mout = mettarl(f'!(treat_step {mettify(label)})')
             # print(f'treat_step mout: {mout}')
             stmt_info = self.labels.get(label)
             if stmt_info:
@@ -938,11 +939,11 @@ class MM:
                     if label in active_hypotheses:
                         self.treat_step(stmt_info, stack, label)
                     else:
-                        raise MMError(f"The label {label} is the label of a nonactive hypothesis.")
+                        raise MMError(f"The label {mettify(label)} is the label of a nonactive hypothesis.")
                 else:
                     self.treat_step(stmt_info, stack, label)
             else:
-                raise MMError(f"No statement information found for label {label}")    
+                raise MMError(f"No statement information found for label {mettify(label)}")    
         print(f'stack: {[(f"Num {i}", stack[i]) for i in range(len(stack))]}')
         # print(f'stack: {stack}')
         mstack = metta.run(f'!(match &stack $s $s)')[0]
@@ -968,11 +969,11 @@ class MM:
                     if label in active_hypotheses:
                         self.treat_step(stmt_info, stack, label)
                     else:
-                        raise MMError(f"The label {label} is the label of a nonactive hypothesis.")
+                        raise MMError(f"The label {mettify(label)} is the label of a nonactive hypothesis.")
                 else:
                     self.treat_step(stmt_info, stack, label)
             else:
-                raise MMError(f"No statement information found for label {label}")    
+                raise MMError(f"No statement information found for label {mettify(label)}")    
         return stack
 
     def treat_compressed_proof(
