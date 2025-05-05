@@ -1,4 +1,21 @@
-# mmverify.py
+# mmverify.py and MeTTaMath
+
+## MeTTaMath
+MeTTaMath is a project to import the Metamath library into MeTTa.
+[MeTTa](https://metta-lang.dev/) is a programming language designed to be the development and cognitive language for AGI systems. The core of MeTTa is pattern matching and rewriting. This aligns naturally with Metamath's core inference rule of variable substitution, making integration conceptually elegant.
+
+
+## Current Status
+The verify() function has been implemented in MeTTa. The project currently processes Metamath .mm files during Python parsing, adding relevant information to MeTTa spaces. Full MeTTa parsing and remaining verification checks are still in development. Performance is currently about 5000x slower than the Python version, but future integration with MORK should offer interesting optimization opportunities.
+
+
+## Repository Structure
+
+* mmverify-utils.metta - Contains the main implementation of the verify() and treat_step() functions, along with utility functions
+* mmverify.py - The original Python Metamath verifier by Raph Levien, modified with MeTTa integration code
+* examples/ - Contains examples of MeTTa interpretation of Metamath statements and their output
+
+---
 
 This is a Metamath verifier written in Python, originally by Raph Levien.
 
