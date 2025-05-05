@@ -53,7 +53,7 @@ def mettarl(cmd: str):
     metta_log.append(cmd)
     return metta.run(cmd)
 
-def mettify(expr) -> str:
+def mettify_old(expr) -> str:
     if expr == set():
         return "()"
     expr_str = str(expr)
@@ -69,36 +69,32 @@ def mettify(expr) -> str:
     expr_str = expr_str.replace("'", '"')
     return expr_str
 
-# def mettify(expr) -> str:
-#     """
-#     Convert Python data structures from mmverify.py to MeTTa syntax.
-#     Handles nested structures and properly escapes double quotes in tokens.
-#     """
-#     # Handle empty set
-#     if expr == set():
-#         return "()"
+def mettify(expr) -> str:
+    """
+    Convert Python data structures from mmverify.py to MeTTa syntax.
+    Handles nested structures and properly escapes double quotes in tokens.
+    """
+    # Handle empty set
+    if expr == set():
+        return "()"
         
-#     # Handle strings (Metamath tokens)
-#     elif isinstance(expr, str):
-#         # Escape double quotes in tokens and wrap in double quotes
-#         return f'"{expr.replace('"', '\\"")}"'
+    # Handle strings (Metamath tokens)
+    elif isinstance(expr, str):
+        # Escape double quotes in tokens and wrap in double quotes
+        return f'"{expr.replace('"', '\\"')}"'
         
-#     # Handle collections recursively
-#     elif isinstance(expr, (list, tuple)):
-#         elements = " ".join(mettify(item) for item in expr)
-#         return f"({elements})"
+    # Handle collections recursively
+    elif isinstance(expr, (list, tuple)):
+        elements = " ".join(mettify(item) for item in expr)
+        return f"({elements})"
         
-#     elif isinstance(expr, set):
-#         elements = " ".join(mettify(item) for item in expr)
-#         return f"({elements})"
+    elif isinstance(expr, set):
+        elements = " ".join(mettify(item) for item in expr)
+        return f"({elements})"
         
-#     # # Handle basic numeric types that might appear
-#     # elif isinstance(expr, (int, float)):
-#     #     return str(expr)
-        
-#     else:
-#         # For anything else, convert to string
-#         return str(expr)
+    else:
+        # For anything else, convert to string
+        return str(expr)
 
 # The MeTTa 'stack' to mirror the Metamath one.
 # Now some utils reference these, so I should define them first.
@@ -392,7 +388,8 @@ class FrameStack(list[Frame]):
                           if x != y)
         self[-1].d.update(new_dvs)
         for x, y in new_dvs:
-            mettarl(f'!(unify &frames (DVar ("{x}" "{y}") $_) () (add-atom &frames (DVar ("{x}" "{y}") ( (FSDepth {len(self)}) (Type "$d") ))))')
+            mettarl(f'!(unify &frames (DVar ({mettify(x)} {mettify(y)}) $_) () (add-atom &frames (DVar ({mettify(x)} {mettify(y)}) ( (FSDepth {len(self)}) (Type "$d") ))))')
+            # mettarl(f'!(unify &frames (DVar ("{x}" "{y}") $_) () (add-atom &frames (DVar ("{x}" "{y}") ( (FSDepth {len(self)}) (Type "$d") ))))')
         # if new_dvs: # Only log if there are actual pairs
             # dv_pairs_metta = " ".join(f'("{x}" "{y}")' for x, y in list(new_dvs))
             # mettarl(f'!(add-atom &frames (DVar ( (FSDepth {len(self)}) (DVars {dv_pairs_metta} ) (Type "$d") )))')
@@ -494,7 +491,7 @@ class MM:
                 'Trying to declare as a constant an active variable: {}'.format(tok))
         self.constants.add(tok)
         # mettarl(f'!(add-atom &frames ( Constant "{tok}" ( (FSDepth {len(self.fs)}) (Type "$c") )))')
-        mettarl(f' !(add-atom &frames ( Constant "{tok}" (Type "$c") ))')
+        mettarl(f' !(add-atom &frames ( Constant {mettify(tok)} (Type "$c") ))')
 
     def add_v(self, tok: Var) -> None:
         """Add a variable to the frame stack top (that is, the current frame)
@@ -506,7 +503,7 @@ class MM:
             raise MMError(
                 'var already declared as constant: {}'.format(tok))
         self.fs[-1].v.add(tok)
-        mettarl(f'!(add-atom &frames ( Var "{tok}" ( (FSDepth {len(self.fs)}) (Type "$v") )))')
+        mettarl(f'!(add-atom &frames ( Var {mettify(tok)} ( (FSDepth {len(self.fs)}) (Type "$v") )))')
 
     def add_f(self, typecode: Const, var: Var, label: Label) -> None:
         """Add a floating hypothesis (ordered pair (variable, typecode)) to
@@ -596,7 +593,7 @@ class MM:
                         '$f must have length two but is {}'.format(stmt))
                 self.add_f(stmt[0], stmt[1], label)
                 self.labels[label] = ('$f', [stmt[0], stmt[1]])
-                mettarl(f'!(add-atom &frames ( (Label {label}) FHyp ( (FSDepth {len(self.fs)}) (Typecode "{mettify(stmt[0])}") (FVar "{mettify(stmt[1])}") (Type "$f") )))')
+                mettarl(f'!(add-atom &frames ( (Label {label}) FHyp ( (FSDepth {len(self.fs)}) (Typecode {mettify(stmt[0])}) (FVar {mettify(stmt[1])}) (Type "$f") )))')
                 label = None
             elif tok == '$e':
                 if not label:
