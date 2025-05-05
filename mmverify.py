@@ -69,6 +69,37 @@ def mettify(expr) -> str:
     expr_str = expr_str.replace("'", '"')
     return expr_str
 
+# def mettify(expr) -> str:
+#     """
+#     Convert Python data structures from mmverify.py to MeTTa syntax.
+#     Handles nested structures and properly escapes double quotes in tokens.
+#     """
+#     # Handle empty set
+#     if expr == set():
+#         return "()"
+        
+#     # Handle strings (Metamath tokens)
+#     elif isinstance(expr, str):
+#         # Escape double quotes in tokens and wrap in double quotes
+#         return f'"{expr.replace('"', '\\"")}"'
+        
+#     # Handle collections recursively
+#     elif isinstance(expr, (list, tuple)):
+#         elements = " ".join(mettify(item) for item in expr)
+#         return f"({elements})"
+        
+#     elif isinstance(expr, set):
+#         elements = " ".join(mettify(item) for item in expr)
+#         return f"({elements})"
+        
+#     # # Handle basic numeric types that might appear
+#     # elif isinstance(expr, (int, float)):
+#     #     return str(expr)
+        
+#     else:
+#         # For anything else, convert to string
+#         return str(expr)
+
 # The MeTTa 'stack' to mirror the Metamath one.
 # Now some utils reference these, so I should define them first.
 # mettarl('!(bind! &consts (new-space))') # Constanst

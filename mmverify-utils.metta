@@ -12,16 +12,17 @@
 (: match' (-> hyperon::space::DynSpace Atom Atom %Undefined%))
 (= (match' $space $pattern $query) (collapse (match $space $pattern $query)))
 
-;; Probably silly, but it looks better to pcollapse (() () () ()) into () to match () in a let* statement.
-(= (collapse_empties $expr)
-  (foldl-atom $expr () $x $acc (if (== $x $acc) () (Error ($x not_equal_to $acc) "I should only receive ()s"))))
+;; Ok, ran into an endless memory error due to collapse_empties.  I'm removing it and ematch.  I'll remove these comments after they're logged in a git commit.
+; ;; Probably silly, but it looks better to pcollapse (() () () ()) into () to match () in a let* statement.
+; (= (collapse_empties $expr)
+;   (foldl-atom $expr () $x $acc (if (== $x $acc) () (Error ($x not_equal_to $acc) "I should only receive ()s"))))
 
-(: ematch (-> hyperon::space::DynSpace Atom Atom %Undefined%))
-(= (ematch $space $pattern $query) (collapse_empties (match' $space $pattern $query)))
+; (: ematch (-> hyperon::space::DynSpace Atom Atom %Undefined%))
+; (= (ematch $space $pattern $query) (collapse_empties (match' $space $pattern $query)))
 
-(= (empty-space $space) (ematch $space $atom (remove-atom $space $atom)))
+(= (empty-space $space) (match' $space $atom (remove-atom $space $atom)))
 
-(= (remove-pattern $space $pattern) (ematch $space $pattern (remove-atom $space $pattern)))
+(= (remove-pattern $space $pattern) (match' $space $pattern (remove-atom $space $pattern)))
 
 ;; Unused sequential alternative to the parallel match-statement version
 (= (remove_from_stack $stack_ptr $stack_len)
@@ -174,14 +175,14 @@
         (() (if (< $sp 0) (Error ((label $label) (npop $npop)) "Stack underflow: proof step requires too many hypotheses") ()))
         (() (add-atom &wm (sp $sp)))
         ($subst (new-space)) ; ($subst &subst)
-        ($_subst_list (map-atom $fhyps $fhyp (add-subst $subst $fhyp)))
-        (() (collapse_empties (map-atom $ehyps $ehyp (check_subst $subst $ehyp)))) 
-        ($_empty_return_values (check_dvs $subst $dvars)) ;; I don't like this *idc about the return value* part.
-        (() (ematch &stack ( (Num $n) $s ) (if (>= $n $sp) (remove-atom &stack ( (Num $n) $s )) ()))) 
+        ($_0 (map-atom $fhyps $fhyp (add-subst $subst $fhyp)))
+        ($_1 (map-atom $ehyps $ehyp (check_subst $subst $ehyp)))
+        ($_2 (check_dvs $subst $dvars)) ;; I don't like this *idc about the return value* part.
+        ($_3 (match' &stack ( (Num $n) $s ) (if (>= $n $sp) (remove-atom &stack ( (Num $n) $s )) ()))) 
         ($new_conclusion (let $new_conclusion (apply_subst $subst $statement) (let () (add-atom &stack ((Num $sp) $new_conclusion)) $new_conclusion)))
         (() (println! (new_conclusion: $new_conclusion)))
-        (() (empty-space &wm))
-      ) (println! (stack ($label): (collapse (match &stack $s $s))))))
+        ($_4 (empty-space &wm))
+      ) (println! (stack ($label): (match' &stack $s $s)))))
 
 ;; The hypothesis part of the treat_step function
 ;; Simply adds the floating or essential hypothesis to the stack, ensuring they are active hypotheses.
@@ -203,7 +204,7 @@
       (
         (() (println! (»»» treating label $label)))
         (($Type $Data) (unify &frames ((Label $label) $Type $Data) ($Type $Data) (Error (label $label) "No statement information found for label")))
-        ($stack_len (case (collapse (match &stack ( (Num $n) $s ) $n)) ( ( () 0 ) ( $nums (+ 1 (max-atom $nums))) ))) ;; Stack length is used in all cases.
+        ($stack_len (case (match' &stack ( (Num $n) $s ) $n) ( ( () 0 ) ( $nums (+ 1 (max-atom $nums))) ))) ;; Stack length is used in all cases.
         (() (println! ($label data: $Data)))
       )
       (case $Type
@@ -223,12 +224,12 @@
     (let*
       (
         (() (println! (Got Proof: $proof)))
-        (() (empty-space &stack)) ;; stack: list[Stmmt] = []
+        ($_0 (empty-space &stack)) ;; stack: list[Stmmt] = []
         ;; active_hypotheses = {label for frame in self.fs for labels in (frame.f_labels, frame.e_labels) for label in labels.values()}
-        (() (ematch &frames ((Label $label) FHyp $Data) (add-atom &frames (ActiveHyp $label))))
-        (() (ematch &frames ((Label $label) EHyp $Data) (add-atom &frames (ActiveHyp $label))))
+        ($_1 (match' &frames ((Label $label) FHyp $Data) (add-atom &frames (ActiveHyp $label))))
+        ($_2 (match' &frames ((Label $label) EHyp $Data) (add-atom &frames (ActiveHyp $label))))
         ; (() (collapse_empties (map-atom $proof $label (treat_step (parse $label)))))
-        ($_ (map-atom $proof $label (treat_step (parse $label))))
+        ($_3 (map-atom $proof $label (treat_step (parse $label))))
         (() (println! "Eval: finished mapping proof."))
       )
       (remove-pattern &frames (ActiveHyp $_))))
@@ -241,9 +242,10 @@
     (let*
       (
         (() (println! (Verifying conclusion $conclusion of proof $proof)))
-        (() (treat_normal_proof $proof))
+        ($_0 (treat_normal_proof $proof))
         (() (println! "Eval: finished treat_normal_proof"))
-        ($stack_expr (collapse (match &stack ( (Num  $n) $f) $f)))
+        ; ($stack_expr (collapse (match &stack ( (Num  $n) $f) $f)))
+        ($stack_expr (match' &stack ( (Num  $n) $f) $f))
         (() (println! "Got stack top"))
         (() (if (== () $stack_expr) (Error (assertion: $conclusion) "Empty stack at end of proof.") ()))  
         (() (if (> (size-atom $stack_expr) 1) (Error ((assertion: $conclusion) (stack: $stack_expr)) "Stack has more than one entry at end of proof.") ()))
@@ -252,6 +254,6 @@
         (() (if (== $conclusion $stack_top) () (Error ((assertion: $conclusion) (stack: $stack_expr)) "Stack entry does not match proved assertion.")))
         ; (() (if (not (== $conclusion (car-atom $stack_expr))) (Error ((assertion: $conclusion) (stack: $stack_expr)) "Stack entry does not match proved assertion.") ()))
         (() (println! "Correct proof!"))
-        (() (empty-space &stack))
+        ($_1 (empty-space &stack))
       ) ($stack_top)))
       
