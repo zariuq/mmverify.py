@@ -1055,7 +1055,11 @@ class MM:
         # dummy variables should be 'lookup_d'ed anyway.
         if proof[0] == '(':  # compressed format
             stack = self.treat_compressed_proof(f_hyps, e_hyps, proof)
+            mout = None
         else:  # normal format
+            print(f'Verify command to run: !(verify {mettify(proof)} {mettify(conclusion)})')
+            mout = mettarl(f'!(verify {mettify(proof)} {mettify(conclusion)})')
+            print(f'Output of verify: {mout}')
             # stack = self.treat_normal_proof_with_treat_step_in_metta(proof)
             stack = self.treat_normal_proof(proof)
         vprint(10, 'Stack at end of proof:', stack)
@@ -1072,9 +1076,6 @@ class MM:
             raise MMError(("Stack entry {} does not match proved " +
                           " assertion {}.").format(stack[0], conclusion))
         vprint(3, 'Correct proof!')
-        print(f'Verify command to run: !(verify {mettify(proof)} {mettify(conclusion)})')
-        mout = mettarl(f'!(verify {mettify(proof)} {mettify(conclusion)})')
-        print(f'Output of verify: {mout}')
         if mout and mout[0]:
             metta_result = [a or b for (a,b) in re.findall(r'"([^"]+)"|([^\s"()]+)', 
                             re.sub(r'^[\[\(]+|[\]\)]+$', '', str(mout[0][0])))]
