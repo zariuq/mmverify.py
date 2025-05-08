@@ -52,13 +52,13 @@
 (= (add-subst $subst ($typecode $var))
   (let*
     (
-      (() (println! ("adding subst" $typecode $var)))
       ($sp (match &wm (sp $sp) $sp))
       ($entry (match &stack ((Num $sp) $s) $s))
       (($entry0 $entry1:) (decons-atom $entry))
     ) (if (== $entry0 $typecode)
         (let* 
           (
+            (() (println! ("adding subst" $var $entry1:)))
             (() (add-atom $subst ($var $entry1:)))
             (() (update-atom &wm (sp $n) (sp (+ $n 1))))
           ) ($var $entry1:))
