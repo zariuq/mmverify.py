@@ -250,5 +250,5 @@
         (() (if (== $conclusion $stack_top) () (Error ((assertion: $conclusion) (stack: $stack_expr)) "Stack entry does not match proved assertion.")))
         (() (println! "Correct proof!"))
         ($_1 (empty-space &stack))
-      ) ()))
+      ) ($stack_top)))
       
