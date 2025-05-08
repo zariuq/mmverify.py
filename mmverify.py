@@ -1050,7 +1050,7 @@ class MM:
             stack = self.treat_compressed_proof(f_hyps, e_hyps, proof)
             mout = None
         else:  # normal format
-            print(f'Verify command to run: !(verify {mettify(proof)} {mettify(conclusion)})')
+            # print(f'\nVerify command to run: !(verify {mettify(proof)} {mettify(conclusion)})')
             mout = mettarl(f'!(verify {mettify(proof)} {mettify(conclusion)})')
             print(f'Output of verify: {mout}')
             # stack = self.treat_normal_proof_with_treat_step_in_metta(proof)

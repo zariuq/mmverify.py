@@ -191,7 +191,7 @@
     (case $Type
       (
         (FHyp (match-atom' $Data (Typecode $t) (match-atom' $Data (FVar $v) (add-atom &stack ((Num $stack_len) ($t $v)))))) 
-        (EHyp (match-atom' $Data (Statement $s) (add-atom &stack ((Num $stack_len}) $s))))
+        (EHyp (match-atom' $Data (Statement $s) (add-atom &stack ((Num $stack_len) $s))))
       )) 
     (Error (label $label) "The label is the label of a nonactive hypothesis.")))
 
@@ -229,7 +229,6 @@
         ($_1 (matchc &frames ((Label $label) FHyp $Data) (add-atom &frames (ActiveHyp $label))))
         ($_2 (matchc &frames ((Label $label) EHyp $Data) (add-atom &frames (ActiveHyp $label))))
         ($_3 (map-atom $proof $label (treat_step $label)))
-        (() (println! "Eval: finished mapping proof."))
       )
       (remove-pattern &frames (ActiveHyp $_))))
 
@@ -240,6 +239,7 @@
 (= (verify $proof $conclusion)
     (let*
       (
+        (() (println! ""))
         (() (println! (Verifying conclusion $conclusion of proof $proof)))
         ($_0 (treat_normal_proof $proof))
         ($stack_expr (matchc &stack ( (Num  $n) $f) $f))
@@ -250,5 +250,5 @@
         (() (if (== $conclusion $stack_top) () (Error ((assertion: $conclusion) (stack: $stack_expr)) "Stack entry does not match proved assertion.")))
         (() (println! "Correct proof!"))
         ($_1 (empty-space &stack))
-      ) ($stack_top)))
+      ) ()))
       
