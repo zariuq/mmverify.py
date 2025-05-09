@@ -205,7 +205,7 @@
         (() (println! (»»» treating label $label)))
         (($Type $Data) (unify &frames ((Label $label) $Type $Data) ($Type $Data) (Error (label $label) "No statement information found for label")))
         ($stack_len (case (matchc &stack ( (Num $n) $s ) $n) ( ( () 0 ) ( $nums (+ 1 (max-atom $nums))) ))) ;; Stack length is used in all cases.
-        (() (println! ($label data: $Data)))
+        (() (println! ($Type $label data: $Data)))
       )
       (case $Type
         (
@@ -249,6 +249,5 @@
         (() (println! (Comparing: $stack_top "==" $conclusion)))
         (() (if (== $conclusion $stack_top) () (Error ((assertion: $conclusion) (stack: $stack_expr)) "Stack entry does not match proved assertion.")))
         (() (println! "Correct proof!"))
-        ($_1 (empty-space &stack))
       ) ($stack_top)))
       
