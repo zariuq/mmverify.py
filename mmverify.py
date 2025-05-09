@@ -593,6 +593,7 @@ class MM:
                 if not label:
                     raise MMError('$e must have label')
                 stmt = self.read_non_p_stmt(tok, toks)
+                ## TODO: add a separate &labels... or something.  Geezio.
                 self.fs.add_e(stmt, label)
                 self.labels[label] = ('$e', stmt)
                 label = None
