@@ -80,6 +80,8 @@ def mettify(expr) -> str:
     if isinstance(expr, str):
         # Escape double quotes in tokens and wrap in double quotes
         return f'"{expr.replace('\\', '\\\\').replace('"', '\\"')}"'
+        # return f'"{expr.replace('\\', '\\\\').replace('"', '\\"').replace('(', '⟮').replace(')', '⟯')}"' ## <-- fine
+        # return f'「{expr.replace('(', '⟮').replace(')', '⟯')}」' ## <-- buggy
         
     # Handle collections recursively, including ()
     elif isinstance(expr, (list, tuple, set)):
@@ -1089,11 +1091,15 @@ class MM:
         # Output of verify: [[(("|-" "\\" "x" ":" "al" "." "T" ":" "(" "al" "->" "be" ")"))]]
         # AssertionError: MeTTa result ['|-', '\\\\', 'x', ':', 'al', '.', 'T', ':', '(', 'al', '->', 'be', ')'] != Python conclusion ['|-', '\\', 'x', ':', 'al', '.', 'T', ':', '(', 'al', '->', 'be', ')']
         if mout and mout[0]:
-            metta_result = [a or b for (a,b) in re.findall(r'"([^"]+)"|([^\s"()]+)', 
-                            re.sub(r'^[\[\(]+|[\]\)]+$', '', str(mout[0][0])))]
-            # assert metta_result == conclusion, f"MeTTa result {metta_result} != Python conclusion {conclusion}"
-            if metta_result != conclusion:
-                metta_log.append(f"ERROR: MeTTa result {metta_result} != Python conclusion {conclusion}")
+            # Clean, simple extraction of tokens with minimal processing
+            raw = re.sub(r'^[\[\(]+|[\]\)]+$', '', str(mout[0][0]))
+            tokens = re.findall(r'"([^"]+)"|([^\s"()]+)', raw)
+            metta_result = [a.replace('\\\\', '\\') if a else b for (a, b) in tokens]
+            # metta_result = [a or b for (a,b) in re.findall(r'"([^"]+)"|([^\s"()]+)', 
+            #                 re.sub(r'^[\[\(]+|[\]\)]+$', '', str(mout[0][0])))]
+            assert metta_result == conclusion, f"MeTTa result {metta_result} != Python conclusion {conclusion}"
+            # if metta_result != conclusion:
+            #     metta_log.append(f"ERROR: MeTTa result {metta_result} != Python conclusion {conclusion} [[untransformed result: {mout}]]")
         else:
             raise AssertionError(f"Empty result from MeTTa verification: {mout}")
         # mettarl(f'!(empty-space &stack)')
