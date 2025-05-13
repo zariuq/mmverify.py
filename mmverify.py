@@ -37,22 +37,24 @@ import argparse
 import typing
 import io
 
-# Imports added by Zarathustra
+# Imports added for MeTTaMath
 import re
 from typing import Optional
 import hyperon
-# from hyperon import E,V,S
 
 metta = hyperon.MeTTa()
 
-# A log of all the MeTTa commands run
+# MeTTa variables:
+run_metta = False
 metta_log = []
 
 # Run and Log a MeTTa Command
 def mettarl(cmd: str):
     # print(cmd)
     metta_log.append(cmd)
-    return metta.run(cmd)
+    if run_metta:
+        return metta.run(cmd) 
+    return []  
 
 def mettify_old(expr) -> str:
     if expr == set():
@@ -91,50 +93,6 @@ def mettify(expr) -> str:
     else:
         # For anything else, convert to string
         return mettify(str(expr))
-
-# The MeTTa 'stack' to mirror the Metamath one.
-# Now some utils reference these, so I should define them first.
-# mettarl('!(bind! &consts (new-space))') # Constanst
-mettarl('!(bind! &stack (new-space))') # Stack in treat_proof
-mettarl('!(bind! &frames (new-space))') # Labels
-# mettarl('!(bind! &subst (new-space))') # Substitution dict
-mettarl('!(bind! &wm (new-space))') # Working Memory (safer than &self, easier to wipe, etc.)
-
-# Ok, I think I ran into a weird parse_all bug.  Will try just running them here
-# MeTTa Utils:
-# mettarl(f'(= (empty-space $space) (match $space $atom (remove-atom $space $atom)))')
-
-# mettarl(f'''(: match-atom (-> Expression Atom Atom %Undefined$))
-#     (= (match-atom $expr $pattern $rewrite)
-#     (if-decons-expr $expr $head $tail (let $pattern $head $rewrite) (empty)))
-#     (= (match-atom $expr $pattern $rewrite)
-#     (if-decons-expr $expr $head $tail (match-atom $tail $pattern $rewrite) (empty)))''')
-
-# mettarl(f'''(= (update-atom $space $atom $update_pattern)
-#   (match $space $atom (let () (add-atom $space $update_pattern) (remove-atom $space $atom))))''')
-
-# mettarl(f'''(= (add-subst ($typecode $var))
-#   (let*
-#     (
-#       ($sp (match &wm (sp $sp) $sp))
-#       ($entry (match &stack ((Num $sp) $s) $s))
-#       (($entry0 $entry1:) (decons-atom $entry))
-#     ) (if (== $entry0 $typecode)
-#         (let* 
-#           (
-#             (() (add-atom &subst ($var $entry1:)))
-#             (() (update-atom &wm (sp $n) (sp (+ $n 1))))
-#           ) ($var $entry1:))
-#         (Error ( (sp $sp) (entry $entry) (typecode $typecode) (var $var) ) "Proof stack entry does not match floating hypothesis."))))''')
-
-# mettarl(f'''(= (apply_subst_tok $tok $subst)
-#   (case ((py-dot $subst get) $tok)
-#     ((() $tok) ;; If the token ($tok) is not in the substitution-binding dictionary ($subst), keep it as is.
-#     ($sub_tok $sub_tok)) ;; If the token ($tok) is in the dictionry ($subst), then return the substituted token ($sub_tok)
-#   ))''')
-
-# mettarl(f'''(= (apply_subst $stmt $subst)
-#   (map-atom $stmt $tok (apply_subst_tok $tok $subst)))''')
 
 # I was using parse_all() but it was buggy.  ChatGPT provided o solution that seems to work.
 def parse_metta_expressions(filename, comment_char=';', encoding='utf-8'):
@@ -183,17 +141,18 @@ def parse_metta_expressions(filename, comment_char=';', encoding='utf-8'):
 
     return expressions
 
-# I think parse_all did the following GroundingSpace bug.
-# (= (add-subst ($typecode $var)) (let* (($sp (match GroundingSpace-0x5a1ce405a438 (sp $sp) $sp)) ($entry (match GroundingSpace-0x5a1ce40adb18 ((Num $sp) $s) $s)) (($entry0 $entry1:) (decons-atom $entry))) (if (== $entry0 $typecode) (let* ((() (add-atom GroundingSpace-0x5a1ce3f66878 ($var $entry1:))) (() (update-atom GroundingSpace-0x5a1ce405a438 (sp $n) (sp (+ $n 1))))) ($var $entry1:)) (Error ((sp $sp) (entry $entry) (typecode $typecode) (var $var)) "Proof stack entry does not match floating hypothesis."))))
-# with open('mmverify-utils.metta', 'r') as f:
-#     MeTTa_Utils = f.read()
+def initialize_metta():
+    # The MeTTa 'stack' to mirror the Metamath one.
+    # Now some utils reference these, so I should define them first.
+    # mettarl('!(bind! &consts (new-space))') # Constanst
+    mettarl('!(bind! &stack (new-space))') # Stack in treat_proof
+    mettarl('!(bind! &frames (new-space))') # Labels
+    # mettarl('!(bind! &subst (new-space))') # Substitution dict
+    mettarl('!(bind! &wm (new-space))') # Working Memory (safer than &self, easier to wipe, etc.)
 
-# Because we run the MeTTa_Utils, we add it to the log to make it self-contained.
-# MeTTa_Utils_Exprs = metta.parse_all(MeTTa_Utils)
-
-MeTTa_Utils_Exprs = parse_metta_expressions('mmverify-utils.metta')
-for expr in MeTTa_Utils_Exprs:
-    mettarl(str(expr))
+    MeTTa_Utils_Exprs = parse_metta_expressions('mmverify-utils.metta')
+    for expr in MeTTa_Utils_Exprs:
+        mettarl(str(expr))
 
 Label = str
 Var = str
@@ -1069,8 +1028,11 @@ class MM:
             mout = None
         else:  # normal format
             # print(f'\nVerify command to run: !(verify {mettify(proof)} {mettify(conclusion)})')
-            mout = mettarl(f'!(verify {mettify(proof)} {mettify(conclusion)})')
-            print(f'Output of verify: {mout}')
+            if run_metta:
+                mout = mettarl(f'!(verify {mettify(proof)} {mettify(conclusion)})')
+                print(f'Output of verify: {mout}')
+            else:
+                mettarl(f'!(verify {mettify(proof)} {mettify(conclusion)})')
             # stack = self.treat_normal_proof_with_treat_step_in_metta(proof)
             stack = self.treat_normal_proof(proof)
         vprint(10, 'Stack at end of proof:', stack)
@@ -1090,18 +1052,19 @@ class MM:
         # Seems to be a weird bug  where the output looks "fine" but the assertion checking code fails.
         # Output of verify: [[(("|-" "\\" "x" ":" "al" "." "T" ":" "(" "al" "->" "be" ")"))]]
         # AssertionError: MeTTa result ['|-', '\\\\', 'x', ':', 'al', '.', 'T', ':', '(', 'al', '->', 'be', ')'] != Python conclusion ['|-', '\\', 'x', ':', 'al', '.', 'T', ':', '(', 'al', '->', 'be', ')']
-        if mout and mout[0]:
+        if run_metta: 
+            if mout and mout[0]:
             # Clean, simple extraction of tokens with minimal processing
-            raw = re.sub(r'^[\[\(]+|[\]\)]+$', '', str(mout[0][0]))
-            tokens = re.findall(r'"([^"]+)"|([^\s"()]+)', raw)
-            metta_result = [a.replace('\\\\', '\\') if a else b for (a, b) in tokens]
-            # metta_result = [a or b for (a,b) in re.findall(r'"([^"]+)"|([^\s"()]+)', 
-            #                 re.sub(r'^[\[\(]+|[\]\)]+$', '', str(mout[0][0])))]
-            assert metta_result == conclusion, f"MeTTa result {metta_result} != Python conclusion {conclusion}"
-            # if metta_result != conclusion:
-            #     metta_log.append(f"ERROR: MeTTa result {metta_result} != Python conclusion {conclusion} [[untransformed result: {mout}]]")
-        else:
-            raise AssertionError(f"Empty result from MeTTa verification: {mout}")
+                raw = re.sub(r'^[\[\(]+|[\]\)]+$', '', str(mout[0][0]))
+                tokens = re.findall(r'"([^"]+)"|([^\s"()]+)', raw)
+                metta_result = [a.replace('\\\\', '\\') if a else b for (a, b) in tokens]
+                # metta_result = [a or b for (a,b) in re.findall(r'"([^"]+)"|([^\s"()]+)', 
+                #                 re.sub(r'^[\[\(]+|[\]\)]+$', '', str(mout[0][0])))]
+                assert metta_result == conclusion, f"MeTTa result {metta_result} != Python conclusion {conclusion}"
+                # if metta_result != conclusion:
+                #     metta_log.append(f"ERROR: MeTTa result {metta_result} != Python conclusion {conclusion} [[untransformed result: {mout}]]")
+            else:
+                raise AssertionError(f"Empty result from MeTTa verification: {mout}")
         # mettarl(f'!(empty-space &stack)')
 
     def dump(self) -> None:
@@ -1161,10 +1124,25 @@ if __name__ == '__main__':
         dest='stop_label',
         type=str,
         help='label where to stop verifying proofs (not included)')
+    parser.add_argument(
+        '-r', '--run-metta',
+        dest='run_metta',
+        action='store_true',
+        default=False,
+        help='execute MeTTa commands during verification instead of just logging them (default: False)')
+    parser.add_argument(
+        '-m', '--log-metta',
+        dest='metta_log_file',
+        type=str,
+        default='mettamath.metta',
+        help='output file for logging MeTTa commands (default mettamath.metta)')
     args = parser.parse_args()
     verbosity = args.verbosity
     db_file = args.database
     logfile = args.logfile
+    run_metta = args.run_metta
+    metta_log_file = args.metta_log_file
+    initialize_metta()
     vprint(1, 'mmverify.py -- Proof verifier for the Metamath language')
     mm = MM(args.begin_label, args.stop_label)
     vprint(1, 'Reading source file "{}"...'.format(db_file.name))
@@ -1173,9 +1151,10 @@ if __name__ == '__main__':
     # mm.dump()
 
     # Write the MeTTa log :)
-    with open('mettamath.metta', 'w') as out:
-        for line in metta_log:
-            out.write(line)
-            if not line.endswith('\n'):
-                out.write('\n')
+    if metta_log:
+        with open(metta_log_file, 'w') as out:
+            for line in metta_log:
+                out.write(line)
+                if not line.endswith('\n'):
+                    out.write('\n')
 
