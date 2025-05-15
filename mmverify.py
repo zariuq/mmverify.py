@@ -447,7 +447,7 @@ class MM:
                 'Trying to declare as a constant an active variable: {}'.format(tok))
         self.constants.add(tok)
         # mettarl(f'!(add-atom &frames ( Constant "{tok}" ( (FSDepth {len(self.fs)}) (Type "$c") )))')
-        mettarl(f'!(add-atom &frames ( Constant {mettify(tok)} (Type "$c") ))')
+        # mettarl(f'!(add-atom &frames ( Constant {mettify(tok)} (Type "$c") ))')
 
     def add_v(self, tok: Var) -> None:
         """Add a variable to the frame stack top (that is, the current frame)
@@ -535,6 +535,7 @@ class MM:
         while tok and tok != '$}':
             if tok == '$c':
                 for tok in self.read_non_p_stmt(tok, toks):
+                    mettarl(f'!(add_c {mettify(tok)})')
                     self.add_c(tok)
             elif tok == '$v':
                 for tok in self.read_non_p_stmt(tok, toks):

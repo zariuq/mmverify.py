@@ -49,6 +49,13 @@
    (chain (get-state $state) $current
      (change-state! $state (+ $current $delta))))
 
+;; Data Adding Section
+
+(= (add_c $tok)
+  (unify &frames (Constant $tok (Type "$c")) (Error (Constant $tok) "Constant already declared.") 
+    (unify &frames (Var $tok ($_ (Type "$v"))) (Error (Var $tok) "Trying to declare as a constant an active variable") 
+      (add-atom &frames ( Constant $tok (Type "$c") )))))
+
 ;; Substitution Section
 
 ;; Add a substiution to the substitution-space, based on a floating hypothesis.
