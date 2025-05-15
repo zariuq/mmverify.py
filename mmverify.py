@@ -148,7 +148,8 @@ def initialize_metta():
     mettarl('!(bind! &stack (new-space))') # Stack in treat_proof
     mettarl('!(bind! &frames (new-space))') # Labels
     # mettarl('!(bind! &subst (new-space))') # Substitution dict
-    mettarl('!(bind! &wm (new-space))') # Working Memory (safer than &self, easier to wipe, etc.)
+    # mettarl('!(bind! &wm (new-space))') # Working Memory (safer than &self, easier to wipe, etc.)
+    mettarl('!(bind! &sp (new-state -1))') # the stack pointer state -1 to throw an error if not updated.
 
     MeTTa_Utils_Exprs = parse_metta_expressions('mmverify-utils.metta')
     for expr in MeTTa_Utils_Exprs:

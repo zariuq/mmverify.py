@@ -41,9 +41,13 @@
 (: match-atom' (-> Expression Atom Atom %Undefined$))
 (= (match-atom' $expr $pattern $rewrite) (case (match-atom $expr $pattern $rewrite) ( (Empty () ) ( $q $q ) )))
 
+;; TODO: remove when outmoted.
 (= (update-atom $space $atom $update_pattern)
   (match $space $atom (let () (add-atom $space $update_pattern) (remove-atom $space $atom))))
 
+(= (adjust-state-additive $state $delta)
+   (chain (get-state $state) $current
+     (change-state! $state (+ $current $delta))))
 
 ;; Substitution Section
 
@@ -52,7 +56,8 @@
 (= (add-subst $subst ($typecode $var))
   (let*
     (
-      ($sp (match &wm (sp $sp) $sp))
+      ; ($sp (match &wm (sp $sp) $sp))
+      ($sp (get-state &sp))
       ($entry (match &stack ((Num $sp) $s) $s))
       (($entry0 $entry1:) (decons-atom $entry))
     ) (if (== $entry0 $typecode)
@@ -60,7 +65,8 @@
           (
             (() (println! ("adding subst" $var $entry1:)))
             (() (add-atom $subst ($var $entry1:)))
-            (() (update-atom &wm (sp $n) (sp (+ $n 1))))
+            ; (() (update-atom &wm (sp $n) (sp (+ $n 1))))
+            ($_ (adjust-state-additive &sp 1))
           ) ($var $entry1:))
         (Error ( (sp $sp) (entry $entry) (typecode $typecode) (var $var) ) "Proof stack entry does not match floating hypothesis."))))
 
@@ -104,11 +110,13 @@
 (= (check_subst $subst $ehyp)
   (let* 
     (
-      ($sp (match &wm (sp $sp) $sp))
+      ; ($sp (match &wm (sp $sp) $sp))
+      ($sp (get-state &sp))
       ($entry (match &stack ((Num $sp) $s) $s))
       ($subst_h (apply_subst $subst $ehyp))
     ) (if (== $entry $subst_h)
-        (update-atom &wm (sp $n) (sp (+ $n 1)))
+        ; (update-atom &wm (sp $n) (sp (+ $n 1)))
+        (adjust-state-additive &sp 1)
         (Error ( (sp $sp) (entry $entry) (ehyp $ehyp) (subst_h $subst_h) ) "Proof stack entry does not match essential hypothesis."))))
 
 ;; Disjoint Variable Check Section
@@ -173,15 +181,16 @@
         ($sp (- $stack_len $npop))
         (() (println! (stack_len: $stack_len , npop: $npop , sp: $sp)))
         (() (if (< $sp 0) (Error ((label $label) (npop $npop)) "Stack underflow: proof step requires too many hypotheses") ()))
-        (() (add-atom &wm (sp $sp)))
+        ; (() (add-atom &wm (sp $sp)))
+        ($_0 (change-state! &sp $sp))
         ($subst (new-space)) ; ($subst &subst)
-        ($_0 (map-atom $fhyps $fhyp (add-subst $subst $fhyp)))
-        ($_1 (map-atom $ehyps $ehyp (check_subst $subst $ehyp)))
-        ($_2 (check_dvs $subst $dvars)) ;; I don't like this *idc about the return value* part.
-        ($_3 (matchc &stack ( (Num $n) $s ) (if (>= $n $sp) (remove-atom &stack ( (Num $n) $s )) ()))) 
+        ($_1 (map-atom $fhyps $fhyp (add-subst $subst $fhyp)))
+        ($_2 (map-atom $ehyps $ehyp (check_subst $subst $ehyp)))
+        ($_3 (check_dvs $subst $dvars)) ;; I don't like this *idc about the return value* part.
+        ($_4 (matchc &stack ( (Num $n) $s ) (if (>= $n $sp) (remove-atom &stack ( (Num $n) $s )) ()))) 
         ($new_conclusion (let $new_conclusion (apply_subst $subst $statement) (let () (add-atom &stack ((Num $sp) $new_conclusion)) $new_conclusion)))
         (() (println! (new_conclusion: $new_conclusion)))
-        ($_4 (empty-space &wm))
+        ; ($_5 (empty-space &wm))
       ) (println! (stack ($label): (matchc &stack $s $s)))))
 
 ;; The hypothesis part of the treat_step function
