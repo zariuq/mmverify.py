@@ -146,7 +146,7 @@ def initialize_metta():
     # Now some utils reference these, so I should define them first.
     # mettarl('!(bind! &consts (new-space))') # Constanst
     mettarl('!(bind! &stack (new-space))') # Stack in treat_proof
-    mettarl('!(bind! &frames (new-space))') # Labels
+    mettarl('!(bind! &kb (new-space))') # Labels
     # mettarl('!(bind! &subst (new-space))') # Substitution dict
     # mettarl('!(bind! &wm (new-space))') # Working Memory (safer than &self, easier to wipe, etc.)
     mettarl('!(bind! &sp (new-state -1))') # the stack pointer state -1 to throw an error if not updated.
@@ -333,7 +333,7 @@ class FrameStack(list[Frame]):
         frame.e.append(stmt)
         frame.e_labels[tuple(stmt)] = label
         # conversion to tuple since dictionary keys must be hashable
-        mettarl(f'!(add-atom &frames ( (Label {mettify(label)}) EHyp ( (FSDepth {len(self)}) (ENum {len(frame.e)}) (Statement {mettify(stmt)}) (Type "$e") )))')
+        mettarl(f'!(add-atom &kb ( (Label {mettify(label)}) EHyp ( (FSDepth {len(self)}) (ENum {len(frame.e)}) (Statement {mettify(stmt)}) (Type "$e") )))')
 
     def add_d(self, varlist: list[Var]) -> None:
         """Add a disjoint variable condition (ordered pair of variables) to
@@ -344,11 +344,11 @@ class FrameStack(list[Frame]):
                           if x != y)
         self[-1].d.update(new_dvs)
         for x, y in new_dvs:
-            mettarl(f'!(unify &frames (DVar ({mettify(x)} {mettify(y)}) $_) () (add-atom &frames (DVar ({mettify(x)} {mettify(y)}) ( (FSDepth {len(self)}) (Type "$d") ))))')
-            # mettarl(f'!(unify &frames (DVar ("{x}" "{y}") $_) () (add-atom &frames (DVar ("{x}" "{y}") ( (FSDepth {len(self)}) (Type "$d") ))))')
+            mettarl(f'!(unify &kb (DVar ({mettify(x)} {mettify(y)}) $_) () (add-atom &kb (DVar ({mettify(x)} {mettify(y)}) ( (FSDepth {len(self)}) (Type "$d") ))))')
+            # mettarl(f'!(unify &kb (DVar ("{x}" "{y}") $_) () (add-atom &kb (DVar ("{x}" "{y}") ( (FSDepth {len(self)}) (Type "$d") ))))')
         # if new_dvs: # Only log if there are actual pairs
             # dv_pairs_metta = " ".join(f'("{x}" "{y}")' for x, y in list(new_dvs))
-            # mettarl(f'!(add-atom &frames (DVar ( (FSDepth {len(self)}) (DVars {dv_pairs_metta} ) (Type "$d") )))')
+            # mettarl(f'!(add-atom &kb (DVar ( (FSDepth {len(self)}) (DVars {dv_pairs_metta} ) (Type "$d") )))')
 
     def lookup_v(self, tok: Var) -> bool:
         """Return whether the given token is an active variable."""
@@ -446,8 +446,8 @@ class MM:
             raise MMError(
                 'Trying to declare as a constant an active variable: {}'.format(tok))
         self.constants.add(tok)
-        # mettarl(f'!(add-atom &frames ( Constant "{tok}" ( (FSDepth {len(self.fs)}) (Type "$c") )))')
-        # mettarl(f'!(add-atom &frames ( Constant {mettify(tok)} (Type "$c") ))')
+        # mettarl(f'!(add-atom &kb ( Constant "{tok}" ( (FSDepth {len(self.fs)}) (Type "$c") )))')
+        # mettarl(f'!(add-atom &kb ( Constant {mettify(tok)} (Type "$c") ))')
 
     def add_v(self, tok: Var) -> None:
         """Add a variable to the frame stack top (that is, the current frame)
@@ -459,7 +459,7 @@ class MM:
             raise MMError(
                 'var already declared as constant: {}'.format(tok))
         self.fs[-1].v.add(tok)
-        mettarl(f'!(add-atom &frames ( Var {mettify(tok)} ( (FSDepth {len(self.fs)}) (Type "$v") )))')
+        # mettarl(f'!(add-atom &kb ( Var {mettify(tok)} ( (FSDepth {len(self.fs)}) (Type "$v") )))')
 
     def add_f(self, typecode: Const, var: Var, label: Label) -> None:
         """Add a floating hypothesis (ordered pair (variable, typecode)) to
@@ -539,6 +539,7 @@ class MM:
                     self.add_c(tok)
             elif tok == '$v':
                 for tok in self.read_non_p_stmt(tok, toks):
+                    mettarl(f'!(add_v {mettify(tok)} {len(self.fs)})')
                     self.add_v(tok)
             elif tok == '$f':
                 stmt = self.read_non_p_stmt(tok, toks)
@@ -550,7 +551,7 @@ class MM:
                         '$f must have length two but is {}'.format(stmt))
                 self.add_f(stmt[0], stmt[1], label)
                 self.labels[label] = ('$f', [stmt[0], stmt[1]])
-                mettarl(f'!(add-atom &frames ( (Label {mettify(label)}) FHyp ( (FSDepth {len(self.fs)}) (Typecode {mettify(stmt[0])}) (FVar {mettify(stmt[1])}) (Type "$f") )))')
+                mettarl(f'!(add-atom &kb ( (Label {mettify(label)}) FHyp ( (FSDepth {len(self.fs)}) (Typecode {mettify(stmt[0])}) (FVar {mettify(stmt[1])}) (Type "$f") )))')
                 label = None
             elif tok == '$e':
                 if not label:
@@ -565,7 +566,7 @@ class MM:
                     raise MMError('$a must have label')
                 dvs, f_hyps, e_hyps, stmt = self.fs.make_assertion(self.read_non_p_stmt(tok, toks))
                 self.labels[label] = ('$a', (dvs, f_hyps, e_hyps, stmt))
-                mettarl(f'!(add-atom &frames ( (Label {mettify(label)}) Assertion ( (DVars {mettify(dvs)}) (FHyps {mettify(f_hyps)}) (EHyps {mettify(e_hyps)}) (Statement {mettify(stmt)}) (Type "$a") )))')
+                mettarl(f'!(add-atom &kb ( (Label {mettify(label)}) Assertion ( (DVars {mettify(dvs)}) (FHyps {mettify(f_hyps)}) (EHyps {mettify(e_hyps)}) (Statement {mettify(stmt)}) (Type "$a") )))')
                 label = None
             elif tok == '$p':
                 if not label:
@@ -576,7 +577,7 @@ class MM:
                     vprint(2, 'Verify:', label)
                     self.verify(f_hyps, e_hyps, conclusion, proof)
                 self.labels[label] = ('$p', (dvs, f_hyps, e_hyps, conclusion))
-                mettarl(f'!(add-atom &frames ( (Label {mettify(label)}) Proof ( (DVars {mettify(dvs)}) (FHyps {mettify(f_hyps)}) (EHyps {mettify(e_hyps)}) (Statement {mettify(stmt)}) (Type "$p") (ProofSequence {mettify(proof)}))))')
+                mettarl(f'!(add-atom &kb ( (Label {mettify(label)}) Proof ( (DVars {mettify(dvs)}) (FHyps {mettify(f_hyps)}) (EHyps {mettify(e_hyps)}) (Statement {mettify(stmt)}) (Type "$p") (ProofSequence {mettify(proof)}))))')
                 label = None
             elif tok == '$d':
                 self.fs.add_d(self.read_non_p_stmt(tok, toks))
@@ -597,7 +598,7 @@ class MM:
             else:
                 raise MMError("Unknown token: '{}'.".format(tok))
             tok = toks.readc()
-        mettarl(f'!(match &frames ($1 $2 $Data) (match-atom $Data (FSDepth {len(self.fs)}) (remove-atom &frames ($1 $2 $Data))))')
+        mettarl(f'!(match &kb ($1 $2 $Data) (match-atom $Data (FSDepth {len(self.fs)}) (remove-atom &kb ($1 $2 $Data))))')
         self.fs.pop()
 
     def treat_step(self,
@@ -666,14 +667,14 @@ class MM:
             _steptype, stmt = step
             stack.append(stmt)
             # Ok, because apply_subst just has the statement, let's try only putting that on the stack!
-            # mettarl(f'!(match &frames ((Label {mettify(label)}) FHyp $d) (match-atom $d (Typecode $t) (match-atom $d (FVar $v) (add-atom &stack ((Num {len(stack) - 1}) ($t $v))))))')
-            # mettarl(f'!(match &frames ((Label {mettify(label)}) EHyp $d) (match-atom $d (Statement $s) (add-atom &stack ((Num {len(stack) - 1}) $s))))')
+            # mettarl(f'!(match &kb ((Label {mettify(label)}) FHyp $d) (match-atom $d (Typecode $t) (match-atom $d (FVar $v) (add-atom &stack ((Num {len(stack) - 1}) ($t $v))))))')
+            # mettarl(f'!(match &kb ((Label {mettify(label)}) EHyp $d) (match-atom $d (Statement $s) (add-atom &stack ((Num {len(stack) - 1}) $s))))')
             print(f'is_hype stack (len: {len(stack)}): {stack}')
-            mettarl(f'''!(match &frames ((Label {mettify(label)}) $type $d) (case $type
+            mettarl(f'''!(match &kb ((Label {mettify(label)}) $type $d) (case $type
                 ((FHyp (match-atom $d (Typecode $t) (match-atom $d (FVar $v) (add-atom &stack ((Num {len(stack) - 1}) ($t $v))))))
                 (EHyp (match-atom $d (Statement $s) (add-atom &stack ((Num {len(stack) - 1}) $s)))))))''')
             # This version keeps the F and EHyp checking because I'll need that for the pure-MeTTa version
-            # mettarl(f'!(match &frames ((Label {mettify(label)}) $type $d) (if (or (== $type FHyp) (== $type EHyp)) (add-atom &stack ( (Num {len(stack) - 1}) (Label {mettify(label)}) $type $d)) (empty)))')
+            # mettarl(f'!(match &kb ((Label {mettify(label)}) $type $d) (if (or (== $type FHyp) (== $type EHyp)) (add-atom &stack ( (Num {len(stack) - 1}) (Label {mettify(label)}) $type $d)) (empty)))')
             ## The fully MeTTa asserts work.  Python is faster.  Order may only work because it's in that order in MeTTa's expressions.
             mout = metta.run(f'!(match &stack ((Num {len(stack) - 1}) $stmt) $stmt)')[0]
             assert stmt == [a or b for (a,b) in re.findall(r'"([^"]+)"|([^\s"()]+)', re.sub(r'^[\[\(]+|[\]\)]+$', '', str(mout)))], f"Stack mismatch: got {mout}, expected {stmt}"
@@ -683,12 +684,12 @@ class MM:
         elif is_assertion(step):
             _steptype, assertion = step
             dvs0, f_hyps0, e_hyps0, conclusion0 = assertion
-            # metta_dvs0 = {tuple(part.strip() for part in str(t).strip('"()').split(',')) for t in metta.run(f'!(match &frames ((Label {mettify(label)}) Assertion $Data) (match-atom $Data (DVars $dvs) (match-atom $dvs ($x $y) (format-args ({{}},{{}}) ($x $y)))))')[0]}
+            # metta_dvs0 = {tuple(part.strip() for part in str(t).strip('"()').split(',')) for t in metta.run(f'!(match &kb ((Label {mettify(label)}) Assertion $Data) (match-atom $Data (DVars $dvs) (match-atom $dvs ($x $y) (format-args ({{}},{{}}) ($x $y)))))')[0]}
             # assert dvs0 == metta_dvs0
             npop = len(f_hyps0) + len(e_hyps0)
             sp = len(stack) - npop
             # Add mdvs0, mf_hyps0, me_hyps0, mconclusion0 to &wm based on the label.  #Verified sort of correct.
-            mout = mettarl(f'''!(match &frames ((Label {mettify(label)}) Assertion $Data)
+            mout = mettarl(f'''!(match &kb ((Label {mettify(label)}) Assertion $Data)
                 (let*
                     (
                     (() (match-atom $Data (DVars $dvars) (add-atom &wm (DVars $dvars))))
@@ -810,9 +811,9 @@ class MM:
 # Uh, fuck, lol, "Example depth" -- fuck you AI Assistants.
 # frame in self.fs actually just means "for all frames", right?
 # Which in MeTTa just means we don't need to worry about it!
-# !(union (match &frames ((Label $label) FHyp $Data) $label) (match &frames ((Label $label) EHyp $Data) $label))
+# !(union (match &kb ((Label $label) FHyp $Data) $label) (match &kb ((Label $label) EHyp $Data) $label))
 # (= (treat_normal_proof $proof))
-# !(unify &frames (ActiveHyp xf) True (Error (label $label) "The label is the label of a nonactive hypothesis."))
+# !(unify &kb (ActiveHyp xf) True (Error (label $label) "The label is the label of a nonactive hypothesis."))
 # But we only do this for $e and $f, so is there a need to do this check here vs later?
 
     def treat_normal_proof_with_treat_step_in_metta(self, proof: list[str]) -> list[Stmt]:
@@ -821,16 +822,16 @@ class MM:
         """
         stack: list[Stmmt] = []
         active_hypotheses = {label for frame in self.fs for labels in (frame.f_labels, frame.e_labels) for label in labels.values()}
-        mettarl('!(match &frames ((Label $label) FHyp $Data) (add-atom &frames (ActiveHyp $label)))')
-        mettarl('!(match &frames ((Label $label) EHyp $Data) (add-atom &frames (ActiveHyp $label)))')
-        # mettarl('!(let $label (union (match &frames ((Label $label) FHyp $Data) $label) (match &frames ((Label $label) EHyp $Data) $label)) (add-atom &frames (ActiveHyp $label)))')
-        # mettarl(f'!(add-atom &frames (ActiveHyps (union (match &frames ((Label $label) FHyp $Data) $label) (match &frames ((Label $label) EHyp $Data) $label))))')
-        mout = metta.run(f'!(match &frames (ActiveHyp $ActiveHyp) $ActiveHyp)')
+        mettarl('!(match &kb ((Label $label) FHyp $Data) (add-atom &kb (ActiveHyp $label)))')
+        mettarl('!(match &kb ((Label $label) EHyp $Data) (add-atom &kb (ActiveHyp $label)))')
+        # mettarl('!(let $label (union (match &kb ((Label $label) FHyp $Data) $label) (match &kb ((Label $label) EHyp $Data) $label)) (add-atom &kb (ActiveHyp $label)))')
+        # mettarl(f'!(add-atom &kb (ActiveHyps (union (match &kb ((Label $label) FHyp $Data) $label) (match &kb ((Label $label) EHyp $Data) $label))))')
+        mout = metta.run(f'!(match &kb (ActiveHyp $ActiveHyp) $ActiveHyp)')
         print(f'active_hypotheses = {active_hypotheses}')
         print(f'mactive_hypotheses = {mout}')
-        # mettarl(f'''!(add-atom &frames (ActiveHyps 
+        # mettarl(f'''!(add-atom &kb (ActiveHyps 
         #                 (collapse (let $current_depth 1 ; Example depth
-        #                 (match &frames ((Label $L) $Type $Data)
+        #                 (match &kb ((Label $L) $Type $Data)
         #                     (if (or (== $Type FHyp) (== $Type EHyp))
         #                         (match-atom $Data (FSDepth $D)
         #                             (if (<= $D $current_depth) $L (empty)))
@@ -858,8 +859,8 @@ class MM:
             parsed_mstack = [[a or b for (a,b) in re.findall(r'"([^"]+)"|([^\s"()]+)', re.sub(r'\(Num\s+\d+(?:\.\d+)?\)\s*', '', str(expr)))] for expr in metta.run('!(match &stack $s $s)')[0]]
             # parsed_mstack = [[a or b for (a,b) in re.findall(r'"([^"]+)"|([^\s"()]+)', re.search(r'\(Num\s+\d+\)\s*\((.*)\)', str(expr)).group(1))] for expr in metta.run('!(match &stack $s $s)')[0]]
             assert parsed_mstack == stack, f"Mismatch in MeTTa vs. Python: {parsed_mstack} vs. {stack}"
-        # mettarl('!(match &frames (ActiveHyp $ActiveHyp) (remove-atom &frames (ActiveHyp $ActiveHyp)))') # Dump the active hypotheses!
-        mettarl('!(remove-pattern &frames (ActiveHyp $_))') # Remove all active hypotheses
+        # mettarl('!(match &kb (ActiveHyp $ActiveHyp) (remove-atom &kb (ActiveHyp $ActiveHyp)))') # Dump the active hypotheses!
+        mettarl('!(remove-pattern &kb (ActiveHyp $_))') # Remove all active hypotheses
         return stack
     
     def treat_normal_proof_with_pure_metta_treat_normal_proof_call(self, proof: list[str]) -> list[Stmt]:
@@ -871,16 +872,16 @@ class MM:
         print(f"tnm output: {mout}")
         stack: list[Stmmt] = []
         active_hypotheses = {label for frame in self.fs for labels in (frame.f_labels, frame.e_labels) for label in labels.values()}
-        # mettarl('!(match &frames ((Label $label) FHyp $Data) (add-atom &frames (ActiveHyp $label)))')
-        # mettarl('!(match &frames ((Label $label) EHyp $Data) (add-atom &frames (ActiveHyp $label)))')
-        # mettarl('!(let $label (union (match &frames ((Label $label) FHyp $Data) $label) (match &frames ((Label $label) EHyp $Data) $label)) (add-atom &frames (ActiveHyp $label)))')
-        # mettarl(f'!(add-atom &frames (ActiveHyps (union (match &frames ((Label $label) FHyp $Data) $label) (match &frames ((Label $label) EHyp $Data) $label))))')
-        mout = metta.run(f'!(match &frames (ActiveHyp $ActiveHyp) $ActiveHyp)')
+        # mettarl('!(match &kb ((Label $label) FHyp $Data) (add-atom &kb (ActiveHyp $label)))')
+        # mettarl('!(match &kb ((Label $label) EHyp $Data) (add-atom &kb (ActiveHyp $label)))')
+        # mettarl('!(let $label (union (match &kb ((Label $label) FHyp $Data) $label) (match &kb ((Label $label) EHyp $Data) $label)) (add-atom &kb (ActiveHyp $label)))')
+        # mettarl(f'!(add-atom &kb (ActiveHyps (union (match &kb ((Label $label) FHyp $Data) $label) (match &kb ((Label $label) EHyp $Data) $label))))')
+        mout = metta.run(f'!(match &kb (ActiveHyp $ActiveHyp) $ActiveHyp)')
         print(f'active_hypotheses = {active_hypotheses}')
         print(f'mactive_hypotheses = {mout}')
-        # mettarl(f'''!(add-atom &frames (ActiveHyps 
+        # mettarl(f'''!(add-atom &kb (ActiveHyps 
         #                 (collapse (let $current_depth 1 ; Example depth
-        #                 (match &frames ((Label $L) $Type $Data)
+        #                 (match &kb ((Label $L) $Type $Data)
         #                     (if (or (== $Type FHyp) (== $Type EHyp))
         #                         (match-atom $Data (FSDepth $D)
         #                             (if (<= $D $current_depth) $L (empty)))
@@ -908,8 +909,8 @@ class MM:
         parsed_mstack = [[a or b for (a,b) in re.findall(r'"([^"]+)"|([^\s"()]+)', re.sub(r'\(Num\s+\d+(?:\.\d+)?\)\s*', '', str(expr)))] for expr in metta.run('!(match &stack $s $s)')[0]]
         # parsed_mstack = [[a or b for (a,b) in re.findall(r'"([^"]+)"|([^\s"()]+)', re.search(r'\(Num\s+\d+\)\s*\((.*)\)', str(expr)).group(1))] for expr in metta.run('!(match &stack $s $s)')[0]]
         assert parsed_mstack == stack, f"Mismatch in MeTTa vs. Python: {parsed_mstack} vs. {stack}"
-        # mettarl('!(match &frames (ActiveHyp $ActiveHyp) (remove-atom &frames (ActiveHyp $ActiveHyp)))') # Dump the active hypotheses!
-        mettarl('!(remove-pattern &frames (ActiveHyp $_))') # Remove all active hypotheses
+        # mettarl('!(match &kb (ActiveHyp $ActiveHyp) (remove-atom &kb (ActiveHyp $ActiveHyp)))') # Dump the active hypotheses!
+        mettarl('!(remove-pattern &kb (ActiveHyp $_))') # Remove all active hypotheses
         return stack
     
     def treat_normal_proof(self, proof: list[str]) -> list[Stmt]:

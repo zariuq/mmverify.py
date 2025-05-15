@@ -52,9 +52,14 @@
 ;; Data Adding Section
 
 (= (add_c $tok)
-  (unify &frames (Constant $tok (Type "$c")) (Error (Constant $tok) "Constant already declared.") 
-    (unify &frames (Var $tok ($_ (Type "$v"))) (Error (Var $tok) "Trying to declare as a constant an active variable") 
-      (add-atom &frames ( Constant $tok (Type "$c") )))))
+  (unify &kb (Constant $tok (Type "$c")) (Error (Constant $tok) "Constant already declared.") 
+    (unify &kb (Var $tok ($_ (Type "$v"))) (Error (Var $tok) "Trying to declare as a constant an active variable.") 
+      (add-atom &kb ( Constant $tok (Type "$c") )))))
+
+(= (add_v $tok $level)
+  (unify &kb (Var $tok ($_ (Type "$v"))) (Error (Var $tok) "Var already declared and active.")
+    (unify &kb (Constant $tok (Type "$c")) (Error (Constant $tok) "Var already declared as constant.")
+      (add-atom &kb ( Var $tok ( (FSDepth $level) (Type "$v") ))))))
 
 ;; Substitution Section
 
@@ -136,14 +141,14 @@
 
 ;; Find all tokens in a statement that are variables
 (= (find_vars $stmt)
-  (filter-atom $stmt $tok (unify &frames (Var $tok $_) True False)))
+  (filter-atom $stmt $tok (unify &kb (Var $tok $_) True False)))
 
 ;; Orient pairs as (min, max)
 (= (orient_pair $x $y)
    (((py-atom min) $x $y) ((py-atom max) $x $y))) 
 
 ;; Look up disjoint variables (which are oriented)
-(= (lookup_d $x $y) (let ($x' $y') (orient_pair $x $y) (unify &frames (DVar ($x' $y') $_) True False)))
+(= (lookup_d $x $y) (let ($x' $y') (orient_pair $x $y) (unify &kb (DVar ($x' $y') $_) True False)))
 
 ;; Check $x and $y, vars in a substitution: if they're the same or not tagged as disjoint, throw an error 
 ;; (because disjointness must be preserved transively through substitution)
@@ -203,7 +208,7 @@
 ;; The hypothesis part of the treat_step function
 ;; Simply adds the floating or essential hypothesis to the stack, ensuring they are active hypotheses.
 (= (treat_hypothesis $label $Type $Data $stack_len)
-  (unify &frames (ActiveHyp $label) 
+  (unify &kb (ActiveHyp $label) 
     (case $Type
       (
         (FHyp (match-atom' $Data (Typecode $t) (match-atom' $Data (FVar $v) (add-atom &stack ((Num $stack_len) ($t $v)))))) 
@@ -212,14 +217,14 @@
     (Error (label $label) "The label is the label of a nonactive hypothesis.")))
 
 ;; Treats the step by label.
-;; Finds the data from the &frames space,
+;; Finds the data from the &kb space,
 ;; Calculates the stack length,
 ;; And calls the appropriate function: treat hypothesis or treat assertion
 (= (treat_step $label) 
     (let*
       (
         (() (println! (»»» treating label $label)))
-        (($Type $Data) (unify &frames ((Label $label) $Type $Data) ($Type $Data) (Error (label $label) "No statement information found for label")))
+        (($Type $Data) (unify &kb ((Label $label) $Type $Data) ($Type $Data) (Error (label $label) "No statement information found for label")))
         ($stack_len (case (matchc &stack ( (Num $n) $s ) $n) ( ( () 0 ) ( $nums (+ 1 (max-atom $nums))) ))) ;; Stack length is used in all cases.
         (() (println! ($Type $label data: $Data)))
       )
@@ -233,7 +238,7 @@
       ))
 
 ;; Treats a normal proof (e.g., a list of labels).
-;; Adds all hypothesis in the &frames space to the active hypotheses set.  (Q: Is this redundant because the data is extracted via the &frames set, so failing to match the label would indicate it is not active?  I don't fully understand the failure mode here.)
+;; Adds all hypothesis in the &kb space to the active hypotheses set.  (Q: Is this redundant because the data is extracted via the &kb set, so failing to match the label would indicate it is not active?  I don't fully understand the failure mode here.)
 ;; Calls treat step for each label in the proof.
 ;; Removes the active hypotheses
 (= (treat_normal_proof $proof)
@@ -242,11 +247,11 @@
         (() (println! (Got Proof: $proof)))
         ($_0 (empty-space &stack)) ;; stack: list[Stmmt] = []
         ;; active_hypotheses = {label for frame in self.fs for labels in (frame.f_labels, frame.e_labels) for label in labels.values()}
-        ($_1 (matchc &frames ((Label $label) FHyp $Data) (add-atom &frames (ActiveHyp $label))))
-        ($_2 (matchc &frames ((Label $label) EHyp $Data) (add-atom &frames (ActiveHyp $label))))
+        ($_1 (matchc &kb ((Label $label) FHyp $Data) (add-atom &kb (ActiveHyp $label))))
+        ($_2 (matchc &kb ((Label $label) EHyp $Data) (add-atom &kb (ActiveHyp $label))))
         ($_3 (map-atom $proof $label (treat_step $label)))
       )
-      (remove-pattern &frames (ActiveHyp $_))))
+      (remove-pattern &kb (ActiveHyp $_))))
 
 ;; Verifies that a proof of a conclusion holds.
 ;; Calls treat normal proof on the proof,
