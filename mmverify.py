@@ -549,11 +549,12 @@ class MM:
                 if len(stmt) != 2: # MeTTa: not sure but let's consider this parsing
                     raise MMError(
                         '$f must have length two but is {}'.format(stmt))
+                mettarl(f'!(add_f {mettify(label)} {mettify(stmt[0])} {mettify(stmt[1])} {len(self.fs)})')
+                mettarl(f'!(add-atom &kb ( (Label {mettify(label)}) FHyp ( (Typecode {mettify(stmt[0])}) (FVar {mettify(stmt[1])}) (Type "$f") )))')
                 self.add_f(stmt[0], stmt[1], label)
                 self.labels[label] = ('$f', [stmt[0], stmt[1]])
                 # mettarl(f'!(add-atom &kb ( (Label {mettify(label)}) FHyp ( (FSDepth {len(self.fs)}) (Typecode {mettify(stmt[0])}) (FVar {mettify(stmt[1])}) (Type "$f") )))')
-                mettarl(f'!(add-atom &kb ( (Label {mettify(label)}) FHyp (FSDepth {len(self.fs)}) ( (Typecode {mettify(stmt[0])}) (FVar {mettify(stmt[1])}) (Type "$f") )))')
-                mettarl(f'!(add-atom &kb ( (Label {mettify(label)}) FHyp ( (Typecode {mettify(stmt[0])}) (FVar {mettify(stmt[1])}) (Type "$f") )))')
+                # mettarl(f'!(add-atom &kb ( (Label {mettify(label)}) FHyp (FSDepth {len(self.fs)}) ( (Typecode {mettify(stmt[0])}) (FVar {mettify(stmt[1])}) (Type "$f") )))')
                 label = None
             elif tok == '$e':
                 if not label:

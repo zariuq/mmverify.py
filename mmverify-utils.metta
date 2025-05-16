@@ -42,8 +42,8 @@
 (= (match-atom' $expr $pattern $rewrite) (case (match-atom $expr $pattern $rewrite) ( (Empty () ) ( $q $q ) )))
 
 ; No longer used due to adjust-state-additive
-; (= (update-atom $space $atom $update_pattern)
-;   (match $space $atom (let () (add-atom $space $update_pattern) (remove-atom $space $atom))))
+(= (update-atom $space $atom $update_pattern)
+  (match $space $atom (let () (add-atom $space $update_pattern) (remove-atom $space $atom))))
 
 (= (adjust-state-additive $state $delta)
    (chain (get-state $state) $current
@@ -111,14 +111,24 @@
     (unify &kb (Constant $tok (Type "$c")) (Error (Constant $tok) "Var already declared as constant.")
       (add-atom &kb ( Var $tok (FSDepth $level) (Type "$v") )))))
 
-; (= (add_f $typecode $var $label)
-;   (unify &kb (Var $var ($_ (Type "$v"))) 
-;     (unify &kb (Constant $typecode (Type "$c")) 
-;       ()
-;       (Error (Constant $typecode) "Typecode in $f not declared."))
-;     (Error (Var $var) "Var in $f not declared."))
-; )
-
+(= (add_f $label $typecode $var $level)
+  (unify &kb (Var $var $_ (Type "$v")) 
+    (unify &kb (Constant $typecode (Type "$c")) 
+      (unify &kb ( (Label $label') FHyp (FSDepth $FSDepth) ( (Typecode $typecode') (FVar $var) (Type "$f") ) ) 
+        (Error ( (Label $label') (Typecode $typecode') (Var $var) ) "Var in $f already typed by an active $f-statement." )
+        (let*
+          ( 
+            ($flist_entry (to-list (($typecode $var))))
+            (() (unify &kb (FList $flist) 
+              (let $flist' (append $flist $flist_entry) (update-atom &kb (FList $flist) (FList $flist')))  
+              (add-atom &kb (FList $flist_entry))))
+          )
+            (add-atom &kb ( (Label $label) FHyp (FSDepth $level) ( (Typecode $typecode) (FVar $var) (Type "$f") )))
+        )
+      )
+      (Error (Constant $typecode) "Typecode in $f not declared."))
+    (Error (Var $var) "Var in $f not declared."))
+)
 
 ;; Substitution Section
 
