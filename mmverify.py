@@ -333,7 +333,7 @@ class FrameStack(list[Frame]):
         frame.e.append(stmt)
         frame.e_labels[tuple(stmt)] = label
         # conversion to tuple since dictionary keys must be hashable
-        mettarl(f'!(add-atom &kb ( (Label {mettify(label)}) EHyp ( (FSDepth {len(self)}) (ENum {len(frame.e)}) (Statement {mettify(stmt)}) (Type "$e") )))')
+        mettarl(f'!(add-atom &kb ( (Label {mettify(label)}) EHyp (FSDepth {len(self)}) ( (ENum {len(frame.e)}) (Statement {mettify(stmt)}) (Type "$e") )))')
 
     def add_d(self, varlist: list[Var]) -> None:
         """Add a disjoint variable condition (ordered pair of variables) to
@@ -344,7 +344,7 @@ class FrameStack(list[Frame]):
                           if x != y)
         self[-1].d.update(new_dvs)
         for x, y in new_dvs:
-            mettarl(f'!(unify &kb (DVar ({mettify(x)} {mettify(y)}) $_) () (add-atom &kb (DVar ({mettify(x)} {mettify(y)}) ( (FSDepth {len(self)}) (Type "$d") ))))')
+            mettarl(f'!(unify &kb (DVar ({mettify(x)} {mettify(y)}) $_) () (add-atom &kb (DVar ({mettify(x)} {mettify(y)}) (FSDepth {len(self)}) (Type "$d") )))')
             # mettarl(f'!(unify &kb (DVar ("{x}" "{y}") $_) () (add-atom &kb (DVar ("{x}" "{y}") ( (FSDepth {len(self)}) (Type "$d") ))))')
         # if new_dvs: # Only log if there are actual pairs
             # dv_pairs_metta = " ".join(f'("{x}" "{y}")' for x, y in list(new_dvs))
@@ -543,21 +543,24 @@ class MM:
                     self.add_v(tok)
             elif tok == '$f':
                 stmt = self.read_non_p_stmt(tok, toks)
-                if not label:
+                if not label: # MeTTa-side, I'll consider this purely parsing
                     raise MMError(
                         '$f must have label (statement: {})'.format(stmt))
-                if len(stmt) != 2:
+                if len(stmt) != 2: # MeTTa: not sure but let's consider this parsing
                     raise MMError(
                         '$f must have length two but is {}'.format(stmt))
                 self.add_f(stmt[0], stmt[1], label)
                 self.labels[label] = ('$f', [stmt[0], stmt[1]])
-                mettarl(f'!(add-atom &kb ( (Label {mettify(label)}) FHyp ( (FSDepth {len(self.fs)}) (Typecode {mettify(stmt[0])}) (FVar {mettify(stmt[1])}) (Type "$f") )))')
+                # mettarl(f'!(add-atom &kb ( (Label {mettify(label)}) FHyp ( (FSDepth {len(self.fs)}) (Typecode {mettify(stmt[0])}) (FVar {mettify(stmt[1])}) (Type "$f") )))')
+                mettarl(f'!(add-atom &kb ( (Label {mettify(label)}) FHyp (FSDepth {len(self.fs)}) ( (Typecode {mettify(stmt[0])}) (FVar {mettify(stmt[1])}) (Type "$f") )))')
+                mettarl(f'!(add-atom &kb ( (Label {mettify(label)}) FHyp ( (Typecode {mettify(stmt[0])}) (FVar {mettify(stmt[1])}) (Type "$f") )))')
                 label = None
             elif tok == '$e':
                 if not label:
                     raise MMError('$e must have label')
                 stmt = self.read_non_p_stmt(tok, toks)
                 ## TODO: add a separate &labels... or something.  Geezio.
+                mettarl(f'!(add-atom &kb ( (Label {mettify(label)}) EHyp ( (Statement {mettify(stmt)}) (Type "$e") )))')
                 self.fs.add_e(stmt, label)
                 self.labels[label] = ('$e', stmt)
                 label = None
@@ -598,7 +601,8 @@ class MM:
             else:
                 raise MMError("Unknown token: '{}'.".format(tok))
             tok = toks.readc()
-        mettarl(f'!(match &kb ($1 $2 $Data) (match-atom $Data (FSDepth {len(self.fs)}) (remove-atom &kb ($1 $2 $Data))))')
+        # mettarl(f'!(match &kb ($1 $2 $Data) (match-atom $Data (FSDepth {len(self.fs)}) (remove-atom &kb ($1 $2 $Data))))')
+        mettarl(f'!(match &kb ($1 $2 (FSDepth {len(self.fs)}) $Data) (remove-atom &kb ($1 $2 (FSDepth {len(self.fs)}) $Data)))')
         self.fs.pop()
 
     def treat_step(self,

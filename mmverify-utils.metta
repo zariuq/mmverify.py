@@ -41,25 +41,84 @@
 (: match-atom' (-> Expression Atom Atom %Undefined$))
 (= (match-atom' $expr $pattern $rewrite) (case (match-atom $expr $pattern $rewrite) ( (Empty () ) ( $q $q ) )))
 
-;; TODO: remove when outmoted.
-(= (update-atom $space $atom $update_pattern)
-  (match $space $atom (let () (add-atom $space $update_pattern) (remove-atom $space $atom))))
+; No longer used due to adjust-state-additive
+; (= (update-atom $space $atom $update_pattern)
+;   (match $space $atom (let () (add-atom $space $update_pattern) (remove-atom $space $atom))))
 
 (= (adjust-state-additive $state $delta)
    (chain (get-state $state) $current
      (change-state! $state (+ $current $delta))))
 
+;; List Utility Section
+
+;; Declaration of List data type and constructors
+; (: List (-> $a Type))
+; (: Nil (List $a))
+; (: Cons (-> $a (List $a) (List $a)))
+
+;; Convert an expression into a list.
+; (: to-list (-> Expression (List Atom)))
+(= (to-list $expr)
+   (if (== $expr ()) Nil
+     (Cons (car-atom $expr)
+         (to-list (cdr-atom $expr)))))
+
+; (: to-list' (-> Expression (List Atom) (List Atom)))
+(= (to-list' $expr $tail)
+   (if (== $expr ()) $tail
+     (Cons (car-atom $expr)
+         (to-list' (cdr-atom $expr) $tail))))
+
+;; Take a list of lists and flatten it.
+; (: flatten-list (-> (List Atom) (List Atom)))
+(= (flatten-list Nil) Nil)
+(= (flatten-list (Cons $head $tail))
+  (case (get-metatype $head)
+    ((Expression (to-list' $head (flatten-list $tail)))
+     ($_ (Cons $head (flatten-list $tail))))))
+
+;; Convert a list into an expression
+; (: from-list (-> (List Atom) Expression))
+; (: from-list (-> (List $a) Expression))
+(= (from-list Nil) ())
+(= (from-list (Cons $head $tail))
+   (let $tail-list (from-list $tail)
+    (cons-atom $head $tail-list)))
+
+;; Flatten an expression
+; (: flatten-expr (-> Expression Expression))
+(= (flatten-expr $expr) (from-list (flatten-list (to-list $expr))))
+
+;; The sacred union of lists - append brings two into one
+; (: append (-> (List $a) (List $a) (List $a)))
+(= (append Nil $list) $list)
+(= (append (Cons $head $tail) $list) 
+   (Cons $head (append $tail $list)))
+
+; (: append-expr (-> Expression Expression Expression))
+; (= (append-expr $expr1 $expr2)
+;    (from-list (append (to-list $expr1) (to-list $expr2))))
+
 ;; Data Adding Section
 
 (= (add_c $tok)
   (unify &kb (Constant $tok (Type "$c")) (Error (Constant $tok) "Constant already declared.") 
-    (unify &kb (Var $tok ($_ (Type "$v"))) (Error (Var $tok) "Trying to declare as a constant an active variable.") 
+    (unify &kb (Var $tok $_ (Type "$v")) (Error (Var $tok) "Trying to declare as a constant an active variable.") 
       (add-atom &kb ( Constant $tok (Type "$c") )))))
 
 (= (add_v $tok $level)
   (unify &kb (Var $tok ($_ (Type "$v"))) (Error (Var $tok) "Var already declared and active.")
     (unify &kb (Constant $tok (Type "$c")) (Error (Constant $tok) "Var already declared as constant.")
-      (add-atom &kb ( Var $tok ( (FSDepth $level) (Type "$v") ))))))
+      (add-atom &kb ( Var $tok (FSDepth $level) (Type "$v") )))))
+
+; (= (add_f $typecode $var $label)
+;   (unify &kb (Var $var ($_ (Type "$v"))) 
+;     (unify &kb (Constant $typecode (Type "$c")) 
+;       ()
+;       (Error (Constant $typecode) "Typecode in $f not declared."))
+;     (Error (Var $var) "Var in $f not declared."))
+; )
+
 
 ;; Substitution Section
 
@@ -82,35 +141,8 @@
           ) ($var $entry1:))
         (Error ( (sp $sp) (entry $entry) (typecode $typecode) (var $var) ) "Proof stack entry does not match floating hypothesis."))))
 
-;; Convert an expression into a list.
-(= (to-list $expr)
-   (if (== $expr ()) Nil
-     (Cons (car-atom $expr)
-         (to-list (cdr-atom $expr)))))
 
-(= (to-list' $expr $tail)
-   (if (== $expr ()) $tail
-     (Cons (car-atom $expr)
-         (to-list' (cdr-atom $expr) $tail))))
-
-;; Take a list of lists and flatten it.
-(= (flatten-list Nil) Nil)
-(= (flatten-list (Cons $head $tail))
-  (case (get-metatype $head)
-    ((Expression (to-list' $head (flatten-list $tail)))
-     ($_ (Cons $head (flatten-list $tail))))))
-
-;; Convert a list into an expression
-; (: from-list (-> (List $a) Expression))
-(= (from-list Nil) ())
-(= (from-list (Cons $head $tail))
-   (let $tail-list (from-list $tail)
-    (cons-atom $head $tail-list)))
-
-;; Flatten an expression
-(= (flatten-expr $expr) (from-list (flatten-list (to-list $expr))))
-
-;; Apply a substitution from thesubstitution space to a token
+;; Apply a substitution from the substitution space to a token
 (= (apply_subst_tok $subst $tok)
   (let $res (unify $subst ($tok $sub) $sub $tok) $res))
 
@@ -247,8 +279,8 @@
         (() (println! (Got Proof: $proof)))
         ($_0 (empty-space &stack)) ;; stack: list[Stmmt] = []
         ;; active_hypotheses = {label for frame in self.fs for labels in (frame.f_labels, frame.e_labels) for label in labels.values()}
-        ($_1 (matchc &kb ((Label $label) FHyp $Data) (add-atom &kb (ActiveHyp $label))))
-        ($_2 (matchc &kb ((Label $label) EHyp $Data) (add-atom &kb (ActiveHyp $label))))
+        ($_1 (matchc &kb ((Label $label) FHyp $FSDepth $Data) (add-atom &kb (ActiveHyp $label))))
+        ($_2 (matchc &kb ((Label $label) EHyp $FSDepth $Data) (add-atom &kb (ActiveHyp $label))))
         ($_3 (map-atom $proof $label (treat_step $label)))
       )
       (remove-pattern &kb (ActiveHyp $_))))
