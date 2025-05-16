@@ -333,7 +333,7 @@ class FrameStack(list[Frame]):
         frame.e.append(stmt)
         frame.e_labels[tuple(stmt)] = label
         # conversion to tuple since dictionary keys must be hashable
-        mettarl(f'!(add-atom &kb ( (Label {mettify(label)}) EHyp (FSDepth {len(self)}) ( (ENum {len(frame.e)}) (Statement {mettify(stmt)}) (Type "$e") )))')
+        # mettarl(f'!(add-atom &kb ( (Label {mettify(label)}) EHyp (FSDepth {len(self)}) ( (ENum {len(frame.e)}) (Statement {mettify(stmt)}) (Type "$e") )))')
 
     def add_d(self, varlist: list[Var]) -> None:
         """Add a disjoint variable condition (ordered pair of variables) to
@@ -560,7 +560,7 @@ class MM:
                 if not label:
                     raise MMError('$e must have label')
                 stmt = self.read_non_p_stmt(tok, toks)
-                ## TODO: add a separate &labels... or something.  Geezio.
+                mettarl(f'!(add_e {mettify(label)} {mettify(stmt)} {len(self.fs)})')
                 mettarl(f'!(add-atom &kb ( (Label {mettify(label)}) EHyp ( (Statement {mettify(stmt)}) (Type "$e") )))')
                 self.fs.add_e(stmt, label)
                 self.labels[label] = ('$e', stmt)

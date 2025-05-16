@@ -130,6 +130,18 @@
     (Error (Var $var) "Var in $f not declared."))
 )
 
+;; Oh, there are no checks.  So this is nearly trivial.  I actually just keep it as is.  But I do both the e_labels (i.e., e with FSDepth, and e.append, i.e., the $EList)
+(= (add_e $label $stmt $level)
+  (let*
+    (
+      ($elist_entry (to-list ($stmt)))
+      (() (unify &kb (EList $elist)
+        (let $elist' (append $elist $elist_entry) (update-atom &kb (EList $elist) (EList $elist')))
+        (add-atom &kb (EList $elist_entry))))
+    )
+      (add-atom &kb ( (Label $label) EHyp (FSDepth $level) ( (Statement {$stmt) (Type "$e") )))
+    )
+
 ;; Substitution Section
 
 ;; Add a substiution to the substitution-space, based on a floating hypothesis.
