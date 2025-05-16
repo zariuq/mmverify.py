@@ -141,6 +141,7 @@
     )
       (add-atom &kb ( (Label $label) EHyp (FSDepth $level) ( (Statement {$stmt) (Type "$e") )))
     )
+)
 
 ;; Substitution Section
 
