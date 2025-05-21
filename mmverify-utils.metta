@@ -41,6 +41,9 @@
 (: match-atom' (-> Expression Atom Atom %Undefined$))
 (= (match-atom' $expr $pattern $rewrite) (case (match-atom $expr $pattern $rewrite) ( (Empty () ) ( $q $q ) )))
 
+(: match-atom'' (-> Expression Atom Atom Atom %Undefined$))
+(= (match-atom'' $expr $pattern $rewrite $Empty) (case (match-atom $expr $pattern $rewrite) ( (Empty $Empty) ( $q $q ) )))
+
 ; No longer used due to adjust-state-additive
 (= (update-atom $space $atom $update_pattern)
   (match $space $atom (let () (add-atom $space $update_pattern) (remove-atom $space $atom))))
@@ -55,6 +58,18 @@
 ; (: List (-> $a Type))
 ; (: Nil (List $a))
 ; (: Cons (-> $a (List $a) (List $a)))
+
+;; Similar to match but takes a list of terms instead of a space.
+(: match' (-> (List Atom) $a $a $a))
+(= (match' Nil $pattern $rewrite) (empty))
+(= (match' (Cons $head $tail) $pattern $rewrite) (let $pattern $head $rewrite))
+(= (match' (Cons $head $tail) $pattern $rewrite) (match' $tail $pattern $rewrite))
+
+(= (map' Nil $_ $_) Nil)
+(= (map' (Cons $head $tail) $var $pattern)
+  (let $var $head
+   (Cons $pattern
+         (map' $tail $var $pattern))))
 
 ;; Convert an expression into a list.
 ; (: to-list (-> Expression (List Atom)))
@@ -119,9 +134,9 @@
         (let*
           ( 
             ($flist_entry (to-list (($typecode $var))))
-            (() (unify &kb (FList $flist) 
-              (let $flist' (append $flist $flist_entry) (update-atom &kb (FList $flist) (FList $flist')))  
-              (add-atom &kb (FList $flist_entry))))
+            (() (unify &kb (FList (FSDepth $level) $flist) 
+              (let $flist' (append $flist $flist_entry) (update-atom &kb (FList (FSDepth $level) $flist) (FList (FSDepth $level) $flist')))  
+              (add-atom &kb (FList (FSDepth $level) $flist_entry))))
           )
             (add-atom &kb ( (Label $label) FHyp (FSDepth $level) ( (Typecode $typecode) (FVar $var) (Type "$f") )))
         )
@@ -135,13 +150,71 @@
   (let*
     (
       ($elist_entry (to-list ($stmt)))
-      (() (unify &kb (EList $elist)
-        (let $elist' (append $elist $elist_entry) (update-atom &kb (EList $elist) (EList $elist')))
-        (add-atom &kb (EList $elist_entry))))
+      (() (unify &kb (EList (FSDepth $level) $elist)
+        (let $elist' (append $elist $elist_entry) (update-atom &kb (EList (FSDepth $level) $elist) (EList (FSDepth $level) $elist')))
+        (add-atom &kb (EList (FSDepth $level) $elist_entry))))
     )
-      (add-atom &kb ( (Label $label) EHyp (FSDepth $level) ( (Statement {$stmt) (Type "$e") )))
+      (add-atom &kb ( (Label $label) EHyp (FSDepth $level) ( (Statement $stmt) (Type "$e") )))
     )
 )
+
+; (= (collect_ehyps_by_depth $current $max $acc)
+;    (if (> $current $max)
+;        ;; End condition: return the accumulated results
+;        $acc
+;        ;; Get entries at current depth and continue recursion
+;        (let $entries (match &kb (EList (FSDepth $current) $elist) ($current $elist))
+;          (collect_ehyps_by_level 
+;            (+ $current 1) 
+;            $max 
+;            (append-expr $acc (($current $entries)))))))
+
+(= (collect_ehyps_by_depth $unordered_list $current $max $ordered_list)
+  (if (> $current $max)
+    $ordered_list
+    (let $current_list (match-atom'' $unordered_list ($current $list) $list Nil)
+      (let () (println! ("collect list:" $current - $current_list))
+      (collect_ehyps_by_depth $unordered_list (+ 1 $current) $max (append $ordered_list $current_list))))))
+
+(= (make_assertion $label $stmt)
+  (let*
+    (
+      (() (println! ("make_assertion" $label - $stmt)))
+      ($e_hyps_lists (matchc &kb (EList (FSDepth $level) $elist) ($level $elist)))
+      (() (println! ("e_hyps lists:" $e_hyps_lists)))
+      ($levels (collapse (match-atom' $e_hyps_lists ($l $_) $l)))
+      (() (println! ("levels:" $levels)))
+      ($max_level (if (== $levels (())) 0 (max-atom $levels)))
+      (() (println! ("max_level of frame stack:" $max_level)))
+      ($e_hyps (from-list (collect_ehyps_by_depth $e_hyps_lists 1 $max_level Nil)))
+      (() (println! ("e_hyps:" $e_hyps)))
+    ) ()))
+
+;     def make_assertion(self, stmt: Stmt) -> Assertion:
+;         """Return a quadruple (disjoint variable conditions, floating
+;         hypotheses, essential hypotheses, conclusion) describing the given
+;         assertion.
+;         """
+;         e_hyps = [eh for fr in self for eh in fr.e]))
+;         mand_vars = {tok for hyp in itertools.chain(e_hyps, [stmt])
+;                      for tok in hyp if self.lookup_v(tok)}
+;         dvs = {(x, y) for fr in self for (x, y)
+;                in fr.d if x in mand_vars and y in mand_vars}
+;         f_hyps = []
+;         for fr in self:
+;             for typecode, var in fr.f:
+;                 if var in mand_vars:
+;                     f_hyps.append((typecode, var))
+;                     mand_vars.remove(var)
+;         assertion = dvs, f_hyps, e_hyps, stmt
+;         vprint(18, 'Make assertion:', assertion)
+;         return assertion
+
+;; At the end of demo0.mm
+; >>> metta.run('!(match &kb (EList $l) $l)')
+; [[(Cons ("|-" "P") (Cons ("|-" "(" "P" "->" "Q" ")") Nil))]]
+; >>> metta.run('!(match &kb (FList $l) $l)')
+; [[(Cons ("term" "t") (Cons ("term" "r") (Cons ("term" "s") (Cons ("wff" "P") (Cons ("wff" "Q") Nil)))))]]
 
 ;; Substitution Section
 
@@ -164,7 +237,10 @@
           ) ($var $entry1:))
         (Error ( (sp $sp) (entry $entry) (typecode $typecode) (var $var) ) "Proof stack entry does not match floating hypothesis."))))
 
-
+(= (map-pattern' Nil $_ $_) Nil)
+(= (map-pattern' (Cons $head $tail) $var $pattern)
+   (Cons (let $var $head $pattern) 
+         (map-pattern' $tail $var $pattern)))
 ;; Apply a substitution from the substitution space to a token
 (= (apply_subst_tok $subst $tok)
   (let $res (unify $subst ($tok $sub) $sub $tok) $res))

@@ -81,7 +81,8 @@ def mettify(expr) -> str:
     # Handle strings (Metamath tokens)
     if isinstance(expr, str):
         # Escape double quotes in tokens and wrap in double quotes
-        return f'"{expr.replace('\\', '\\\\').replace('"', '\\"')}"'
+        # return f'"{expr.replace('\\', '\\\\').replace('"', '\\"')}"'
+        return '"' + expr.replace("\\", "\\\\").replace("\"", "\\\"") + '"'
         # return f'"{expr.replace('\\', '\\\\').replace('"', '\\"').replace('(', '⟮').replace(')', '⟯')}"' ## <-- fine
         # return f'「{expr.replace('(', '⟮').replace(')', '⟯')}」' ## <-- buggy
         
@@ -568,7 +569,9 @@ class MM:
             elif tok == '$a':
                 if not label:
                     raise MMError('$a must have label')
-                dvs, f_hyps, e_hyps, stmt = self.fs.make_assertion(self.read_non_p_stmt(tok, toks))
+                stmt = self.read_non_p_stmt(tok, toks) # Just less-compact
+                mettarl(f'!(make_assertion {mettify(label)} {mettify(stmt)})')
+                dvs, f_hyps, e_hyps, stmt = self.fs.make_assertion(stmt) # make_assertion(self.read_non_p_stmt(tok, toks))
                 self.labels[label] = ('$a', (dvs, f_hyps, e_hyps, stmt))
                 mettarl(f'!(add-atom &kb ( (Label {mettify(label)}) Assertion ( (DVars {mettify(dvs)}) (FHyps {mettify(f_hyps)}) (EHyps {mettify(e_hyps)}) (Statement {mettify(stmt)}) (Type "$a") )))')
                 label = None
@@ -724,7 +727,7 @@ class MM:
             #         (let $error (format-args (Stack underflow: proof step requires too many ({{}}) hypotheses.\nData is lf: {{}} vs {len(f_hyps0)}, le: {{}} vs {len(e_hyps0)}, slen: {{}} vs {len(stack)}, sp: {{}} vs {sp} ) ($npop $lenf $lene $slen $sp) ) (Error ((Label {mettify(label)}) Assertion $Data) $error))
             #         (let () (add-atom &wm (sp $sp)) ($lenf $lene $npop $slen $sp)))))''')
             print(f'assertion: {assertion}')
-            print(f'label {mettify(label)}, sp: {sp}, npop:{npop}, assertion: {assertion}, metta sp: {metta.run('!(match &wm (sp $sp) $sp)')}')
+            print(f"label {mettify(label)}, sp: {sp}, npop:{npop}, assertion: {assertion}, metta sp: {metta.run('!(match &wm (sp $sp) $sp)')}")
             # print(f'mout: {mout}')
             # # print(f'metta stack size: {metta.run(f'!(let $nums (collapse (let $nums (match &stack ( (Num $n) $l $t $d ) $n) $nums)) (max-atom $nums))')}')
             metta_sp = int(float(str(metta.run('!(match &wm (sp $sp) $sp)')[0][0])))
