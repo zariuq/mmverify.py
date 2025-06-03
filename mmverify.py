@@ -345,7 +345,7 @@ class FrameStack(list[Frame]):
                           if x != y)
         self[-1].d.update(new_dvs)
         for x, y in new_dvs:
-            mettarl(f'!(unify &kb (DVar ({mettify(x)} {mettify(y)}) $_) () (add-atom &kb (DVar ({mettify(x)} {mettify(y)}) (FSDepth {len(self)}) (Type "$d") )))')
+            mettarl(f'!(unify &kb (DVar ({mettify(x)} {mettify(y)}) $_ (Type "$d")) () (add-atom &kb (DVar ({mettify(x)} {mettify(y)}) (FSDepth {len(self)}) (Type "$d") )))')
             # mettarl(f'!(unify &kb (DVar ("{x}" "{y}") $_) () (add-atom &kb (DVar ("{x}" "{y}") ( (FSDepth {len(self)}) (Type "$d") ))))')
         # if new_dvs: # Only log if there are actual pairs
             # dv_pairs_metta = " ".join(f'("{x}" "{y}")' for x, y in list(new_dvs))
@@ -396,9 +396,9 @@ class FrameStack(list[Frame]):
         e_hyps = [eh for fr in self for eh in fr.e]
         mand_vars = {tok for hyp in itertools.chain(e_hyps, [stmt])
                      for tok in hyp if self.lookup_v(tok)}
-        print(f"Make assertion debug.\ne_hyps: {e_hyps}\nmand_vars: {mand_vars}\n\n")
         dvs = {(x, y) for fr in self for (x, y)
                in fr.d if x in mand_vars and y in mand_vars}
+        print(f"Make assertion debug.\ne_hyps: {e_hyps}\nmand_vars: {mand_vars}\ndvs: {dvs}\n\n")
         f_hyps = []
         for fr in self:
             for typecode, var in fr.f:
@@ -571,7 +571,7 @@ class MM:
                 if not label:
                     raise MMError('$a must have label')
                 stmt = self.read_non_p_stmt(tok, toks) # Just less-compact
-                # mettarl(f'!(make_assertion {mettify(label)} {mettify(stmt)})')
+                mettarl(f'!(make_assertion {mettify(label)} {mettify(stmt)})')
                 dvs, f_hyps, e_hyps, stmt = self.fs.make_assertion(stmt) # make_assertion(self.read_non_p_stmt(tok, toks))
                 self.labels[label] = ('$a', (dvs, f_hyps, e_hyps, stmt))
                 mettarl(f'!(add-atom &kb ( (Label {mettify(label)}) Assertion ( (DVars {mettify(dvs)}) (FHyps {mettify(f_hyps)}) (EHyps {mettify(e_hyps)}) (Statement {mettify(stmt)}) (Type "$a") )))')
@@ -580,6 +580,7 @@ class MM:
                 if not label:
                     raise MMError('$p must have label')
                 stmt, proof = self.read_p_stmt(toks)
+                mettarl(f'!(make_assertion {mettify(label)} {mettify(stmt)})')
                 dvs, f_hyps, e_hyps, conclusion = self.fs.make_assertion(stmt)
                 if self.verify_proofs:
                     vprint(2, 'Verify:', label)

@@ -230,17 +230,20 @@
       (() (println! ("max_level of frame stack:" $max_level)))
       ($e_hyps_list (collect_ehyps_by_depth $e_hyps_lists 1 $max_level Nil))
       (() (println! ("e_hyps_list:" $e_hyps_list)))
-      ($e_hyps (from-list $e_hyps_list))
-      (() (println! ("e_hyps:" $e_hyps)))
+      ; ($e_hyps (from-list $e_hyps_list))
+      ; (() (println! ("e_hyps:" $e_hyps)))
       ; mand_vars = {tok for hyp in itertools.chain(e_hyps, [stmt])
       ; for tok in hyp if self.lookup_v(tok)}
       ($_0 (map-atom (from-list (flatten-list $e_hyps_list)) $tok (add_mand_var $tok)))
       ($_1 (map-atom $stmt $tok (add_mand_var $tok)))
       ($mand_vars (matchc &kb (MandVar $var) $var))
-      (() (println! ("mand_vars:" $mand_vars'')))
+      (() (println! ("mand_vars:" $mand_vars)))
       ; dvs = {(x, y) for fr in self for (x, y)
       ;        in fr.d if x in mand_vars and y in mand_vars}
-
+      ($dvs (matchc &kb (DVar ($x $y) $_ (Type "$d"))
+              (unify &kb (MandVar $x)
+                (unify &kb (MandVar $y) ($x $y) ()) ())))
+      (() (println! ("dvs:" $dvs)))
       ; ($e_hyps_and_stmt_list (append $e_hyps_list (to-list ($stmt))))
       ; (() (println! ("h_hypes_and_stmt_list:" $e_hyps_and_stmt_list)))
       ; ($e_toks' (flatten-list $e_hyps_list))
@@ -255,7 +258,6 @@
       ; ($mand_vars (filter-atom $e_toks $tok (unify &kb (Var $tok $_ (Type "$v")) True False)))
       (() (println! ("mand_vars:" $mand_vars)))
       ($_2 (remove-pattern &kb (MandVar $var)))
-      (() (println! ("$_2:" $_2)))
     ) ()))
 
 ;     def make_assertion(self, stmt: Stmt) -> Assertion:
