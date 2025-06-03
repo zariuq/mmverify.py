@@ -396,6 +396,7 @@ class FrameStack(list[Frame]):
         e_hyps = [eh for fr in self for eh in fr.e]
         mand_vars = {tok for hyp in itertools.chain(e_hyps, [stmt])
                      for tok in hyp if self.lookup_v(tok)}
+        print(f"Make assertion debug.\ne_hyps: {e_hyps}\nmand_vars: {mand_vars}\n\n")
         dvs = {(x, y) for fr in self for (x, y)
                in fr.d if x in mand_vars and y in mand_vars}
         f_hyps = []
@@ -570,7 +571,7 @@ class MM:
                 if not label:
                     raise MMError('$a must have label')
                 stmt = self.read_non_p_stmt(tok, toks) # Just less-compact
-                mettarl(f'!(make_assertion {mettify(label)} {mettify(stmt)})')
+                # mettarl(f'!(make_assertion {mettify(label)} {mettify(stmt)})')
                 dvs, f_hyps, e_hyps, stmt = self.fs.make_assertion(stmt) # make_assertion(self.read_non_p_stmt(tok, toks))
                 self.labels[label] = ('$a', (dvs, f_hyps, e_hyps, stmt))
                 mettarl(f'!(add-atom &kb ( (Label {mettify(label)}) Assertion ( (DVars {mettify(dvs)}) (FHyps {mettify(f_hyps)}) (EHyps {mettify(e_hyps)}) (Statement {mettify(stmt)}) (Type "$a") )))')
@@ -606,6 +607,8 @@ class MM:
                 raise MMError("Unknown token: '{}'.".format(tok))
             tok = toks.readc()
         # mettarl(f'!(match &kb ($1 $2 $Data) (match-atom $Data (FSDepth {len(self.fs)}) (remove-atom &kb ($1 $2 $Data))))')
+        mettarl(f'!(match &kb (EList (FSDepth {len(self.fs)}) $elist) (remove-atom &kb (EList (FSDepth {len(self.fs)}) $elist)))')
+        mettarl(f'!(match &kb (FList (FSDepth {len(self.fs)}) $flist) (remove-atom &kb (FList (FSDepth {len(self.fs)}) $flist)))')
         mettarl(f'!(match &kb ($1 $2 (FSDepth {len(self.fs)}) $Data) (remove-atom &kb ($1 $2 (FSDepth {len(self.fs)}) $Data)))')
         self.fs.pop()
 

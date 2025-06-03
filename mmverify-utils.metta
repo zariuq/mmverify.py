@@ -5,7 +5,6 @@
 ;;                                                                     ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-
 ;; Generic Utilities Section
 
 ;; Collapse is used to pull-in non-determinism
@@ -114,6 +113,55 @@
 ; (= (append-expr $expr1 $expr2)
 ;    (from-list (append (to-list $expr1) (to-list $expr2))))
 
+
+;; Disjoint Variable Check Section
+
+;; Map over the atoms in a pair of lists
+(= (map-pairs $list1 $list2 $fn)
+   (map-atom $list1 $v1
+     (map-atom $list2 $v2
+       ($fn $v1 $v2))))
+
+;; Find all tokens in a statement that are variables
+(= (find_vars $stmt)
+  (filter-atom $stmt $tok (unify &kb (Var $tok $_ (Type "$v")) True False)))
+
+;; Orient pairs as (min, max)
+(= (orient_pair $x $y)
+   (((py-atom min) $x $y) ((py-atom max) $x $y))) 
+
+;; Look up disjoint variables (which are oriented)
+(= (lookup_d $x $y) (let ($x' $y') (orient_pair $x $y) (unify &kb (DVar ($x' $y') $_ (Type "$d")) True False)))
+
+;; Check $x and $y, vars in a substitution: if they're the same or not tagged as disjoint, throw an error 
+;; (because disjointness must be preserved transively through substitution)
+(= (dv_check $x $y)
+  (if (or
+        (== $x $y)
+        (not (lookup_d $x $y)))
+      (Error ($x $y) "Disjoint variable violation.")
+      ()))
+
+;; Check whether the substitutions satisfy the disjoint variable conditions
+; (= (check_dvs $subst $dvs0)
+;     (map-atom $dvs0 $d 
+;       (let ($d1 $d2) $d ;; the for x, y in dvs0
+;         (let ($x_vars $y_vars)
+;           (match $subst ($d1 $sub1) 
+;             (match $subst ($d2 $sub2) 
+;               ((find_vars $sub1) (find_vars $sub2)))) 
+;           (map-pairs $x_vars $y_vars dv_check)))))
+
+
+(= (check_dvs $subst $dvs0)
+    (map-atom $dvs0 $d ;; the for x, y in dvs0
+      (let*
+        (
+          (($d1 $d2) $d)
+          ($x_vars (match $subst ($d1 $sub1) (find_vars $sub1)))
+          ($y_vars (match $subst ($d2 $sub2) (find_vars $sub2)))
+        ) (map-pairs $x_vars $y_vars dv_check))))
+
 ;; Data Adding Section
 
 (= (add_c $tok)
@@ -122,7 +170,7 @@
       (add-atom &kb ( Constant $tok (Type "$c") )))))
 
 (= (add_v $tok $level)
-  (unify &kb (Var $tok ($_ (Type "$v"))) (Error (Var $tok) "Var already declared and active.")
+  (unify &kb (Var $tok $_ (Type "$v")) (Error (Var $tok) "Var already declared and active.")
     (unify &kb (Constant $tok (Type "$c")) (Error (Constant $tok) "Var already declared as constant.")
       (add-atom &kb ( Var $tok (FSDepth $level) (Type "$v") )))))
 
@@ -158,17 +206,6 @@
     )
 )
 
-; (= (collect_ehyps_by_depth $current $max $acc)
-;    (if (> $current $max)
-;        ;; End condition: return the accumulated results
-;        $acc
-;        ;; Get entries at current depth and continue recursion
-;        (let $entries (match &kb (EList (FSDepth $current) $elist) ($current $elist))
-;          (collect_ehyps_by_level 
-;            (+ $current 1) 
-;            $max 
-;            (append-expr $acc (($current $entries)))))))
-
 (= (collect_ehyps_by_depth $unordered_list $current $max $ordered_list)
   (if (> $current $max)
     $ordered_list
@@ -176,9 +213,14 @@
       (let () (println! ("collect list:" $current - $current_list))
       (collect_ehyps_by_depth $unordered_list (+ 1 $current) $max (append $ordered_list $current_list))))))
 
+(= (add_mand_var $tok)
+  (unify &kb (Var $tok $_ (Type "$v"))
+    (unify &kb (MandVar $tok) () (add-atom &kb (MandVar $tok))) ()))
+
 (= (make_assertion $label $stmt)
   (let*
     (
+      ;; e_hyps = [eh for fr in self for eh in fr.e]))
       (() (println! ("make_assertion" $label - $stmt)))
       ($e_hyps_lists (matchc &kb (EList (FSDepth $level) $elist) ($level $elist)))
       (() (println! ("e_hyps lists:" $e_hyps_lists)))
@@ -186,8 +228,34 @@
       (() (println! ("levels:" $levels)))
       ($max_level (if (== $levels (())) 0 (max-atom $levels)))
       (() (println! ("max_level of frame stack:" $max_level)))
-      ($e_hyps (from-list (collect_ehyps_by_depth $e_hyps_lists 1 $max_level Nil)))
+      ($e_hyps_list (collect_ehyps_by_depth $e_hyps_lists 1 $max_level Nil))
+      (() (println! ("e_hyps_list:" $e_hyps_list)))
+      ($e_hyps (from-list $e_hyps_list))
       (() (println! ("e_hyps:" $e_hyps)))
+      ; mand_vars = {tok for hyp in itertools.chain(e_hyps, [stmt])
+      ; for tok in hyp if self.lookup_v(tok)}
+      ($_0 (map-atom (from-list (flatten-list $e_hyps_list)) $tok (add_mand_var $tok)))
+      ($_1 (map-atom $stmt $tok (add_mand_var $tok)))
+      ($mand_vars (matchc &kb (MandVar $var) $var))
+      (() (println! ("mand_vars:" $mand_vars'')))
+      ; dvs = {(x, y) for fr in self for (x, y)
+      ;        in fr.d if x in mand_vars and y in mand_vars}
+
+      ; ($e_hyps_and_stmt_list (append $e_hyps_list (to-list ($stmt))))
+      ; (() (println! ("h_hypes_and_stmt_list:" $e_hyps_and_stmt_list)))
+      ; ($e_toks' (flatten-list $e_hyps_list))
+      ; (() (println! ("e_toks':" $e_toks')))
+      ; ($e_toks (from-list (flatten-list $e_hyps_and_stmt_list)))
+      ; (() (println! ("e_toks:" $e_toks)))
+      ; ; ($mand_vars' (map-atom $e_hyps $e_hyp (find_vars $e_hyp)))
+      ; (() (println! ("mand_vars:" $mand_vars')))
+      ; ($vars (matchc &kb (Var $var $_ (Type "$v")) $var))
+      ; (() (println! ("vars:" $vars)))
+      ; ($mand_vars (find_vars $e_toks))
+      ; ($mand_vars (filter-atom $e_toks $tok (unify &kb (Var $tok $_ (Type "$v")) True False)))
+      (() (println! ("mand_vars:" $mand_vars)))
+      ($_2 (remove-pattern &kb (MandVar $var)))
+      (() (println! ("$_2:" $_2)))
     ) ()))
 
 ;     def make_assertion(self, stmt: Stmt) -> Assertion:
@@ -237,10 +305,6 @@
           ) ($var $entry1:))
         (Error ( (sp $sp) (entry $entry) (typecode $typecode) (var $var) ) "Proof stack entry does not match floating hypothesis."))))
 
-(= (map-pattern' Nil $_ $_) Nil)
-(= (map-pattern' (Cons $head $tail) $var $pattern)
-   (Cons (let $var $head $pattern) 
-         (map-pattern' $tail $var $pattern)))
 ;; Apply a substitution from the substitution space to a token
 (= (apply_subst_tok $subst $tok)
   (let $res (unify $subst ($tok $sub) $sub $tok) $res))
@@ -262,43 +326,6 @@
         (adjust-state-additive &sp 1)
         (Error ( (sp $sp) (entry $entry) (ehyp $ehyp) (subst_h $subst_h) ) "Proof stack entry does not match essential hypothesis."))))
 
-;; Disjoint Variable Check Section
-
-;; Map over the atoms in a pair of lists
-(= (map-pairs $list1 $list2 $fn)
-   (map-atom $list1 $v1
-     (map-atom $list2 $v2
-       ($fn $v1 $v2))))
-
-;; Find all tokens in a statement that are variables
-(= (find_vars $stmt)
-  (filter-atom $stmt $tok (unify &kb (Var $tok $_) True False)))
-
-;; Orient pairs as (min, max)
-(= (orient_pair $x $y)
-   (((py-atom min) $x $y) ((py-atom max) $x $y))) 
-
-;; Look up disjoint variables (which are oriented)
-(= (lookup_d $x $y) (let ($x' $y') (orient_pair $x $y) (unify &kb (DVar ($x' $y') $_) True False)))
-
-;; Check $x and $y, vars in a substitution: if they're the same or not tagged as disjoint, throw an error 
-;; (because disjointness must be preserved transively through substitution)
-(= (dv_check $x $y)
-  (if (or
-        (== $x $y)
-        (not (lookup_d $x $y)))
-      (Error ($x $y) "Disjoint variable violation.")
-      ()))
-
-;; Check whether the substitutions satisfy the disjoint variable conditions
-(= (check_dvs $subst $dvs0)
-    (map-atom $dvs0 $d 
-      (let ($d1 $d2) $d ;; the for x, y in dvs0
-        (let ($x_vars $y_vars)
-          (match $subst ($d1 $sub1) 
-            (match $subst ($d2 $sub2) 
-              ((find_vars $sub1) (find_vars $sub2)))) 
-          (map-pairs $x_vars $y_vars dv_check)))))
 
 
 ;; Proof Verification Section
@@ -329,7 +356,7 @@
         ($subst (new-space)) ; ($subst &subst)
         ($_1 (map-atom $fhyps $fhyp (add-subst $subst $fhyp)))
         ($_2 (map-atom $ehyps $ehyp (check_subst $subst $ehyp)))
-        ($_3 (check_dvs $subst $dvars)) ;; I don't like this *idc about the return value* part.
+        ($_3 (collapse (check_dvs $subst $dvars))) ;; I don't like this *idc about the return value* part.
         ($_4 (matchc &stack ( (Num $n) $s ) (if (>= $n $sp) (remove-atom &stack ( (Num $n) $s )) ()))) 
         ($new_conclusion (let $new_conclusion (apply_subst $subst $statement) (let () (add-atom &stack ((Num $sp) $new_conclusion)) $new_conclusion)))
         (() (println! (new_conclusion: $new_conclusion)))
