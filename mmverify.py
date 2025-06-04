@@ -574,17 +574,21 @@ class MM:
                 if not label:
                     raise MMError('$a must have label')
                 stmt = self.read_non_p_stmt(tok, toks) # Just less-compact
-                mettarl(f'!(make_assertion {mettify(label)} {mettify(stmt)})')
+                mout = mettarl(f'!(make_assertion {mettify(label)} {mettify(stmt)})')
+                print(f"make_assertion_mout: {mout}")
                 dvs, f_hyps, e_hyps, stmt = self.fs.make_assertion(stmt) # make_assertion(self.read_non_p_stmt(tok, toks))
                 self.labels[label] = ('$a', (dvs, f_hyps, e_hyps, stmt))
                 mettarl(f'!(add-atom &kb ( (Label {mettify(label)}) Assertion ( (DVars {mettify(dvs)}) (FHyps {mettify(f_hyps)}) (EHyps {mettify(e_hyps)}) (Statement {mettify(stmt)}) (Type "$a") )))')
+                print(f'make_assertion_command: !(add-atom &kb ( (Label {mettify(label)}) Assertion ( (DVars {mettify(dvs)}) (FHyps {mettify(f_hyps)}) (EHyps {mettify(e_hyps)}) (Statement {mettify(stmt)}) (Type "$a") )))')
                 label = None
             elif tok == '$p':
                 if not label:
                     raise MMError('$p must have label')
                 stmt, proof = self.read_p_stmt(toks)
-                mettarl(f'!(make_assertion {mettify(label)} {mettify(stmt)})')
+                mout = mettarl(f'!(make_assertion {mettify(label)} {mettify(stmt)})')
+                print(f"make_assertion_mout: {mout}")
                 dvs, f_hyps, e_hyps, conclusion = self.fs.make_assertion(stmt)
+                print(f'make_assertion_command: !(add-atom &kb ( (Label {mettify(label)}) Proof ( (DVars {mettify(dvs)}) (FHyps {mettify(f_hyps)}) (EHyps {mettify(e_hyps)}) (Statement {mettify(stmt)}) (Type "$p") (ProofSequence {mettify(proof)}))))')
                 if self.verify_proofs:
                     vprint(2, 'Verify:', label)
                     self.verify(f_hyps, e_hyps, conclusion, proof)

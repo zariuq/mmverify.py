@@ -253,8 +253,10 @@
     (
       ($tail-result (assign_f_hyps $tail))
       (($typecode $var) $head)
+      ($pred (unify &kb (MandVar $var) True False))
+      ; (() (if (== $pred True) (remove-atom &kb (MandVar $var)) ()))
     ) 
-      (unify &kb (MandVar $var)
+      (if (== $pred True) 
         (let () (remove-atom &kb (MandVar $var)) (Cons $head $tail-result))
         $tail-result)))
 
@@ -324,9 +326,20 @@
       ; (() (println! ("vars:" $vars)))
       ; ($mand_vars (find_vars $e_toks))
       ; ($mand_vars (filter-atom $e_toks $tok (unify &kb (Var $tok $_ (Type "$v")) True False)))
-      (() (println! ("mand_vars:" $mand_vars)))
+      ($mand_vars' (matchc &kb (MandVar $var) $var))
+      (() (println! ("mand_vars':" $mand_vars')))
       ($_2 (remove-patternc &kb (MandVar $var)))
-    ) ()))
+            ; !(make_assertion "good" ("|-" "(" "(" "x" "y" ")" "(" "z" "w" ")" ")"))
+      ; !(verify ("xf" "yf" "combo" "zf" "wf" "combo" "ax-1") ("|-" "(" "(" "x" "y" ")" "(" "z" "w" ")" ")"))
+      ; !(add-atom &kb ( (Label "good") Proof ( (DVars (("x" "z") ("w" "z") ("y" "z") ("w" "x") ("x" "y") ("w" "y"))) (FHyps (("formula" "x") ("formula" "y") ("formula" "z") ("formula" "w"))) (EHyps ()) (Statement ("|-" "(" "(" "x" "y" ")" "(" "z" "w" ")" ")")) (Type "$p") (ProofSequence ("xf" "yf" "combo" "zf" "wf" "combo" "ax-1")))))
+      ; !(add-atom &kb ( (Label "ax-1") Assertion ( (DVars (("x" "y"))) (FHyps (("formula" "x") ("formula" "y"))) (EHyps ()) (Statement ("|-" "(" "x" "y" ")")) (Type "$a") )))
+    ) ( (DVars $dvs) (FHyps (from-list $f_hyps)) (EHyps (from-list $e_hyps_list)) (Statement $stmt) )))
+
+; Next I will make add_a and add_p. 
+
+; add_a will juts wrap make_assertion
+; add_p will call verify.
+; IF it is a normal proof, which I am assuming, there is nothing I am especially doing in the self.verify() functcion for metta, so I can actually just call it all in MeTTa add_p!
 
 ;     def make_assertion(self, stmt: Stmt) -> Assertion:
 ;         """Return a quadruple (disjoint variable conditions, floating
