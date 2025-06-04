@@ -19,14 +19,25 @@
 ; (: ematch (-> hyperon::space::DynSpace Atom Atom %Undefined%))
 ; (= (ematch $space $pattern $query) (collapse_empties (matchc $space $pattern $query)))
 
+; (= (empty-space $space) (matchc $space $atom (remove-atom $space $atom)))
 (= (empty-space $space) (matchc $space $atom (remove-atom $space $atom)))
 
-(= (remove-pattern $space $pattern) (matchc $space $pattern (remove-atom $space $pattern)))
+
+; (= (remove-pattern $space $pattern) (matchc $space $pattern (remove-atom $space $pattern)))
+
+(= (remove-pattern $space $pattern) (let $pattern (match $space $pattern $pattern) (remove-atom $space $pattern)))
+(= (remove-patternc $space $pattern) (collapse (let $pattern (match $space $pattern $pattern) (remove-atom $space $pattern))))
+
 
 ;; Unused sequential alternative to the parallel match-statement version
+; (= (remove_from_stack $stack_ptr $stack_len)
+;   (if (> $stack_len $stack_ptr)
+;     (let () (match &stack ( (Num $stack_ptr) $s ) (remove-atom &stack ( (Num $stack_ptr) $s ))) (remove_from_stack (+ 1 $stack_ptr) $stack_len))
+;     ()))
+
 (= (remove_from_stack $stack_ptr $stack_len)
   (if (> $stack_len $stack_ptr)
-    (let () (match &stack ( (Num $stack_ptr) $s ) (remove-atom &stack ( (Num $stack_ptr) $s ))) (remove_from_stack (+ 1 $stack_ptr) $stack_len))
+    (let () (remove-pattern &stack ( (Num $stack_ptr) $s )) (remove_from_stack (+ 1 $stack_ptr) $stack_len))
     ()))
 
 ;; Super-handy function for matching atoms in an expression.
@@ -244,6 +255,12 @@
               (unify &kb (MandVar $x)
                 (unify &kb (MandVar $y) ($x $y) ()) ())))
       (() (println! ("dvs:" $dvs)))
+      ; f_hyps = []
+      ;    for fr in self:
+      ;        for typecode, var in fr.f:
+      ;            if var in mand_vars:
+      ;                f_hyps.append((typecode, var))
+      ;                mand_vars.remove(var)
       ; ($e_hyps_and_stmt_list (append $e_hyps_list (to-list ($stmt))))
       ; (() (println! ("h_hypes_and_stmt_list:" $e_hyps_and_stmt_list)))
       ; ($e_toks' (flatten-list $e_hyps_list))
@@ -257,7 +274,7 @@
       ; ($mand_vars (find_vars $e_toks))
       ; ($mand_vars (filter-atom $e_toks $tok (unify &kb (Var $tok $_ (Type "$v")) True False)))
       (() (println! ("mand_vars:" $mand_vars)))
-      ($_2 (remove-pattern &kb (MandVar $var)))
+      ($_2 (remove-patternc &kb (MandVar $var)))
     ) ()))
 
 ;     def make_assertion(self, stmt: Stmt) -> Assertion:
@@ -359,7 +376,7 @@
         ($_1 (map-atom $fhyps $fhyp (add-subst $subst $fhyp)))
         ($_2 (map-atom $ehyps $ehyp (check_subst $subst $ehyp)))
         ($_3 (collapse (check_dvs $subst $dvars))) ;; I don't like this *idc about the return value* part.
-        ($_4 (matchc &stack ( (Num $n) $s ) (if (>= $n $sp) (remove-atom &stack ( (Num $n) $s )) ()))) 
+        ($_4 (matchc &stack ( (Num $n) $s ) (if (>= $n $sp) (remove-atom &stack ( (Num $n) $s )) ())))
         ($new_conclusion (let $new_conclusion (apply_subst $subst $statement) (let () (add-atom &stack ((Num $sp) $new_conclusion)) $new_conclusion)))
         (() (println! (new_conclusion: $new_conclusion)))
         ; ($_5 (empty-space &wm))
@@ -411,7 +428,7 @@
         ($_2 (matchc &kb ((Label $label) EHyp $FSDepth $Data) (add-atom &kb (ActiveHyp $label))))
         ($_3 (map-atom $proof $label (treat_step $label)))
       )
-      (remove-pattern &kb (ActiveHyp $_))))
+      (remove-patternc &kb (ActiveHyp $_))))
 
 ;; Verifies that a proof of a conclusion holds.
 ;; Calls treat normal proof on the proof,

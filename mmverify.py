@@ -607,11 +607,19 @@ class MM:
             else:
                 raise MMError("Unknown token: '{}'.".format(tok))
             tok = toks.readc()
+        metta_dvars = metta.run(f'!(matchc &kb (DVar ($x $y) (FSDepth $d) (Type "$d")) (DVar ($x $y) (FSDepth $d) (Type "$d")))')[0]
         # mettarl(f'!(match &kb ($1 $2 $Data) (match-atom $Data (FSDepth {len(self.fs)}) (remove-atom &kb ($1 $2 $Data))))')
-        mettarl(f'!(match &kb (EList (FSDepth {len(self.fs)}) $elist) (remove-atom &kb (EList (FSDepth {len(self.fs)}) $elist)))')
-        mettarl(f'!(match &kb (FList (FSDepth {len(self.fs)}) $flist) (remove-atom &kb (FList (FSDepth {len(self.fs)}) $flist)))')
-        mettarl(f'!(match &kb ($1 $2 (FSDepth {len(self.fs)}) $Data) (remove-atom &kb ($1 $2 (FSDepth {len(self.fs)}) $Data)))')
+        # mettarl(f'!(match &kb (EList (FSDepth {len(self.fs)}) $elist) (remove-atom &kb (EList (FSDepth {len(self.fs)}) $elist)))')
+        # mettarl(f'!(match &kb (FList (FSDepth {len(self.fs)}) $flist) (remove-atom &kb (FList (FSDepth {len(self.fs)}) $flist)))')
+        # mettarl(f'!(let $atom (match &kb ($1 $2 (FSDepth {len(self.fs)}) $Data) ($1 $2 (FSDepth {len(self.fs)}) $Data)) (remove-atom &kb $atom))')
+        mettarl(f'!(remove-pattern &kb (EList (FSDepth {len(self.fs)}) $elist))')
+        mettarl(f'!(remove-pattern &kb (FList (FSDepth {len(self.fs)}) $flist))')
+        mettarl(f'!(remove-pattern &kb ($1 $2 (FSDepth {len(self.fs)}) $Data))')
         self.fs.pop()
+        py_dvs = {(x, y) for fr in self.fs for (x,y) in fr.d}
+        remaining_dvars = metta.run(f'!(matchc &kb (DVar ($x $y) (FSDepth $d) (Type "$d")) ($d ($x $y)))')[0]
+        print(f"metta_dvars: {metta_dvars}")
+        print(f"remaining_dvars (@ {len(self.fs)+1}): {remaining_dvars}.  dvs in fs: {py_dvs}")
 
     def treat_step(self,
                    step: FullStmt,
