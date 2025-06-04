@@ -398,14 +398,17 @@ class FrameStack(list[Frame]):
                      for tok in hyp if self.lookup_v(tok)}
         dvs = {(x, y) for fr in self for (x, y)
                in fr.d if x in mand_vars and y in mand_vars}
-        print(f"Make assertion debug.\ne_hyps: {e_hyps}\nmand_vars: {mand_vars}\ndvs: {dvs}\n\n")
+        print(f"Make assertion debug.\ne_hyps: {e_hyps}\nmand_vars: {mand_vars}\ndvs: {dvs}")
         f_hyps = []
+        f_hyps_all = []
         for fr in self:
             for typecode, var in fr.f:
+                f_hyps_all.append((typecode, var))
                 if var in mand_vars:
                     f_hyps.append((typecode, var))
                     mand_vars.remove(var)
         assertion = dvs, f_hyps, e_hyps, stmt
+        print(f"f_hyps: {f_hyps}\nf_hyps_all: {f_hyps_all}\n\n")
         vprint(18, 'Make assertion:', assertion)
         return assertion
 
@@ -619,7 +622,7 @@ class MM:
         py_dvs = {(x, y) for fr in self.fs for (x,y) in fr.d}
         remaining_dvars = metta.run(f'!(matchc &kb (DVar ($x $y) (FSDepth $d) (Type "$d")) ($d ($x $y)))')[0]
         print(f"metta_dvars: {metta_dvars}")
-        print(f"remaining_dvars (@ {len(self.fs)+1}): {remaining_dvars}.  dvs in fs: {py_dvs}")
+        print(f"remaining_dvars (@ {len(self.fs)+1}): {remaining_dvars}.  dvs in fs: {py_dvs}\n\n")
 
     def treat_step(self,
                    step: FullStmt,
@@ -1053,7 +1056,7 @@ class MM:
             # print(f'\nVerify command to run: !(verify {mettify(proof)} {mettify(conclusion)})')
             if run_metta:
                 mout = mettarl(f'!(verify {mettify(proof)} {mettify(conclusion)})')
-                print(f'Output of verify: {mout}')
+                print(f'Output of verify: {mout}\n')
             else:
                 mettarl(f'!(verify {mettify(proof)} {mettify(conclusion)})')
             # stack = self.treat_normal_proof_with_treat_step_in_metta(proof)

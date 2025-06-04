@@ -124,6 +124,12 @@
 ; (= (append-expr $expr1 $expr2)
 ;    (from-list (append (to-list $expr1) (to-list $expr2))))
 
+(= (filter' Nil $predicate) Nil)
+(= (filter' (Cons $head $tail) $predicate)
+   (let $tail-result (filter' $tail $predicate)
+     (if ($predicate $head)
+       (Cons $head $tail-result)
+       $tail-result)))
 
 ;; Disjoint Variable Check Section
 
@@ -224,10 +230,37 @@
       (let () (println! ("collect list:" $current - $current_list))
       (collect_ehyps_by_depth $unordered_list (+ 1 $current) $max (append $ordered_list $current_list))))))
 
+(= (collect_lists_by_depth $unordered_list $current $max $ordered_list)
+  (if (> $current $max)
+    $ordered_list
+    (let $current_list (match-atom'' $unordered_list ($current $list) $list Nil)
+      (let () (println! ("collect list:" $current - $current_list))
+      (collect_lists_by_depth $unordered_list (+ 1 $current) $max (append $ordered_list $current_list))))))
+
 (= (add_mand_var $tok)
   (unify &kb (Var $tok $_ (Type "$v"))
     (unify &kb (MandVar $tok) () (add-atom &kb (MandVar $tok))) ()))
 
+(= (assign_f_hyp_to_var $f_hyp)
+  (let ($typecode $var) $f_hyp
+    (unify &kb (MandVar $var)
+      (let () (remove-atom &kb (MandVar $var)) True)
+      False)))
+
+(= (assign_f_hyps Nil) Nil)
+(= (assign_f_hyps (Cons $head $tail))
+   (let*
+    (
+      ($tail-result (assign_f_hyps $tail))
+      (($typecode $var) $head)
+    ) 
+      (unify &kb (MandVar $var)
+        (let () (remove-atom &kb (MandVar $var)) (Cons $head $tail-result))
+        $tail-result)))
+
+;; TODO: gosh, going through all these lists multiple times seems so wasteful.
+;; The checks should be done on the initial pass through.
+;; Get the max_level and go through the lists iteratively from the ground up.
 (= (make_assertion $label $stmt)
   (let*
     (
@@ -235,11 +268,11 @@
       (() (println! ("make_assertion" $label - $stmt)))
       ($e_hyps_lists (matchc &kb (EList (FSDepth $level) $elist) ($level $elist)))
       (() (println! ("e_hyps lists:" $e_hyps_lists)))
-      ($levels (collapse (match-atom' $e_hyps_lists ($l $_) $l)))
-      (() (println! ("levels:" $levels)))
-      ($max_level (if (== $levels (())) 0 (max-atom $levels)))
-      (() (println! ("max_level of frame stack:" $max_level)))
-      ($e_hyps_list (collect_ehyps_by_depth $e_hyps_lists 1 $max_level Nil))
+      ($e_levels (collapse (match-atom' $e_hyps_lists ($l $_) $l)))
+      (() (println! ("e_levels:" $e_levels)))
+      ($e_max_level (if (== $e_levels (())) 0 (max-atom $e_levels)))
+      (() (println! ("max_level of ehyps frame stack:" $e_max_level)))
+      ($e_hyps_list (collect_lists_by_depth $e_hyps_lists 1 $e_max_level Nil))
       (() (println! ("e_hyps_list:" $e_hyps_list)))
       ; ($e_hyps (from-list $e_hyps_list))
       ; (() (println! ("e_hyps:" $e_hyps)))
@@ -261,6 +294,24 @@
       ;            if var in mand_vars:
       ;                f_hyps.append((typecode, var))
       ;                mand_vars.remove(var)
+      ($f_hyps_lists (matchc &kb (FList (FSDepth $level) $flist) ($level $flist)))
+      (() (println! ("f_hyps lists:" $f_hyps_lists)))
+      ($f_levels (collapse (match-atom' $f_hyps_lists ($l $_) $l)))
+      (() (println! ("f_levels:" $f_levels)))
+      ($f_max_level (if (== $f_levels (())) 0 (max-atom $f_levels)))
+      (() (println! ("max_level of fhyps frame stack:" $f_max_level)))
+      ($f_hyps_list (collect_lists_by_depth $f_hyps_lists 1 $f_max_level Nil))
+      (() (println! ("f_hyps_list:" $f_hyps_list)))
+      ; ($f_hyps_list_as_expression (from-list $f_hyps_list))
+      ; (() (println! ("f_hyps_list_as_expression:" $f_hyps_list_as_expression)))
+      ; ($f_hyps_list_flattened_expression (from-list (flatten-list $f_hyps_list)))
+      ; (() (println! ("f_hyps_list_flattened_expression:" $f_hyps_list_flattened_expression)))
+      ; (() (println! (assign_f_hyp_to_var ("formula" "x"))))
+      ; (() (println! (eval (assign_f_hyp_to_var ("formula" "x")))))
+      ; ($f_hyps (assign_f_hyps $f_hyps_list))
+      ($f_hyps (filter' $f_hyps_list assign_f_hyp_to_var))
+      ; ($f_hyps (filter-atom (from-list $f_hyps_list) $f_hyp (assign_f_hyp_to_var $f_hyp)))
+      (() (println! ("f_hyps:" $f_hyps)))
       ; ($e_hyps_and_stmt_list (append $e_hyps_list (to-list ($stmt))))
       ; (() (println! ("h_hypes_and_stmt_list:" $e_hyps_and_stmt_list)))
       ; ($e_toks' (flatten-list $e_hyps_list))
