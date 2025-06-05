@@ -591,6 +591,24 @@ class MM:
                 print(f'make_assertion_command: !(add-atom &kb ( (Label {mettify(label)}) Proof ( (DVars {mettify(dvs)}) (FHyps {mettify(f_hyps)}) (EHyps {mettify(e_hyps)}) (Statement {mettify(stmt)}) (Type "$p") (ProofSequence {mettify(proof)}))))')
                 if self.verify_proofs:
                     vprint(2, 'Verify:', label)
+                    if proof[0] != '(':  # Normal format - use MeTTa
+                        if run_metta:
+                            mout = mettarl(f'!(verify {mettify(proof)} {mettify(conclusion)})')
+                            print(f'Output of verify: {mout}\n')
+                            if mout[0]:
+                            # Clean, simple extraction of tokens with minimal processing
+                                raw = re.sub(r'^[\[\(]+|[\]\)]+$', '', str(mout[0][0]))
+                                tokens = re.findall(r'"([^"]+)"|([^\s"()]+)', raw)
+                                metta_result = [a.replace('\\\\', '\\') if a else b for (a, b) in tokens]
+                                # metta_result = [a or b for (a,b) in re.findall(r'"([^"]+)"|([^\s"()]+)', 
+                                #                 re.sub(r'^[\[\(]+|[\]\)]+$', '', str(mout[0][0])))]
+                                assert metta_result == conclusion, f"MeTTa result {metta_result} != Python conclusion {conclusion}"
+                                # if metta_result != conclusion:
+                                #     metta_log.append(f"ERROR: MeTTa result {metta_result} != Python conclusion {conclusion} [[untransformed result: {mout}]]")
+                            else:
+                                raise AssertionError(f"Empty result from MeTTa verification: {mout}")
+                        else:
+                            mettarl(f'!(verify {mettify(proof)} {mettify(conclusion)})')
                     self.verify(f_hyps, e_hyps, conclusion, proof)
                 self.labels[label] = ('$p', (dvs, f_hyps, e_hyps, conclusion))
                 mettarl(f'!(add-atom &kb ( (Label {mettify(label)}) Proof ( (DVars {mettify(dvs)}) (FHyps {mettify(f_hyps)}) (EHyps {mettify(e_hyps)}) (Statement {mettify(stmt)}) (Type "$p") (ProofSequence {mettify(proof)}))))')
@@ -1055,14 +1073,14 @@ class MM:
         # dummy variables should be 'lookup_d'ed anyway.
         if proof[0] == '(':  # compressed format
             stack = self.treat_compressed_proof(f_hyps, e_hyps, proof)
-            mout = None
+            # mout = None
         else:  # normal format
             # print(f'\nVerify command to run: !(verify {mettify(proof)} {mettify(conclusion)})')
-            if run_metta:
-                mout = mettarl(f'!(verify {mettify(proof)} {mettify(conclusion)})')
-                print(f'Output of verify: {mout}\n')
-            else:
-                mettarl(f'!(verify {mettify(proof)} {mettify(conclusion)})')
+            # if run_metta:
+            #     mout = mettarl(f'!(verify {mettify(proof)} {mettify(conclusion)})')
+            #     print(f'Output of verify: {mout}\n')
+            # else:
+            #     mettarl(f'!(verify {mettify(proof)} {mettify(conclusion)})')
             # stack = self.treat_normal_proof_with_treat_step_in_metta(proof)
             stack = self.treat_normal_proof(proof)
         vprint(10, 'Stack at end of proof:', stack)
@@ -1082,19 +1100,19 @@ class MM:
         # Seems to be a weird bug  where the output looks "fine" but the assertion checking code fails.
         # Output of verify: [[(("|-" "\\" "x" ":" "al" "." "T" ":" "(" "al" "->" "be" ")"))]]
         # AssertionError: MeTTa result ['|-', '\\\\', 'x', ':', 'al', '.', 'T', ':', '(', 'al', '->', 'be', ')'] != Python conclusion ['|-', '\\', 'x', ':', 'al', '.', 'T', ':', '(', 'al', '->', 'be', ')']
-        if run_metta: 
-            if mout and mout[0]:
-            # Clean, simple extraction of tokens with minimal processing
-                raw = re.sub(r'^[\[\(]+|[\]\)]+$', '', str(mout[0][0]))
-                tokens = re.findall(r'"([^"]+)"|([^\s"()]+)', raw)
-                metta_result = [a.replace('\\\\', '\\') if a else b for (a, b) in tokens]
-                # metta_result = [a or b for (a,b) in re.findall(r'"([^"]+)"|([^\s"()]+)', 
-                #                 re.sub(r'^[\[\(]+|[\]\)]+$', '', str(mout[0][0])))]
-                assert metta_result == conclusion, f"MeTTa result {metta_result} != Python conclusion {conclusion}"
-                # if metta_result != conclusion:
-                #     metta_log.append(f"ERROR: MeTTa result {metta_result} != Python conclusion {conclusion} [[untransformed result: {mout}]]")
-            else:
-                raise AssertionError(f"Empty result from MeTTa verification: {mout}")
+        # if run_metta: 
+        #     if mout and mout[0]:
+        #     # Clean, simple extraction of tokens with minimal processing
+        #         raw = re.sub(r'^[\[\(]+|[\]\)]+$', '', str(mout[0][0]))
+        #         tokens = re.findall(r'"([^"]+)"|([^\s"()]+)', raw)
+        #         metta_result = [a.replace('\\\\', '\\') if a else b for (a, b) in tokens]
+        #         # metta_result = [a or b for (a,b) in re.findall(r'"([^"]+)"|([^\s"()]+)', 
+        #         #                 re.sub(r'^[\[\(]+|[\]\)]+$', '', str(mout[0][0])))]
+        #         assert metta_result == conclusion, f"MeTTa result {metta_result} != Python conclusion {conclusion}"
+        #         # if metta_result != conclusion:
+        #         #     metta_log.append(f"ERROR: MeTTa result {metta_result} != Python conclusion {conclusion} [[untransformed result: {mout}]]")
+        #     else:
+        #         raise AssertionError(f"Empty result from MeTTa verification: {mout}")
         # mettarl(f'!(empty-space &stack)')
 
     def dump(self) -> None:
