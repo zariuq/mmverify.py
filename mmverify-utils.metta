@@ -11,6 +11,13 @@
 (: matchc (-> hyperon::space::DynSpace Atom Atom %Undefined%))
 (= (matchc $space $pattern $query) (collapse (match $space $pattern $query)))
 
+;; Codex: use this because matchc doesn't throw the error
+;; Bastardized it and it didin't work.
+; (: collapse-error (-> Atom Atom))
+; (= (collapse-error $expr)
+;     (let $res (collapse $expr)
+;       (trace! $res $res)))
+
 ;; Ok, ran into an endless memory error due to collapse_empties.  I'm removing it and ematch.  I'll remove these comments after they're logged in a git commit.
 ; ;; Probably silly, but it looks better to pcollapse (() () () ()) into () to match () in a let* statement.
 ; (= (collapse_empties $expr)
@@ -52,7 +59,7 @@
 (= (match-atom' $expr $pattern $rewrite) (case (match-atom $expr $pattern $rewrite) ( (Empty () ) ( $q $q ) )))
 
 (: match-atom'' (-> Expression Atom Atom Atom %Undefined$))
-(= (match-atom'' $expr $pattern $rewrite $Empty) (case (match-atom $expr $pattern $rewrite) ( (Empty $Empty) ( $q $q ) )))
+(= (match-atom'' $expr $pattern $rewrite $Empty) (case (match-atom $expr $pattern $rewrite) ( (Empty Empty) ( $q $q ) )))
 
 ; No longer used due to adjust-state-additive
 (= (update-atom $space $atom $update_pattern)
@@ -150,6 +157,12 @@
 ;; Look up disjoint variables (which are oriented)
 (= (lookup_d $x $y) (let ($x' $y') (orient_pair $x $y) (unify &kb (DVar ($x' $y') $_ (Type "$d")) True False)))
 
+; (= (lookup_d $x $y) 
+;     (let ($x' $y') (orient_pair $x $y) 
+;     (let $result (unify &kb (DVar ($x' $y') $_ $_) True False)
+;     (let () (println! ("lookup_d" $x $y "oriented as" ($x' $y') "found:" $result))
+;     $result))))
+
 ;; Check $x and $y, vars in a substitution: if they're the same or not tagged as disjoint, throw an error 
 ;; (because disjointness must be preserved transively through substitution)
 (= (dv_check $x $y)
@@ -223,14 +236,12 @@
     )
 )
 
-; (= (add_a))
-
-(= (collect_ehyps_by_depth $unordered_list $current $max $ordered_list)
-  (if (> $current $max)
-    $ordered_list
-    (let $current_list (match-atom'' $unordered_list ($current $list) $list Nil)
-      (let () (println! ("collect list:" $current - $current_list))
-      (collect_ehyps_by_depth $unordered_list (+ 1 $current) $max (append $ordered_list $current_list))))))
+; (= (collect_ehyps_by_depth $unordered_list $current $max $ordered_list)
+;   (if (> $current $max)
+;     $ordered_list
+;     (let $current_list (match-atom'' $unordered_list ($current $list) $list Nil)
+;       (let () (println! ("collect list:" $current - $current_list))
+;       (collect_ehyps_by_depth $unordered_list (+ 1 $current) $max (append $ordered_list $current_list))))))
 
 (= (collect_lists_by_depth $unordered_list $current $max $ordered_list)
   (if (> $current $max)
@@ -265,11 +276,11 @@
 ;; TODO: gosh, going through all these lists multiple times seems so wasteful.
 ;; The checks should be done on the initial pass through.
 ;; Get the max_level and go through the lists iteratively from the ground up.
-(= (make_assertion $label $stmt)
+(= (make_assertion $stmt)
   (let*
     (
       ;; e_hyps = [eh for fr in self for eh in fr.e]))
-      (() (println! ("make_assertion" $label - $stmt)))
+      ; (() (println! ("make_assertion" $label - $stmt)))
       ($e_hyps_lists (matchc &kb (EList (FSDepth $level) $elist) ($level $elist)))
       (() (println! ("e_hyps lists:" $e_hyps_lists)))
       ($e_levels (collapse (match-atom' $e_hyps_lists ($l $_) $l)))
@@ -336,6 +347,16 @@
       ; !(add-atom &kb ( (Label "good") Proof ( (DVars (("x" "z") ("w" "z") ("y" "z") ("w" "x") ("x" "y") ("w" "y"))) (FHyps (("formula" "x") ("formula" "y") ("formula" "z") ("formula" "w"))) (EHyps ()) (Statement ("|-" "(" "(" "x" "y" ")" "(" "z" "w" ")" ")")) (Type "$p") (ProofSequence ("xf" "yf" "combo" "zf" "wf" "combo" "ax-1")))))
       ; !(add-atom &kb ( (Label "ax-1") Assertion ( (DVars (("x" "y"))) (FHyps (("formula" "x") ("formula" "y"))) (EHyps ()) (Statement ("|-" "(" "x" "y" ")")) (Type "$a") )))
     ) ( (DVars $dvs) (FHyps (from-list $f_hyps)) (EHyps (from-list $e_hyps_list)) (Statement $stmt) )))
+
+; !(add-atom &kb ( (Label {mettify(label)}) Assertion ( (DVars {mettify(dvs)}) (FHyps {mettify(f_hyps)}) (EHyps {mettify(e_hyps)}) (Statement {mettify(stmt)}) (Type "$a") )))
+(= (add_a $label $stmt)
+  (let*
+    (
+      (() (println! ("make_assertion" $label - $stmt)))
+      (( (DVars $dvs) (FHyps $f_hyps) (EHyps $e_hyps) (Statement $stmt) ) (make_assertion $stmt))
+      (() (println! ("gathered assertion data:" $dvs $f_hyps $e_hyps $stmt)))
+    )
+      (add-atom &kb ( (Label $label) Assertion ( (DVars $dvs) (FHyps $f_hyps) (EHyps $e_hyps) (Statement $stmt) (Type "$a") )))))
 
 ; Next I will make add_a and add_p. 
 
@@ -441,7 +462,12 @@
         ($subst (new-space)) ; ($subst &subst)
         ($_1 (map-atom $fhyps $fhyp (add-subst $subst $fhyp)))
         ($_2 (map-atom $ehyps $ehyp (check_subst $subst $ehyp)))
-        ($_3 (collapse (check_dvs $subst $dvars))) ;; I don't like this *idc about the return value* part.
+        ; ($_3 (collapse-error (check_dvs $subst $dvars)))
+        ($_3 (eval (collapse (check_dvs $subst $dvars)))) ;; I don't like this *idc about the return value* part.
+        ; ($_3 (check_dvs $subst $dvars)) ;; I don't like this *idc about the return value* part.
+        (() (println! (check_dvs_output: $_3))) ;; (Error ("x" "z") "Disjoint variable violation.")
+        ; ($error (match-atom' $_3 (Error $errorA $errorB) (Error $errorA $errorB)))
+        ; (() (println! (error_check: $error)))
         ($_4 (matchc &stack ( (Num $n) $s ) (if (>= $n $sp) (remove-atom &stack ( (Num $n) $s )) ())))
         ($new_conclusion (let $new_conclusion (apply_subst $subst $statement) (let () (add-atom &stack ((Num $sp) $new_conclusion)) $new_conclusion)))
         (() (println! (new_conclusion: $new_conclusion)))
