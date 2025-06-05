@@ -586,33 +586,37 @@ class MM:
                 if not label:
                     raise MMError('$p must have label')
                 stmt, proof = self.read_p_stmt(toks)
-                mout = mettarl(f'!(make_assertion {mettify(label)} {mettify(stmt)})')
-                print(f"make_assertion_mout: {mout}")
+                # mout = mettarl(f'!(make_assertion {mettify(label)} {mettify(stmt)})')
+                # print(f"make_assertion_mout: {mout}")
+                if run_metta:
+                    # print(f'add_p_command: !(add_p {mettify(label)} {mettify(stmt)} {mettify(proof)} {self.verify_proofs})')
+                    mout = mettarl(f'!(add_p {mettify(label)} {mettify(stmt)} {mettify(proof)} {self.verify_proofs})')
+                    print(f'Output of verify: {mout}\n') # Could check this for an error to throw an MMError.
                 dvs, f_hyps, e_hyps, conclusion = self.fs.make_assertion(stmt)
-                print(f'make_assertion_command: !(add-atom &kb ( (Label {mettify(label)}) Proof ( (DVars {mettify(dvs)}) (FHyps {mettify(f_hyps)}) (EHyps {mettify(e_hyps)}) (Statement {mettify(stmt)}) (Type "$p") (ProofSequence {mettify(proof)}))))')
+                # print(f'make_assertion_command: !(add-atom &kb ( (Label {mettify(label)}) Proof ( (DVars {mettify(dvs)}) (FHyps {mettify(f_hyps)}) (EHyps {mettify(e_hyps)}) (Statement {mettify(stmt)}) (Type "$p") (ProofSequence {mettify(proof)}))))')
                 if self.verify_proofs:
                     vprint(2, 'Verify:', label)
-                    if proof[0] != '(':  # Normal format - use MeTTa
-                        if run_metta:
-                            mout = mettarl(f'!(verify {mettify(proof)} {mettify(conclusion)})')
-                            print(f'Output of verify: {mout}\n')
-                            if mout[0]:
-                            # Clean, simple extraction of tokens with minimal processing
-                                raw = re.sub(r'^[\[\(]+|[\]\)]+$', '', str(mout[0][0]))
-                                tokens = re.findall(r'"([^"]+)"|([^\s"()]+)', raw)
-                                metta_result = [a.replace('\\\\', '\\') if a else b for (a, b) in tokens]
-                                # metta_result = [a or b for (a,b) in re.findall(r'"([^"]+)"|([^\s"()]+)', 
-                                #                 re.sub(r'^[\[\(]+|[\]\)]+$', '', str(mout[0][0])))]
-                                assert metta_result == conclusion, f"MeTTa result {metta_result} != Python conclusion {conclusion}"
-                                # if metta_result != conclusion:
-                                #     metta_log.append(f"ERROR: MeTTa result {metta_result} != Python conclusion {conclusion} [[untransformed result: {mout}]]")
-                            else:
-                                raise AssertionError(f"Empty result from MeTTa verification: {mout}")
-                        else:
-                            mettarl(f'!(verify {mettify(proof)} {mettify(conclusion)})')
+                    # if proof[0] != '(':  # Normal format - use MeTTa
+                    #     if run_metta:
+                    #         mout = mettarl(f'!(verify {mettify(proof)} {mettify(conclusion)})')
+                    #         print(f'Output of verify: {mout}\n')
+                    #         if mout[0]:
+                    #         # Clean, simple extraction of tokens with minimal processing
+                    #             raw = re.sub(r'^[\[\(]+|[\]\)]+$', '', str(mout[0][0]))
+                    #             tokens = re.findall(r'"([^"]+)"|([^\s"()]+)', raw)
+                    #             metta_result = [a.replace('\\\\', '\\') if a else b for (a, b) in tokens]
+                    #             # metta_result = [a or b for (a,b) in re.findall(r'"([^"]+)"|([^\s"()]+)', 
+                    #             #                 re.sub(r'^[\[\(]+|[\]\)]+$', '', str(mout[0][0])))]
+                    #             assert metta_result == conclusion, f"MeTTa result {metta_result} != Python conclusion {conclusion}"
+                    #             # if metta_result != conclusion:
+                    #             #     metta_log.append(f"ERROR: MeTTa result {metta_result} != Python conclusion {conclusion} [[untransformed result: {mout}]]")
+                    #         else:
+                    #             raise AssertionError(f"Empty result from MeTTa verification: {mout}")
+                    #     else:
+                    #         mettarl(f'!(verify {mettify(proof)} {mettify(conclusion)})')
                     self.verify(f_hyps, e_hyps, conclusion, proof)
                 self.labels[label] = ('$p', (dvs, f_hyps, e_hyps, conclusion))
-                mettarl(f'!(add-atom &kb ( (Label {mettify(label)}) Proof ( (DVars {mettify(dvs)}) (FHyps {mettify(f_hyps)}) (EHyps {mettify(e_hyps)}) (Statement {mettify(stmt)}) (Type "$p") (ProofSequence {mettify(proof)}))))')
+                # mettarl(f'!(add-atom &kb ( (Label {mettify(label)}) Proof ( (DVars {mettify(dvs)}) (FHyps {mettify(f_hyps)}) (EHyps {mettify(e_hyps)}) (Statement {mettify(stmt)}) (Type "$p") (ProofSequence {mettify(proof)}))))')
                 label = None
             elif tok == '$d':
                 self.fs.add_d(self.read_non_p_stmt(tok, toks))

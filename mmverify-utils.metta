@@ -59,7 +59,7 @@
 (= (match-atom' $expr $pattern $rewrite) (case (match-atom $expr $pattern $rewrite) ( (Empty () ) ( $q $q ) )))
 
 (: match-atom'' (-> Expression Atom Atom Atom %Undefined$))
-(= (match-atom'' $expr $pattern $rewrite $Empty) (case (match-atom $expr $pattern $rewrite) ( (Empty Empty) ( $q $q ) )))
+(= (match-atom'' $expr $pattern $rewrite $Empty) (case (match-atom $expr $pattern $rewrite) ( (Empty $Empty) ( $q $q ) )))
 
 ; No longer used due to adjust-state-additive
 (= (update-atom $space $atom $update_pattern)
@@ -293,7 +293,11 @@
       ; (() (println! ("e_hyps:" $e_hyps)))
       ; mand_vars = {tok for hyp in itertools.chain(e_hyps, [stmt])
       ; for tok in hyp if self.lookup_v(tok)}
-      ($_0 (map-atom (from-list (flatten-list $e_hyps_list)) $tok (add_mand_var $tok)))
+      ; ($vars (matchc &kb (Var $var $_ (Type "$v")) $var))
+      ; (() (println! ("vars:" $vars)))
+      ($e_hyps_toks (from-list (flatten-list $e_hyps_list)))
+      ; (() (println! ("e_hyps_toks:" $e_hyps_toks)))
+      ($_0 (map-atom $e_hyps_toks $tok (add_mand_var $tok)))
       ($_1 (map-atom $stmt $tok (add_mand_var $tok)))
       ($mand_vars (matchc &kb (MandVar $var) $var))
       (() (println! ("mand_vars:" $mand_vars)))
@@ -465,7 +469,7 @@
         ; ($_3 (collapse-error (check_dvs $subst $dvars)))
         ($_3 (eval (collapse (check_dvs $subst $dvars)))) ;; I don't like this *idc about the return value* part.
         ; ($_3 (check_dvs $subst $dvars)) ;; I don't like this *idc about the return value* part.
-        (() (println! (check_dvs_output: $_3))) ;; (Error ("x" "z") "Disjoint variable violation.")
+        ; (() (println! (check_dvs_output: $_3))) ;; (Error ("x" "z") "Disjoint variable violation.")
         ; ($error (match-atom' $_3 (Error $errorA $errorB) (Error $errorA $errorB)))
         ; (() (println! (error_check: $error)))
         ($_4 (matchc &stack ( (Num $n) $s ) (if (>= $n $sp) (remove-atom &stack ( (Num $n) $s )) ())))
@@ -539,5 +543,17 @@
         (() (println! (Comparing: $stack_top "==" $conclusion)))
         (() (if (== $conclusion $stack_top) () (Error ((assertion: $conclusion) (stack: $stack_expr)) "Stack entry does not match proved assertion.")))
         (() (println! "Correct proof!"))
-      ) ($stack_top)))
+      ) ()));;($stack_top)))
+
+;; Stopped returning stack_top to check in Python because, well, I should 'trust' the == check in MeTTa 🙄
       
+(= (add_p $label $stmt $proof $verify_proofs)
+  (let*
+    (
+      (() (if $verify_proofs (verify $proof $stmt) ()))
+      (() (println! ("make_assertion" $label - $stmt)))
+      (( (DVars $dvs) (FHyps $f_hyps) (EHyps $e_hyps) (Statement $stmt) ) (make_assertion $stmt))
+      (() (println! ("gathered assertion data:" $dvs $f_hyps $e_hyps $stmt)))
+    )
+      (add-atom &kb ( (Label $label) Proof ( (DVars $dvs) (FHyps $f_hyps) (EHyps $e_hyps) (Statement $stmt) (Type "$p") (ProofSequence $proof) )))))
+  
