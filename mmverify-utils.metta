@@ -533,8 +533,8 @@
 (= (verify $proof $conclusion)
     (let*
       (
-        (() (println! ""))
-        (() (println! (Verifying conclusion $conclusion of proof $proof)))
+        ; (() (println! ""))
+        ; (() (println! (Verifying conclusion $conclusion of proof $proof)))
         ($_0 (treat_normal_proof $proof))
         ($stack_expr (matchc &stack ( (Num  $n) $f) $f))
         (() (if (== () $stack_expr) (Error (assertion: $conclusion) "Empty stack at end of proof.") ()))  
@@ -550,6 +550,8 @@
 (= (add_p $label $stmt $proof $verify_proofs)
   (let*
     (
+      (() (println! ""))
+      (() (println! (Verifying conclusion ($label) $stmt with proof $proof)))
       (() (if $verify_proofs (verify $proof $stmt) ()))
       (() (println! ("make_assertion" $label - $stmt)))
       (( (DVars $dvs) (FHyps $f_hyps) (EHyps $e_hyps) (Statement $stmt) ) (make_assertion $stmt))
