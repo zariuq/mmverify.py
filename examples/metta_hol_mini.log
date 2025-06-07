@@ -1,0 +1,200 @@
+(Verifying conclusion ("|-" "R" "|=" "A") of proof ("idi.1"))
+(Got Proof: ("idi.1"))
+(»»» treating label "idi.1")
+("idi.1" data: ((FSDepth 2) (ENum 1) (Statement ("|-" "R" "|=" "A")) (Type "$e")))
+(Comparing: ("|-" "R" "|=" "A") "==" ("|-" "R" "|=" "A"))
+Correct proof!
+(Verifying conclusion ("|-" "A" ":" "al") of proof ("idt.1"))
+(Got Proof: ("idt.1"))
+(»»» treating label "idt.1")
+("idt.1" data: ((FSDepth 2) (ENum 1) (Statement ("|-" "A" ":" "al")) (Type "$e")))
+(Comparing: ("|-" "A" ":" "al") "==" ("|-" "A" ":" "al"))
+Correct proof!
+(Verifying conclusion ("|-" "R" "|=" "T") of proof ("tr" "ts" "tt" "ax-syl.1" "ax-syl.2" "ax-syl"))
+(Got Proof: ("tr" "ts" "tt" "ax-syl.1" "ax-syl.2" "ax-syl"))
+(»»» treating label "tr")
+("tr" data: ((FSDepth 1) (Typecode "term") (FVar "R") (Type "$f")))
+(»»» treating label "ts")
+("ts" data: ((FSDepth 1) (Typecode "term") (FVar "S") (Type "$f")))
+(»»» treating label "tt")
+("tt" data: ((FSDepth 1) (Typecode "term") (FVar "T") (Type "$f")))
+(»»» treating label "ax-syl.1")
+("ax-syl.1" data: ((FSDepth 2) (ENum 1) (Statement ("|-" "R" "|=" "S")) (Type "$e")))
+(»»» treating label "ax-syl.2")
+("ax-syl.2" data: ((FSDepth 2) (ENum 2) (Statement ("|-" "S" "|=" "T")) (Type "$e")))
+(»»» treating label "ax-syl")
+("ax-syl" data: ((DVars ()) (FHyps (("term" "R") ("term" "S") ("term" "T"))) (EHyps (("|-" "R" "|=" "S") ("|-" "S" "|=" "T"))) (Statement ("|-" "R" "|=" "T")) (Type "$a")))
+(stack_len: 5.0 , npop: 5 , sp: 0.0)
+("adding subst" "R" ("R"))
+("adding subst" "S" ("S"))
+("adding subst" "T" ("T"))
+(new_conclusion: ("|-" "R" "|=" "T"))
+(stack ("ax-syl") : (((Num 0) ("|-" "R" "|=" "T"))))
+(Comparing: ("|-" "R" "|=" "T") "==" ("|-" "R" "|=" "T"))
+Correct proof!
+(Verifying conclusion ("|-" "R" "|=" "(" "S" "," "T" ")") of proof ("tr" "ts" "tt" "ax-jca.1" "ax-jca.2" "ax-jca"))
+(Got Proof: ("tr" "ts" "tt" "ax-jca.1" "ax-jca.2" "ax-jca"))
+(»»» treating label "tr")
+("tr" data: ((FSDepth 1) (Typecode "term") (FVar "R") (Type "$f")))
+(»»» treating label "ts")
+("ts" data: ((FSDepth 1) (Typecode "term") (FVar "S") (Type "$f")))
+(»»» treating label "tt")
+("tt" data: ((FSDepth 1) (Typecode "term") (FVar "T") (Type "$f")))
+(»»» treating label "ax-jca.1")
+("ax-jca.1" data: ((FSDepth 2) (ENum 1) (Statement ("|-" "R" "|=" "S")) (Type "$e")))
+(»»» treating label "ax-jca.2")
+("ax-jca.2" data: ((FSDepth 2) (ENum 2) (Statement ("|-" "R" "|=" "T")) (Type "$e")))
+(»»» treating label "ax-jca")
+("ax-jca" data: ((DVars ()) (FHyps (("term" "R") ("term" "S") ("term" "T"))) (EHyps (("|-" "R" "|=" "S") ("|-" "R" "|=" "T"))) (Statement ("|-" "R" "|=" "(" "S" "," "T" ")")) (Type "$a")))
+(stack_len: 5.0 , npop: 5 , sp: 0.0)
+("adding subst" "R" ("R"))
+("adding subst" "S" ("S"))
+("adding subst" "T" ("T"))
+(new_conclusion: ("|-" "R" "|=" "(" "S" "," "T" ")"))
+(stack ("ax-jca") : (((Num 0) ("|-" "R" "|=" "(" "S" "," "T" ")"))))
+(Comparing: ("|-" "R" "|=" "(" "S" "," "T" ")") "==" ("|-" "R" "|=" "(" "S" "," "T" ")"))
+Correct proof!
+(Verifying conclusion ("|-" "R" "|=" "A") of proof ("tr" "ts" "tt" "kct" "ta" "tr" "ts" "tt" "syl2anc.1" "syl2anc.2" "jca" "syl2anc.3" "syl"))
+(Got Proof: ("tr" "ts" "tt" "kct" "ta" "tr" "ts" "tt" "syl2anc.1" "syl2anc.2" "jca" "syl2anc.3" "syl"))
+(»»» treating label "tr")
+("tr" data: ((FSDepth 1) (Typecode "term") (FVar "R") (Type "$f")))
+(»»» treating label "ts")
+("ts" data: ((FSDepth 1) (Typecode "term") (FVar "S") (Type "$f")))
+(»»» treating label "tt")
+("tt" data: ((FSDepth 1) (Typecode "term") (FVar "T") (Type "$f")))
+(»»» treating label "kct")
+("kct" data: ((DVars ()) (FHyps (("term" "A") ("term" "B"))) (EHyps ()) (Statement ("term" "(" "A" "," "B" ")")) (Type "$a")))
+(stack_len: 3.0 , npop: 2 , sp: 1.0)
+("adding subst" "A" ("S"))
+("adding subst" "B" ("T"))
+(new_conclusion: ("term" "(" "S" "," "T" ")"))
+(stack ("kct") : (((Num 0) ("term" "R")) ((Num 1.0) ("term" "(" "S" "," "T" ")"))))
+(»»» treating label "ta")
+("ta" data: ((FSDepth 1) (Typecode "term") (FVar "A") (Type "$f")))
+(»»» treating label "tr")
+("tr" data: ((FSDepth 1) (Typecode "term") (FVar "R") (Type "$f")))
+(»»» treating label "ts")
+("ts" data: ((FSDepth 1) (Typecode "term") (FVar "S") (Type "$f")))
+(»»» treating label "tt")
+("tt" data: ((FSDepth 1) (Typecode "term") (FVar "T") (Type "$f")))
+(»»» treating label "syl2anc.1")
+("syl2anc.1" data: ((FSDepth 2) (ENum 1) (Statement ("|-" "R" "|=" "S")) (Type "$e")))
+(»»» treating label "syl2anc.2")
+("syl2anc.2" data: ((FSDepth 2) (ENum 2) (Statement ("|-" "R" "|=" "T")) (Type "$e")))
+(»»» treating label "jca")
+("jca" data: ((DVars ()) (FHyps (("term" "R") ("term" "S") ("term" "T"))) (EHyps (("|-" "R" "|=" "S") ("|-" "R" "|=" "T"))) (Statement ("|-" "R" "|=" "(" "S" "," "T" ")")) (Type "$p") (ProofSequence ("tr" "ts" "tt" "ax-jca.1" "ax-jca.2" "ax-jca"))))
+(stack_len: 8.0 , npop: 5 , sp: 3.0)
+("adding subst" "R" ("R"))
+("adding subst" "S" ("S"))
+("adding subst" "T" ("T"))
+(new_conclusion: ("|-" "R" "|=" "(" "S" "," "T" ")"))
+(stack ("jca") : (((Num 0) ("term" "R")) ((Num 1.0) ("term" "(" "S" "," "T" ")")) ((Num 2.0) ("term" "A")) ((Num 3.0) ("|-" "R" "|=" "(" "S" "," "T" ")"))))
+(»»» treating label "syl2anc.3")
+("syl2anc.3" data: ((FSDepth 2) (ENum 3) (Statement ("|-" "(" "S" "," "T" ")" "|=" "A")) (Type "$e")))
+(»»» treating label "syl")
+("syl" data: ((DVars ()) (FHyps (("term" "R") ("term" "S") ("term" "T"))) (EHyps (("|-" "R" "|=" "S") ("|-" "S" "|=" "T"))) (Statement ("|-" "R" "|=" "T")) (Type "$p") (ProofSequence ("tr" "ts" "tt" "ax-syl.1" "ax-syl.2" "ax-syl"))))
+(stack_len: 5.0 , npop: 5 , sp: 0.0)
+("adding subst" "R" ("R"))
+("adding subst" "S" ("(" "S" "," "T" ")"))
+("adding subst" "T" ("A"))
+(new_conclusion: ("|-" "R" "|=" "A"))
+(stack ("syl") : (((Num 0) ("|-" "R" "|=" "A"))))
+(Comparing: ("|-" "R" "|=" "A") "==" ("|-" "R" "|=" "A"))
+Correct proof!
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[(("|-" "R" "|=" "A"))]
+[()]
+[()]
+[()]
+[(("|-" "A" ":" "al"))]
+[()]
+[()]
+[()]
+[()]
+[()]
+[(("|-" "R" "|=" "T"))]
+[()]
+[(), ()]
+[()]
+[()]
+[()]
+[(("|-" "R" "|=" "(" "S" "," "T" ")"))]
+[()]
+[(), ()]
+[()]
+[()]
+[()]
+[(("|-" "R" "|=" "A"))]
+[()]
+[(), (), ()]
+[(), (), (), (), (), (), (), (), (), (), (), (), (), (), (), (), (), (), (), (), (), (), (), (), (), (), (), (), (), (), (), (), (), (), (), ()]

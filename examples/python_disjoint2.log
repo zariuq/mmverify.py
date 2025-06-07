@@ -1,0 +1,85 @@
+mmverify.py -- Proof verifier for the Metamath language
+Reading source file "disjoint2.mm"...
+Statement: ['formula', '|-', '(', ')']
+Statement: ['x', 'y', 'z', 'w']
+Label: xf
+Statement: ['formula', 'x']
+Label: yf
+Statement: ['formula', 'y']
+Label: zf
+Statement: ['formula', 'z']
+Label: wf
+Statement: ['formula', 'w']
+Label: combo
+Statement: ['formula', '(', 'x', 'y', ')']
+Make assertion: (set(), [('formula', 'x'), ('formula', 'y')], [], ['formula', '(', 'x', 'y', ')'])
+Statement: ['x', 'y']
+Label: ax-1
+Statement: ['|-', '(', 'x', 'y', ')']
+Make assertion: ({('x', 'y')}, [('formula', 'x'), ('formula', 'y')], [], ['|-', '(', 'x', 'y', ')'])
+Statement: ['x', 'y', 'z', 'w']
+Label: good
+Statement: ['|-', '(', '(', 'x', 'y', ')', '(', 'z', 'w', ')', ')']
+Statement: ['xf', 'yf', 'combo', 'zf', 'wf', 'combo', 'ax-1']
+Make assertion: ({('y', 'z'), ('x', 'y'), ('w', 'y'), ('w', 'x'), ('x', 'z'), ('w', 'z')}, [('formula', 'x'), ('formula', 'y'), ('formula', 'z'), ('formula', 'w')], [], ['|-', '(', '(', 'x', 'y', ')', '(', 'z', 'w', ')', ')'])
+Verify: good
+Proof step: ('$f', ['formula', 'x'])
+Proof stack: [['formula', 'x']]
+Proof step: ('$f', ['formula', 'y'])
+Proof stack: [['formula', 'x'], ['formula', 'y']]
+Proof step: ('$a', (set(), [('formula', 'x'), ('formula', 'y')], [], ['formula', '(', 'x', 'y', ')']))
+Substitution to apply: {'x': ['x'], 'y': ['y']}
+Applying subst {'x': ['x'], 'y': ['y']} to stmt ['formula', '(', 'x', 'y', ')'] : ['formula', '(', 'x', 'y', ')']
+Proof stack: [['formula', '(', 'x', 'y', ')']]
+Proof step: ('$f', ['formula', 'z'])
+Proof stack: [['formula', '(', 'x', 'y', ')'], ['formula', 'z']]
+Proof step: ('$f', ['formula', 'w'])
+Proof stack: [['formula', '(', 'x', 'y', ')'], ['formula', 'z'], ['formula', 'w']]
+Proof step: ('$a', (set(), [('formula', 'x'), ('formula', 'y')], [], ['formula', '(', 'x', 'y', ')']))
+Substitution to apply: {'x': ['z'], 'y': ['w']}
+Applying subst {'x': ['z'], 'y': ['w']} to stmt ['formula', '(', 'x', 'y', ')'] : ['formula', '(', 'z', 'w', ')']
+Proof stack: [['formula', '(', 'x', 'y', ')'], ['formula', '(', 'z', 'w', ')']]
+Proof step: ('$a', ({('x', 'y')}, [('formula', 'x'), ('formula', 'y')], [], ['|-', '(', 'x', 'y', ')']))
+Substitution to apply: {'x': ['(', 'x', 'y', ')'], 'y': ['(', 'z', 'w', ')']}
+dist x y ['(', 'x', 'y', ')'] ['(', 'z', 'w', ')']
+V(x) = {'y', 'x'}
+V(y) = {'w', 'z'}
+Applying subst {'x': ['(', 'x', 'y', ')'], 'y': ['(', 'z', 'w', ')']} to stmt ['|-', '(', 'x', 'y', ')'] : ['|-', '(', '(', 'x', 'y', ')', '(', 'z', 'w', ')', ')']
+Proof stack: [['|-', '(', '(', 'x', 'y', ')', '(', 'z', 'w', ')', ')']]
+Stack at end of proof: [['|-', '(', '(', 'x', 'y', ')', '(', 'z', 'w', ')', ')']]
+Correct proof!
+Statement: ['x', 'z']
+Statement: ['x', 'w']
+Statement: ['y', 'z']
+Statement: ['y', 'w']
+Label: stillgood
+Statement: ['|-', '(', '(', 'x', 'y', ')', '(', 'z', 'w', ')', ')']
+Statement: ['xf', 'yf', 'combo', 'zf', 'wf', 'combo', 'ax-1']
+Make assertion: ({('w', 'x'), ('x', 'z'), ('y', 'z'), ('w', 'y')}, [('formula', 'x'), ('formula', 'y'), ('formula', 'z'), ('formula', 'w')], [], ['|-', '(', '(', 'x', 'y', ')', '(', 'z', 'w', ')', ')'])
+Verify: stillgood
+Proof step: ('$f', ['formula', 'x'])
+Proof stack: [['formula', 'x']]
+Proof step: ('$f', ['formula', 'y'])
+Proof stack: [['formula', 'x'], ['formula', 'y']]
+Proof step: ('$a', (set(), [('formula', 'x'), ('formula', 'y')], [], ['formula', '(', 'x', 'y', ')']))
+Substitution to apply: {'x': ['x'], 'y': ['y']}
+Applying subst {'x': ['x'], 'y': ['y']} to stmt ['formula', '(', 'x', 'y', ')'] : ['formula', '(', 'x', 'y', ')']
+Proof stack: [['formula', '(', 'x', 'y', ')']]
+Proof step: ('$f', ['formula', 'z'])
+Proof stack: [['formula', '(', 'x', 'y', ')'], ['formula', 'z']]
+Proof step: ('$f', ['formula', 'w'])
+Proof stack: [['formula', '(', 'x', 'y', ')'], ['formula', 'z'], ['formula', 'w']]
+Proof step: ('$a', (set(), [('formula', 'x'), ('formula', 'y')], [], ['formula', '(', 'x', 'y', ')']))
+Substitution to apply: {'x': ['z'], 'y': ['w']}
+Applying subst {'x': ['z'], 'y': ['w']} to stmt ['formula', '(', 'x', 'y', ')'] : ['formula', '(', 'z', 'w', ')']
+Proof stack: [['formula', '(', 'x', 'y', ')'], ['formula', '(', 'z', 'w', ')']]
+Proof step: ('$a', ({('x', 'y')}, [('formula', 'x'), ('formula', 'y')], [], ['|-', '(', 'x', 'y', ')']))
+Substitution to apply: {'x': ['(', 'x', 'y', ')'], 'y': ['(', 'z', 'w', ')']}
+dist x y ['(', 'x', 'y', ')'] ['(', 'z', 'w', ')']
+V(x) = {'y', 'x'}
+V(y) = {'w', 'z'}
+Applying subst {'x': ['(', 'x', 'y', ')'], 'y': ['(', 'z', 'w', ')']} to stmt ['|-', '(', 'x', 'y', ')'] : ['|-', '(', '(', 'x', 'y', ')', '(', 'z', 'w', ')', ')']
+Proof stack: [['|-', '(', '(', 'x', 'y', ')', '(', 'z', 'w', ')', ')']]
+Stack at end of proof: [['|-', '(', '(', 'x', 'y', ')', '(', 'z', 'w', ')', ')']]
+Correct proof!
+No errors were found.

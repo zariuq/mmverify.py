@@ -1,0 +1,231 @@
+mmverify.py -- Proof verifier for the Metamath language
+Reading source file "../hol_example_normal.mm"...
+Statement: ['var']
+Statement: ['type']
+Statement: ['term']
+Statement: ['|-']
+Statement: [':']
+Statement: ['.']
+Statement: ['|=']
+Statement: ['bool']
+Statement: ['ind']
+Statement: ['->']
+Statement: ['(']
+Statement: [')']
+Statement: [',']
+Statement: ['\\']
+Statement: ['=']
+Statement: ['T.']
+Statement: ['[']
+Statement: [']']
+Statement: ['al']
+Statement: ['be']
+Statement: ['ga']
+Statement: ['de']
+Statement: ['x', 'y', 'z', 'f', 'g', 'p', 'q']
+Statement: ['A', 'B', 'C', 'F', 'R', 'S', 'T']
+Label: hal
+Statement: ['type', 'al']
+Label: hbe
+Statement: ['type', 'be']
+Label: hga
+Statement: ['type', 'ga']
+Label: hde
+Statement: ['type', 'de']
+Label: vx
+Statement: ['var', 'x']
+Label: vy
+Statement: ['var', 'y']
+Label: vz
+Statement: ['var', 'z']
+Label: vf
+Statement: ['var', 'f']
+Label: vg
+Statement: ['var', 'g']
+Label: vp
+Statement: ['var', 'p']
+Label: vq
+Statement: ['var', 'q']
+Label: ta
+Statement: ['term', 'A']
+Label: tb
+Statement: ['term', 'B']
+Label: tc
+Statement: ['term', 'C']
+Label: tf
+Statement: ['term', 'F']
+Label: tr
+Statement: ['term', 'R']
+Label: ts
+Statement: ['term', 'S']
+Label: tt
+Statement: ['term', 'T']
+Label: tv
+Statement: ['term', 'x', ':', 'al']
+Make assertion: (set(), [('type', 'al'), ('var', 'x')], [], ['term', 'x', ':', 'al'])
+Label: ht
+Statement: ['type', '(', 'al', '->', 'be', ')']
+Make assertion: (set(), [('type', 'al'), ('type', 'be')], [], ['type', '(', 'al', '->', 'be', ')'])
+Label: hb
+Statement: ['type', 'bool']
+Make assertion: (set(), [], [], ['type', 'bool'])
+Label: hi
+Statement: ['type', 'ind']
+Make assertion: (set(), [], [], ['type', 'ind'])
+Label: kc
+Statement: ['term', '(', 'F', 'T', ')']
+Make assertion: (set(), [('term', 'F'), ('term', 'T')], [], ['term', '(', 'F', 'T', ')'])
+Label: kl
+Statement: ['term', '\\', 'x', ':', 'al', '.', 'T']
+Make assertion: (set(), [('type', 'al'), ('var', 'x'), ('term', 'T')], [], ['term', '\\', 'x', ':', 'al', '.', 'T'])
+Label: ke
+Statement: ['term', '=']
+Make assertion: (set(), [], [], ['term', '='])
+Label: kt
+Statement: ['term', 'T.']
+Make assertion: (set(), [], [], ['term', 'T.'])
+Label: kbr
+Statement: ['term', '[', 'A', 'F', 'B', ']']
+Make assertion: (set(), [('term', 'A'), ('term', 'B'), ('term', 'F')], [], ['term', '[', 'A', 'F', 'B', ']'])
+Label: kct
+Statement: ['term', '(', 'A', ',', 'B', ')']
+Make assertion: (set(), [('term', 'A'), ('term', 'B')], [], ['term', '(', 'A', ',', 'B', ')'])
+Statement: ['wff']
+Label: wffMMJ2
+Statement: ['wff', 'A', '|=', 'B']
+Make assertion: (set(), [('term', 'A'), ('term', 'B')], [], ['wff', 'A', '|=', 'B'])
+Label: wffMMJ2t
+Statement: ['wff', 'A', ':', 'al']
+Make assertion: (set(), [('type', 'al'), ('term', 'A')], [], ['wff', 'A', ':', 'al'])
+Label: idi.1
+Statement: ['|-', 'R', '|=', 'A']
+Label: idi
+Statement: ['|-', 'R', '|=', 'A']
+Statement: ['idi.1']
+Make assertion: (set(), [('term', 'A'), ('term', 'R')], [['|-', 'R', '|=', 'A']], ['|-', 'R', '|=', 'A'])
+Verify: idi
+Proof step: ('$e', ['|-', 'R', '|=', 'A'])
+Proof stack: [['|-', 'R', '|=', 'A']]
+Stack at end of proof: [['|-', 'R', '|=', 'A']]
+Correct proof!
+Label: idt.1
+Statement: ['|-', 'A', ':', 'al']
+Label: idt
+Statement: ['|-', 'A', ':', 'al']
+Statement: ['idt.1']
+Make assertion: (set(), [('type', 'al'), ('term', 'A')], [['|-', 'A', ':', 'al']], ['|-', 'A', ':', 'al'])
+Verify: idt
+Proof step: ('$e', ['|-', 'A', ':', 'al'])
+Proof stack: [['|-', 'A', ':', 'al']]
+Stack at end of proof: [['|-', 'A', ':', 'al']]
+Correct proof!
+Label: ax-syl.1
+Statement: ['|-', 'R', '|=', 'S']
+Label: ax-syl.2
+Statement: ['|-', 'S', '|=', 'T']
+Label: ax-syl
+Statement: ['|-', 'R', '|=', 'T']
+Make assertion: (set(), [('term', 'R'), ('term', 'S'), ('term', 'T')], [['|-', 'R', '|=', 'S'], ['|-', 'S', '|=', 'T']], ['|-', 'R', '|=', 'T'])
+Label: syl
+Statement: ['|-', 'R', '|=', 'T']
+Statement: ['tr', 'ts', 'tt', 'ax-syl.1', 'ax-syl.2', 'ax-syl']
+Make assertion: (set(), [('term', 'R'), ('term', 'S'), ('term', 'T')], [['|-', 'R', '|=', 'S'], ['|-', 'S', '|=', 'T']], ['|-', 'R', '|=', 'T'])
+Verify: syl
+Proof step: ('$f', ['term', 'R'])
+Proof stack: [['term', 'R']]
+Proof step: ('$f', ['term', 'S'])
+Proof stack: [['term', 'R'], ['term', 'S']]
+Proof step: ('$f', ['term', 'T'])
+Proof stack: [['term', 'R'], ['term', 'S'], ['term', 'T']]
+Proof step: ('$e', ['|-', 'R', '|=', 'S'])
+Proof stack: [['term', 'R'], ['term', 'S'], ['term', 'T'], ['|-', 'R', '|=', 'S']]
+Proof step: ('$e', ['|-', 'S', '|=', 'T'])
+Proof stack: [['term', 'R'], ['term', 'S'], ['term', 'T'], ['|-', 'R', '|=', 'S'], ['|-', 'S', '|=', 'T']]
+Proof step: ('$a', (set(), [('term', 'R'), ('term', 'S'), ('term', 'T')], [['|-', 'R', '|=', 'S'], ['|-', 'S', '|=', 'T']], ['|-', 'R', '|=', 'T']))
+Substitution to apply: {'R': ['R'], 'S': ['S'], 'T': ['T']}
+Applying subst {'R': ['R'], 'S': ['S'], 'T': ['T']} to stmt ['|-', 'R', '|=', 'S'] : ['|-', 'R', '|=', 'S']
+Applying subst {'R': ['R'], 'S': ['S'], 'T': ['T']} to stmt ['|-', 'S', '|=', 'T'] : ['|-', 'S', '|=', 'T']
+Applying subst {'R': ['R'], 'S': ['S'], 'T': ['T']} to stmt ['|-', 'R', '|=', 'T'] : ['|-', 'R', '|=', 'T']
+Proof stack: [['|-', 'R', '|=', 'T']]
+Stack at end of proof: [['|-', 'R', '|=', 'T']]
+Correct proof!
+Label: ax-jca.1
+Statement: ['|-', 'R', '|=', 'S']
+Label: ax-jca.2
+Statement: ['|-', 'R', '|=', 'T']
+Label: ax-jca
+Statement: ['|-', 'R', '|=', '(', 'S', ',', 'T', ')']
+Make assertion: (set(), [('term', 'R'), ('term', 'S'), ('term', 'T')], [['|-', 'R', '|=', 'S'], ['|-', 'R', '|=', 'T']], ['|-', 'R', '|=', '(', 'S', ',', 'T', ')'])
+Label: jca
+Statement: ['|-', 'R', '|=', '(', 'S', ',', 'T', ')']
+Statement: ['tr', 'ts', 'tt', 'ax-jca.1', 'ax-jca.2', 'ax-jca']
+Make assertion: (set(), [('term', 'R'), ('term', 'S'), ('term', 'T')], [['|-', 'R', '|=', 'S'], ['|-', 'R', '|=', 'T']], ['|-', 'R', '|=', '(', 'S', ',', 'T', ')'])
+Verify: jca
+Proof step: ('$f', ['term', 'R'])
+Proof stack: [['term', 'R']]
+Proof step: ('$f', ['term', 'S'])
+Proof stack: [['term', 'R'], ['term', 'S']]
+Proof step: ('$f', ['term', 'T'])
+Proof stack: [['term', 'R'], ['term', 'S'], ['term', 'T']]
+Proof step: ('$e', ['|-', 'R', '|=', 'S'])
+Proof stack: [['term', 'R'], ['term', 'S'], ['term', 'T'], ['|-', 'R', '|=', 'S']]
+Proof step: ('$e', ['|-', 'R', '|=', 'T'])
+Proof stack: [['term', 'R'], ['term', 'S'], ['term', 'T'], ['|-', 'R', '|=', 'S'], ['|-', 'R', '|=', 'T']]
+Proof step: ('$a', (set(), [('term', 'R'), ('term', 'S'), ('term', 'T')], [['|-', 'R', '|=', 'S'], ['|-', 'R', '|=', 'T']], ['|-', 'R', '|=', '(', 'S', ',', 'T', ')']))
+Substitution to apply: {'R': ['R'], 'S': ['S'], 'T': ['T']}
+Applying subst {'R': ['R'], 'S': ['S'], 'T': ['T']} to stmt ['|-', 'R', '|=', 'S'] : ['|-', 'R', '|=', 'S']
+Applying subst {'R': ['R'], 'S': ['S'], 'T': ['T']} to stmt ['|-', 'R', '|=', 'T'] : ['|-', 'R', '|=', 'T']
+Applying subst {'R': ['R'], 'S': ['S'], 'T': ['T']} to stmt ['|-', 'R', '|=', '(', 'S', ',', 'T', ')'] : ['|-', 'R', '|=', '(', 'S', ',', 'T', ')']
+Proof stack: [['|-', 'R', '|=', '(', 'S', ',', 'T', ')']]
+Stack at end of proof: [['|-', 'R', '|=', '(', 'S', ',', 'T', ')']]
+Correct proof!
+Label: syl2anc.1
+Statement: ['|-', 'R', '|=', 'S']
+Label: syl2anc.2
+Statement: ['|-', 'R', '|=', 'T']
+Label: syl2anc.3
+Statement: ['|-', '(', 'S', ',', 'T', ')', '|=', 'A']
+Label: syl2anc
+Statement: ['|-', 'R', '|=', 'A']
+Statement: ['tr', 'ts', 'tt', 'kct', 'ta', 'tr', 'ts', 'tt', 'syl2anc.1', 'syl2anc.2', 'jca', 'syl2anc.3', 'syl']
+Make assertion: (set(), [('term', 'A'), ('term', 'R'), ('term', 'S'), ('term', 'T')], [['|-', 'R', '|=', 'S'], ['|-', 'R', '|=', 'T'], ['|-', '(', 'S', ',', 'T', ')', '|=', 'A']], ['|-', 'R', '|=', 'A'])
+Verify: syl2anc
+Proof step: ('$f', ['term', 'R'])
+Proof stack: [['term', 'R']]
+Proof step: ('$f', ['term', 'S'])
+Proof stack: [['term', 'R'], ['term', 'S']]
+Proof step: ('$f', ['term', 'T'])
+Proof stack: [['term', 'R'], ['term', 'S'], ['term', 'T']]
+Proof step: ('$a', (set(), [('term', 'A'), ('term', 'B')], [], ['term', '(', 'A', ',', 'B', ')']))
+Substitution to apply: {'A': ['S'], 'B': ['T']}
+Applying subst {'A': ['S'], 'B': ['T']} to stmt ['term', '(', 'A', ',', 'B', ')'] : ['term', '(', 'S', ',', 'T', ')']
+Proof stack: [['term', 'R'], ['term', '(', 'S', ',', 'T', ')']]
+Proof step: ('$f', ['term', 'A'])
+Proof stack: [['term', 'R'], ['term', '(', 'S', ',', 'T', ')'], ['term', 'A']]
+Proof step: ('$f', ['term', 'R'])
+Proof stack: [['term', 'R'], ['term', '(', 'S', ',', 'T', ')'], ['term', 'A'], ['term', 'R']]
+Proof step: ('$f', ['term', 'S'])
+Proof stack: [['term', 'R'], ['term', '(', 'S', ',', 'T', ')'], ['term', 'A'], ['term', 'R'], ['term', 'S']]
+Proof step: ('$f', ['term', 'T'])
+Proof stack: [['term', 'R'], ['term', '(', 'S', ',', 'T', ')'], ['term', 'A'], ['term', 'R'], ['term', 'S'], ['term', 'T']]
+Proof step: ('$e', ['|-', 'R', '|=', 'S'])
+Proof stack: [['term', 'R'], ['term', '(', 'S', ',', 'T', ')'], ['term', 'A'], ['term', 'R'], ['term', 'S'], ['term', 'T'], ['|-', 'R', '|=', 'S']]
+Proof step: ('$e', ['|-', 'R', '|=', 'T'])
+Proof stack: [['term', 'R'], ['term', '(', 'S', ',', 'T', ')'], ['term', 'A'], ['term', 'R'], ['term', 'S'], ['term', 'T'], ['|-', 'R', '|=', 'S'], ['|-', 'R', '|=', 'T']]
+Proof step: ('$p', (set(), [('term', 'R'), ('term', 'S'), ('term', 'T')], [['|-', 'R', '|=', 'S'], ['|-', 'R', '|=', 'T']], ['|-', 'R', '|=', '(', 'S', ',', 'T', ')']))
+Substitution to apply: {'R': ['R'], 'S': ['S'], 'T': ['T']}
+Applying subst {'R': ['R'], 'S': ['S'], 'T': ['T']} to stmt ['|-', 'R', '|=', 'S'] : ['|-', 'R', '|=', 'S']
+Applying subst {'R': ['R'], 'S': ['S'], 'T': ['T']} to stmt ['|-', 'R', '|=', 'T'] : ['|-', 'R', '|=', 'T']
+Applying subst {'R': ['R'], 'S': ['S'], 'T': ['T']} to stmt ['|-', 'R', '|=', '(', 'S', ',', 'T', ')'] : ['|-', 'R', '|=', '(', 'S', ',', 'T', ')']
+Proof stack: [['term', 'R'], ['term', '(', 'S', ',', 'T', ')'], ['term', 'A'], ['|-', 'R', '|=', '(', 'S', ',', 'T', ')']]
+Proof step: ('$e', ['|-', '(', 'S', ',', 'T', ')', '|=', 'A'])
+Proof stack: [['term', 'R'], ['term', '(', 'S', ',', 'T', ')'], ['term', 'A'], ['|-', 'R', '|=', '(', 'S', ',', 'T', ')'], ['|-', '(', 'S', ',', 'T', ')', '|=', 'A']]
+Proof step: ('$p', (set(), [('term', 'R'), ('term', 'S'), ('term', 'T')], [['|-', 'R', '|=', 'S'], ['|-', 'S', '|=', 'T']], ['|-', 'R', '|=', 'T']))
+Substitution to apply: {'R': ['R'], 'S': ['(', 'S', ',', 'T', ')'], 'T': ['A']}
+Applying subst {'R': ['R'], 'S': ['(', 'S', ',', 'T', ')'], 'T': ['A']} to stmt ['|-', 'R', '|=', 'S'] : ['|-', 'R', '|=', '(', 'S', ',', 'T', ')']
+Applying subst {'R': ['R'], 'S': ['(', 'S', ',', 'T', ')'], 'T': ['A']} to stmt ['|-', 'S', '|=', 'T'] : ['|-', '(', 'S', ',', 'T', ')', '|=', 'A']
+Applying subst {'R': ['R'], 'S': ['(', 'S', ',', 'T', ')'], 'T': ['A']} to stmt ['|-', 'R', '|=', 'T'] : ['|-', 'R', '|=', 'A']
+Proof stack: [['|-', 'R', '|=', 'A']]
+Stack at end of proof: [['|-', 'R', '|=', 'A']]
+Correct proof!
+No errors were found.

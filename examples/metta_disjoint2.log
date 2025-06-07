@@ -1,0 +1,104 @@
+(Verifying conclusion ("|-" "(" "(" "x" "y" ")" "(" "z" "w" ")" ")") of proof ("xf" "yf" "combo" "zf" "wf" "combo" "ax-1"))
+(Got Proof: ("xf" "yf" "combo" "zf" "wf" "combo" "ax-1"))
+(»»» treating label "xf")
+("xf" data: ((FSDepth 1) (Typecode "formula") (FVar "x") (Type "$f")))
+(»»» treating label "yf")
+("yf" data: ((FSDepth 1) (Typecode "formula") (FVar "y") (Type "$f")))
+(»»» treating label "combo")
+("combo" data: ((DVars ()) (FHyps (("formula" "x") ("formula" "y"))) (EHyps ()) (Statement ("formula" "(" "x" "y" ")")) (Type "$a")))
+(stack_len: 2.0 , npop: 2 , sp: 0.0)
+("adding subst" "x" ("x"))
+("adding subst" "y" ("y"))
+(new_conclusion: ("formula" "(" "x" "y" ")"))
+(stack ("combo") : (((Num 0) ("formula" "(" "x" "y" ")"))))
+(»»» treating label "zf")
+("zf" data: ((FSDepth 1) (Typecode "formula") (FVar "z") (Type "$f")))
+(»»» treating label "wf")
+("wf" data: ((FSDepth 1) (Typecode "formula") (FVar "w") (Type "$f")))
+(»»» treating label "combo")
+("combo" data: ((DVars ()) (FHyps (("formula" "x") ("formula" "y"))) (EHyps ()) (Statement ("formula" "(" "x" "y" ")")) (Type "$a")))
+(stack_len: 3.0 , npop: 2 , sp: 1.0)
+("adding subst" "x" ("z"))
+("adding subst" "y" ("w"))
+(new_conclusion: ("formula" "(" "z" "w" ")"))
+(stack ("combo") : (((Num 0) ("formula" "(" "x" "y" ")")) ((Num 1.0) ("formula" "(" "z" "w" ")"))))
+(»»» treating label "ax-1")
+("ax-1" data: ((DVars (("x" "y"))) (FHyps (("formula" "x") ("formula" "y"))) (EHyps ()) (Statement ("|-" "(" "x" "y" ")")) (Type "$a")))
+(stack_len: 2.0 , npop: 2 , sp: 0.0)
+("adding subst" "x" ("(" "x" "y" ")"))
+("adding subst" "y" ("(" "z" "w" ")"))
+(new_conclusion: ("|-" "(" "(" "x" "y" ")" "(" "z" "w" ")" ")"))
+(stack ("ax-1") : (((Num 0) ("|-" "(" "(" "x" "y" ")" "(" "z" "w" ")" ")"))))
+Eval: finished mapping proof.
+(Comparing: ("|-" "(" "(" "x" "y" ")" "(" "z" "w" ")" ")") "==" ("|-" "(" "(" "x" "y" ")" "(" "z" "w" ")" ")"))
+Correct proof!
+(Verifying conclusion ("|-" "(" "(" "x" "y" ")" "(" "z" "w" ")" ")") of proof ("xf" "yf" "combo" "zf" "wf" "combo" "ax-1"))
+(Got Proof: ("xf" "yf" "combo" "zf" "wf" "combo" "ax-1"))
+(»»» treating label "xf")
+("xf" data: ((FSDepth 1) (Typecode "formula") (FVar "x") (Type "$f")))
+(»»» treating label "yf")
+("yf" data: ((FSDepth 1) (Typecode "formula") (FVar "y") (Type "$f")))
+(»»» treating label "combo")
+("combo" data: ((DVars ()) (FHyps (("formula" "x") ("formula" "y"))) (EHyps ()) (Statement ("formula" "(" "x" "y" ")")) (Type "$a")))
+(stack_len: 2.0 , npop: 2 , sp: 0.0)
+("adding subst" "x" ("x"))
+("adding subst" "y" ("y"))
+(new_conclusion: ("formula" "(" "x" "y" ")"))
+(stack ("combo") : (((Num 0) ("formula" "(" "x" "y" ")"))))
+(»»» treating label "zf")
+("zf" data: ((FSDepth 1) (Typecode "formula") (FVar "z") (Type "$f")))
+(»»» treating label "wf")
+("wf" data: ((FSDepth 1) (Typecode "formula") (FVar "w") (Type "$f")))
+(»»» treating label "combo")
+("combo" data: ((DVars ()) (FHyps (("formula" "x") ("formula" "y"))) (EHyps ()) (Statement ("formula" "(" "x" "y" ")")) (Type "$a")))
+(stack_len: 3.0 , npop: 2 , sp: 1.0)
+("adding subst" "x" ("z"))
+("adding subst" "y" ("w"))
+(new_conclusion: ("formula" "(" "z" "w" ")"))
+(stack ("combo") : (((Num 0) ("formula" "(" "x" "y" ")")) ((Num 1.0) ("formula" "(" "z" "w" ")"))))
+(»»» treating label "ax-1")
+("ax-1" data: ((DVars (("x" "y"))) (FHyps (("formula" "x") ("formula" "y"))) (EHyps ()) (Statement ("|-" "(" "x" "y" ")")) (Type "$a")))
+(stack_len: 2.0 , npop: 2 , sp: 0.0)
+("adding subst" "x" ("(" "x" "y" ")"))
+("adding subst" "y" ("(" "z" "w" ")"))
+(new_conclusion: ("|-" "(" "(" "x" "y" ")" "(" "z" "w" ")" ")"))
+(stack ("ax-1") : (((Num 0) ("|-" "(" "(" "x" "y" ")" "(" "z" "w" ")" ")"))))
+Eval: finished mapping proof.
+(Comparing: ("|-" "(" "(" "x" "y" ")" "(" "z" "w" ")" ")") "==" ("|-" "(" "(" "x" "y" ")" "(" "z" "w" ")" ")"))
+Correct proof!
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[()]
+[(("|-" "(" "(" "x" "y" ")" "(" "z" "w" ")" ")"))]
+[()]
+[(), (), (), (), (), ()]
+[()]
+[()]
+[()]
+[()]
+[(("|-" "(" "(" "x" "y" ")" "(" "z" "w" ")" ")"))]
+[()]
+[(), (), (), (), ()]
+[(), (), (), (), (), (), (), ()]
