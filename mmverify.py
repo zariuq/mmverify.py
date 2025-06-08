@@ -47,7 +47,7 @@ metta = hyperon.MeTTa()
 # MeTTa variables:
 run_metta = False
 only_metta = False
-unicode_delimeters = False
+unicode_delimiters = False
 metta_log = []
 
 # Run and Log a MeTTa Command
@@ -79,9 +79,9 @@ def mettify(expr) -> str:
     Convert Python data structures from mmverify.py to MeTTa syntax.
     Handles nested structures and properly escapes double quotes in tokens.
     """
-    if unicode_delimeters:
-        # Handle strings (Metamath tokens)
-        if isinstance(expr, str):
+    # Handle strings (Metamath tokens)
+    if isinstance(expr, str):
+        if unicode_delimiters:        
             # Escape double quotes in tokens and wrap in double quotes
             # return f'"{expr.replace('\\', '\\\\').replace('"', '\\"')}"'
             # return '"' + expr.replace("\\", "\\\\").replace("\"", "\\\"") + '"'
@@ -94,9 +94,8 @@ def mettify(expr) -> str:
             # return '⟨' + expr.replace("\\", "\\\\").replace('(', '⟦').replace(')', '⟧') + '⟩'
             return '⟨' + expr.replace('(', '⟦').replace(')', '⟧') + '⟩'
 
-    else:
+        else:
         # Handle strings (Metamath tokens)
-        if isinstance(expr, str):
             # Escape double quotes in tokens and wrap in double quotes
             # return f'"{expr.replace('\\', '\\\\').replace('"', '\\"')}"'
             return '"' + expr.replace("\\", "\\\\").replace("\"", "\\\"") + '"'
@@ -104,7 +103,7 @@ def mettify(expr) -> str:
             # return f'「{expr.replace('(', '⟮').replace(')', '⟯')}」' ## <-- buggy
             
     # Handle collections recursively, including ()
-    if isinstance(expr, (list, tuple, set)):
+    elif isinstance(expr, (list, tuple, set)):
         elements = " ".join(mettify(item) for item in expr)
         return f"({elements})"
 
@@ -1219,8 +1218,8 @@ if __name__ == '__main__':
         default=False,
         help='execute MeTTa commands during verification instead of just logging them (default: False)')
     parser.add_argument(
-        '-u', '--unicode_delimeters',
-        dest='unicode_delimeters',
+        '-u', '--unicode_delimiters',
+        dest='unicode_delimiters',
         action='store_true',
         default=False,
         help='use ⟨⟩ instead of "" and ⟦⟧ instead of () (default: False)')
@@ -1244,7 +1243,7 @@ if __name__ == '__main__':
     only_metta = args.only_metta
     if only_metta:
         run_metta = True
-    unicode_delimeters = args.unicode_delimeters
+    unicode_delimiters = args.unicode_delimiters
     metta_log_file = args.metta_log_file
     initialize_metta()
     vprint(1, 'mmverify.py -- Proof verifier for the Metamath language')
