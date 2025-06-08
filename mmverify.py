@@ -593,7 +593,8 @@ class MM:
                 stmt, proof = self.read_p_stmt(toks)
                 # mout = mettarl(f'!(make_assertion {mettify(label)} {mettify(stmt)})')
                 # print(f"make_assertion_mout: {mout}")
-                if run_metta:
+                normal_proof = proof[0] != '('
+                if run_metta and normal_proof:
                     print(f'add_p_command: !(add_p {mettify(label)} {mettify(stmt)} {mettify(proof)} {self.verify_proofs})')
                     mout = mettarl(f'!(add_p {mettify(label)} {mettify(stmt)} {mettify(proof)} {self.verify_proofs})')
                     print(f'Output of verify: {mout}\n') # Could check this for an error to throw an MMError.
@@ -609,7 +610,7 @@ class MM:
                         raise MMError(f"MeTTa verification returned malformed output: {mout}")   
                 dvs, f_hyps, e_hyps, conclusion = self.fs.make_assertion(stmt)
                 # print(f'make_assertion_command: !(add-atom &kb ( (Label {mettify(label)}) Proof ( (DVars {mettify(dvs)}) (FHyps {mettify(f_hyps)}) (EHyps {mettify(e_hyps)}) (Statement {mettify(stmt)}) (Type "$p") (ProofSequence {mettify(proof)}))))')
-                if self.verify_proofs and not only_metta:
+                if self.verify_proofs and ((not only_metta) or (not normal_proof)):
                     vprint(2, 'Verify:', label)
                     # if proof[0] != '(':  # Normal format - use MeTTa
                     #     if run_metta:
