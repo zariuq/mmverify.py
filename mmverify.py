@@ -46,6 +46,7 @@ metta = hyperon.MeTTa()
 
 # MeTTa variables:
 run_metta = False
+only_metta = False
 metta_log = []
 
 # Run and Log a MeTTa Command
@@ -593,12 +594,22 @@ class MM:
                 # mout = mettarl(f'!(make_assertion {mettify(label)} {mettify(stmt)})')
                 # print(f"make_assertion_mout: {mout}")
                 if run_metta:
-                    # print(f'add_p_command: !(add_p {mettify(label)} {mettify(stmt)} {mettify(proof)} {self.verify_proofs})')
+                    print(f'add_p_command: !(add_p {mettify(label)} {mettify(stmt)} {mettify(proof)} {self.verify_proofs})')
                     mout = mettarl(f'!(add_p {mettify(label)} {mettify(stmt)} {mettify(proof)} {self.verify_proofs})')
                     print(f'Output of verify: {mout}\n') # Could check this for an error to throw an MMError.
+                    # Simple MeTTa error checker - add this after the mout line:
+                    if mout and mout[0]:
+                        result = str(mout[0][0])
+                        if result.startswith('(Error'):
+                            raise MMError(f"MeTTa verification failed: {result}")
+                        elif result != '()':
+                            raise MMError(f"MeTTa verification returned unexpected result: {result} (expected unit)")
+                        # If result is '()', then success - do nothing
+                    else:
+                        raise MMError(f"MeTTa verification returned malformed output: {mout}")   
                 dvs, f_hyps, e_hyps, conclusion = self.fs.make_assertion(stmt)
                 # print(f'make_assertion_command: !(add-atom &kb ( (Label {mettify(label)}) Proof ( (DVars {mettify(dvs)}) (FHyps {mettify(f_hyps)}) (EHyps {mettify(e_hyps)}) (Statement {mettify(stmt)}) (Type "$p") (ProofSequence {mettify(proof)}))))')
-                if self.verify_proofs:
+                if self.verify_proofs and not only_metta:
                     vprint(2, 'Verify:', label)
                     # if proof[0] != '(':  # Normal format - use MeTTa
                     #     if run_metta:
@@ -1190,6 +1201,12 @@ if __name__ == '__main__':
         default=False,
         help='execute MeTTa commands during verification instead of just logging them (default: False)')
     parser.add_argument(
+        '-o', '--only-metta',
+        dest='only_metta',
+        action='store_true',
+        default=False,
+        help='only execute MeTTa commands during verification instead of just logging them (default: False)')
+    parser.add_argument(
         '-m', '--log-metta',
         dest='metta_log_file',
         type=str,
@@ -1200,6 +1217,9 @@ if __name__ == '__main__':
     db_file = args.database
     logfile = args.logfile
     run_metta = args.run_metta
+    only_metta = args.only_metta
+    if only_metta:
+        run_metta = True
     metta_log_file = args.metta_log_file
     initialize_metta()
     vprint(1, 'mmverify.py -- Proof verifier for the Metamath language')
