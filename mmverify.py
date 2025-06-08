@@ -356,13 +356,15 @@ class FrameStack(list[Frame]):
         """Add a disjoint variable condition (ordered pair of variables) to
         the frame stack top.
         """
+        print(f"add_d var list: {mettify(varlist)}")
+        mettarl(f'!(add_d {mettify(varlist)} {len(self)})')
         new_dvs = set((min(x, y), max(x, y))
                           for x, y in itertools.product(varlist, varlist)
                           if x != y)
         self[-1].d.update(new_dvs)
-        for x, y in new_dvs:
-            # mettarl(f'!(unify &kb (DVar {mettify((x, y))} $_ (Type "$d")) () (add-atom &kb (DVar ({mettify(x)} {mettify(y)}) (FSDepth {len(self)}) (Type "$d") )))')
-            mettarl(f'!(unify &kb (DVar ({mettify(x)} {mettify(y)}) $_ (Type "$d")) () (add-atom &kb (DVar ({mettify(x)} {mettify(y)}) (FSDepth {len(self)}) (Type "$d") )))')
+        # for x, y in new_dvs:
+        #     mettarl(f'!(unify &kb (DVar ({mettify(x)} {mettify(y)}) $_ (Type "$d")) () (add-atom &kb (DVar ({mettify(x)} {mettify(y)}) (FSDepth {len(self)}) (Type "$d") )))')
+        
             # mettarl(f'!(unify &kb (DVar ("{x}" "{y}") $_) () (add-atom &kb (DVar ("{x}" "{y}") ( (FSDepth {len(self)}) (Type "$d") ))))')
         # if new_dvs: # Only log if there are actual pairs
             # dv_pairs_metta = " ".join(f'("{x}" "{y}")' for x, y in list(new_dvs))

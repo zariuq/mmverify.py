@@ -211,6 +211,19 @@
           ($y_vars (match $subst ($d2 $sub2) (find_vars $sub2)))
         ) (map-pairs $x_vars $y_vars dv_check))))
 
+            mettarl(f'!(unify &kb (DVar ({mettify(x)} {mettify(y)}) $_ (Type "$d")) () (add-atom &kb (DVar ({mettify(x)} {mettify(y)}) (FSDepth {len(self)}) (Type "$d") )))')
+
+
+(= (add_dv_pair_if_fresh $x $y $level)
+  (if (== $x $y) ()
+    (let ($ox $oy) (orient_pair $x $y)
+      (unify &kb (DVar ($ox $oy) (FSDepth $level) (Type "$d")) () (add-atom &kb (DVar ($ox $oy) (FSDepth $level) (Type "$d") ))))))
+
+(= (add_d $varlist $level)
+  (map-atom $varlist $x
+    (map-atom $varlist $y
+      (add_dv_pair_if_fresh $x $y $level))))
+
 ;; Data Adding Section
 
 (= (add_c $tok)
