@@ -6,12 +6,12 @@ MeTTaMath is a project to import the Metamath library into MeTTa.
 
 
 ## Current Status
-The verify() function has been implemented in MeTTa. The project currently processes Metamath .mm files during Python parsing, adding relevant information to MeTTa spaces. Full MeTTa parsing and remaining verification checks are still in development. Performance is currently about 5000x slower than the Python version, but future integration with MORK should offer interesting optimization opportunities.
+Every core function called _after parsing_ in the read() function is implemented in MeTTa, which includes _verify()_, _treat_step_, _add_d_, etc. The project currently processes Metamath .mm files during Python parsing, adding relevant information to MeTTa spaces, and proceeding to do verification in MeTTa.  The implementation passes the [metamath tests](https://github.com/zariuq/metamath-test) that it can run in a reasonable amount of time.  Full MeTTa pasring may be done once [MORK](https://github.com/trueagi-io/MORK) is fully integrated, speeding it up a lot.
 
 
 ## Repository Structure
 
-* mmverify-utils.metta - Contains the main implementation of the verify() and treat_step() functions, along with utility functions
+* mmverify-utils.metta - Contains the MeTTa implementations along with utility functions
 * mmverify.py - The original Python Metamath verifier by Raph Levien, modified with MeTTa integration code
 * examples/ - Contains examples of MeTTa interpretation of Metamath statements and their output
 
