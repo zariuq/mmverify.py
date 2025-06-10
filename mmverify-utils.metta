@@ -126,18 +126,36 @@
   (filter-atom $stmt $tok (unify &kb (Var $tok $_ (Type "$v")) True False)))
 
 ;; Orient pairs as (min, max)
+; (= (orient_pair $x $y)
+;    (((py-atom min) $x $y) ((py-atom max) $x $y))) 
+
+;; This version dies on \s.
+; (= (orient_pair $x $y)
+;   (let ($str_x $str_y) ((repr $x) (repr $y))
+;     ((parse ((py-atom min) $str_x $str_y)) (parse ((py-atom max) $str_x $str_y)))))
+
+;; The __lt__ trick comparing strings w/o manipulating them is cleaner!  (Ty Claude Sonnet 3.7!)
+(: string< (-> String String Bool))
+(= (string< $x $y)
+   ((py-dot $x __lt__) $y))
+
 (= (orient_pair $x $y)
-   (((py-atom min) $x $y) ((py-atom max) $x $y))) 
+   (let ($str_x $str_y) ((repr $x) (repr $y))
+     (if (string< $str_x $str_y)
+         ($x $y)
+         ($y $x))))
 
-;; Look up disjoint variables (which are oriented)
-(= (lookup_d $x $y) (let ($x' $y') (orient_pair $x $y) (unify &kb (DVar ($x' $y') $_ (Type "$d")) True False)))
+; Look up disjoint variables (which are oriented)
+; (= (lookup_d $x $y) (let ($x' $y') (orient_pair $x $y) (unify &kb (DVar ($x' $y') $_ (Type "$d")) True False)))
 
-; (= (lookup_d $x $y)
-;     (let ($x' $y') (orient_pair $x $y)
-;     (let $result (unify &kb (DVar ($x' $y') $_ $_) True False)
-;     (let () (println! ("lookup_d" $x $y "oriented as" ($x' $y') "found:" $result))
-;     $result))))
-
+;; Compact version with debugging
+;; Look up disjoint variables (which are oriented) with proper debugging
+(= (lookup_d $x $y) 
+   (let ($x' $y') (orient_pair $x $y)
+     (let $result (unify &kb (DVar ($x' $y') $_ (Type "$d")) True False)
+       (trace! (format-args "lookup_d: {} and {} oriented as ({}, {}) found: {}" 
+                           ($x $y $x' $y' $result))
+               $result))))
 
 ;; Check $x and $y, vars in a substitution: if they're the same or not tagged as disjoint, throw an error 
 ;; (because disjointness must be preserved transively through substitution)
@@ -157,6 +175,19 @@
           ($x_vars (match $subst ($d1 $sub1) (find_vars $sub1)))
           ($y_vars (match $subst ($d2 $sub2) (find_vars $sub2)))
         ) (map-pairs $x_vars $y_vars dv_check))))
+
+            mettarl(f'!(unify &kb (DVar ({mettify(x)} {mettify(y)}) $_ (Type "$d")) () (add-atom &kb (DVar ({mettify(x)} {mettify(y)}) (FSDepth {len(self)}) (Type "$d") )))')
+
+
+(= (add_dv_pair_if_fresh $x $y $level)
+  (if (== $x $y) ()
+    (let ($ox $oy) (orient_pair $x $y)
+      (unify &kb (DVar ($ox $oy) (FSDepth $level) (Type "$d")) () (add-atom &kb (DVar ($ox $oy) (FSDepth $level) (Type "$d") ))))))
+
+(= (add_d $varlist $level)
+  (map-atom $varlist $x
+    (map-atom $varlist $y
+      (add_dv_pair_if_fresh $x $y $level))))
 
 ;; Data Adding Section
 

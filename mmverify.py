@@ -47,6 +47,7 @@ metta = hyperon.MeTTa()
 # MeTTa variables:
 run_metta = False
 only_metta = False
+unicode_delimiters = False
 metta_log = []
 
 # Run and Log a MeTTa Command
@@ -62,12 +63,29 @@ def mettify(expr) -> str:
     Convert Python data structures from mmverify.py to MeTTa syntax.
     Handles nested structures and properly escapes double quotes in tokens.
     """
-        
     # Handle strings (Metamath tokens)
     if isinstance(expr, str):
-        # Escape double quotes in tokens and wrap in double quotes
-        return '"' + expr.replace("\\", "\\\\").replace("\"", "\\\"") + '"'
-        
+        if unicode_delimiters:        
+            # Escape double quotes in tokens and wrap in double quotes
+            # return f'"{expr.replace('\\', '\\\\').replace('"', '\\"')}"'
+            # return '"' + expr.replace("\\", "\\\\").replace("\"", "\\\"") + '"'
+            # return '⟨' + expr.replace('(', '（').replace(')', '）') + '⟩'
+            # return '⟨' + expr.replace('(', '\"(\"').replace(')', '\")\"') + '⟩'
+            # return '"' + expr.replace("\\", "\\\\").replace("\"", "\\\"").replace('(', '（').replace(')', '）') + '"'
+            # return f'"{expr.replace('\\', '\\\\').replace('"', '\\"').replace('(', '⟮').replace(')', '⟯')}"' ## <-- fine
+            # return f'「{expr.replace('(', '❲').replace(')', '❳')}」' ## <-- buggy
+            # return '⟨' + expr.replace("\\", "\\\\").replace("\"", "\\\"").replace('(', '⟦').replace(')', '⟧') + '⟩'
+            # return '⟨' + expr.replace("\\", "\\\\").replace('(', '⟦').replace(')', '⟧') + '⟩'
+            return '⟨' + expr.replace('(', '⟦').replace(')', '⟧') + '⟩'
+
+        else:
+        # Handle strings (Metamath tokens)
+            # Escape double quotes in tokens and wrap in double quotes
+            # return f'"{expr.replace('\\', '\\\\').replace('"', '\\"')}"'
+            return '"' + expr.replace("\\", "\\\\").replace("\"", "\\\"") + '"'
+            # return f'"{expr.replace('\\', '\\\\').replace('"', '\\"').replace('(', '⟮').replace(')', '⟯')}"' ## <-- fine
+            # return f'「{expr.replace('(', '⟮').replace(')', '⟯')}」' ## <-- buggy
+
     # Handle collections recursively, including ()
     elif isinstance(expr, (list, tuple, set)):
         elements = " ".join(mettify(item) for item in expr)
@@ -319,12 +337,15 @@ class FrameStack(list[Frame]):
         """Add a disjoint variable condition (ordered pair of variables) to
         the frame stack top.
         """
+        print(f"add_d var list: {mettify(varlist)}")
+        mettarl(f'!(add_d {mettify(varlist)} {len(self)})')
         new_dvs = set((min(x, y), max(x, y))
                           for x, y in itertools.product(varlist, varlist)
                           if x != y)
         self[-1].d.update(new_dvs)
-        for x, y in new_dvs:
-            mettarl(f'!(unify &kb (DVar ({mettify(x)} {mettify(y)}) $_ (Type "$d")) () (add-atom &kb (DVar ({mettify(x)} {mettify(y)}) (FSDepth {len(self)}) (Type "$d") )))')
+        # for x, y in new_dvs:
+        #     mettarl(f'!(unify &kb (DVar ({mettify(x)} {mettify(y)}) $_ (Type "$d")) () (add-atom &kb (DVar ({mettify(x)} {mettify(y)}) (FSDepth {len(self)}) (Type "$d") )))')
+        
             # mettarl(f'!(unify &kb (DVar ("{x}" "{y}") $_) () (add-atom &kb (DVar ("{x}" "{y}") ( (FSDepth {len(self)}) (Type "$d") ))))')
         # if new_dvs: # Only log if there are actual pairs
             # dv_pairs_metta = " ".join(f'("{x}" "{y}")' for x, y in list(new_dvs))
@@ -563,7 +584,7 @@ class MM:
                 stmt, proof = self.read_p_stmt(toks)
                 normal_proof = proof[0] != '('
                 if run_metta and normal_proof:
-                    print(f'add_p_command: !(add_p {mettify(label)} {mettify(stmt)} {mettify(proof)} {self.verify_proofs})')
+                    # print(f'add_p_command: !(add_p {mettify(label)} {mettify(stmt)} {mettify(proof)} {self.verify_proofs})')
                     mout = mettarl(f'!(add_p {mettify(label)} {mettify(stmt)} {mettify(proof)} {self.verify_proofs})')
                     print(f'Output of verify: {mout}\n') # Could check this for an error to throw an MMError.
                     # Simple MeTTa error checker - add this after the mout line:
@@ -888,6 +909,12 @@ if __name__ == '__main__':
         default=False,
         help='execute MeTTa commands during verification instead of just logging them (default: False)')
     parser.add_argument(
+        '-u', '--unicode_delimiters',
+        dest='unicode_delimiters',
+        action='store_true',
+        default=False,
+        help='use ⟨⟩ instead of "" and ⟦⟧ instead of () (default: False)')
+    parser.add_argument(
         '-o', '--only-metta',
         dest='only_metta',
         action='store_true',
@@ -907,6 +934,7 @@ if __name__ == '__main__':
     only_metta = args.only_metta
     if only_metta:
         run_metta = True
+    unicode_delimiters = args.unicode_delimiters
     metta_log_file = args.metta_log_file
     initialize_metta()
     vprint(1, 'mmverify.py -- Proof verifier for the Metamath language')
