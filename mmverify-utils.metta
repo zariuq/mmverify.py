@@ -11,36 +11,10 @@
 (: matchc (-> hyperon::space::DynSpace Atom Atom %Undefined%))
 (= (matchc $space $pattern $query) (collapse (match $space $pattern $query)))
 
-;; Codex: use this because matchc doesn't throw the error
-;; Bastardized it and it didin't work.
-; (: collapse-error (-> Atom Atom))
-; (= (collapse-error $expr)
-;     (let $res (collapse $expr)
-;       (trace! $res $res)))
-
-;; Ok, ran into an endless memory error due to collapse_empties.  I'm removing it and ematch.  I'll remove these comments after they're logged in a git commit.
-; ;; Probably silly, but it looks better to pcollapse (() () () ()) into () to match () in a let* statement.
-; (= (collapse_empties $expr)
-;   (foldl-atom $expr () $x $acc (if (== $x $acc) () (Error ($x not_equal_to $acc) "I should only receive ()s"))))
-
-; (: ematch (-> hyperon::space::DynSpace Atom Atom %Undefined%))
-; (= (ematch $space $pattern $query) (collapse_empties (matchc $space $pattern $query)))
-
-; (= (empty-space $space) (matchc $space $atom (remove-atom $space $atom)))
 (= (empty-space $space) (matchc $space $atom (remove-atom $space $atom)))
-
-
-; (= (remove-pattern $space $pattern) (matchc $space $pattern (remove-atom $space $pattern)))
 
 (= (remove-pattern $space $pattern) (let $pattern (match $space $pattern $pattern) (remove-atom $space $pattern)))
 (= (remove-patternc $space $pattern) (collapse (let $pattern (match $space $pattern $pattern) (remove-atom $space $pattern))))
-
-
-;; Unused sequential alternative to the parallel match-statement version
-; (= (remove_from_stack $stack_ptr $stack_len)
-;   (if (> $stack_len $stack_ptr)
-;     (let () (match &stack ( (Num $stack_ptr) $s ) (remove-atom &stack ( (Num $stack_ptr) $s ))) (remove_from_stack (+ 1 $stack_ptr) $stack_len))
-;     ()))
 
 (= (remove_from_stack $stack_ptr $stack_len)
   (if (> $stack_len $stack_ptr)
@@ -61,7 +35,6 @@
 (: match-atom'' (-> Expression Atom Atom Atom %Undefined$))
 (= (match-atom'' $expr $pattern $rewrite $Empty) (case (match-atom $expr $pattern $rewrite) ( (Empty $Empty) ( $q $q ) )))
 
-; No longer used due to adjust-state-additive
 (= (update-atom $space $atom $update_pattern)
   (match $space $atom (let () (add-atom $space $update_pattern) (remove-atom $space $atom))))
 
@@ -81,12 +54,6 @@
 (= (match' Nil $pattern $rewrite) (empty))
 (= (match' (Cons $head $tail) $pattern $rewrite) (let $pattern $head $rewrite))
 (= (match' (Cons $head $tail) $pattern $rewrite) (match' $tail $pattern $rewrite))
-
-(= (map' Nil $_ $_) Nil)
-(= (map' (Cons $head $tail) $var $pattern)
-  (let $var $head
-   (Cons $pattern
-         (map' $tail $var $pattern))))
 
 ;; Convert an expression into a list.
 ; (: to-list (-> Expression (List Atom)))
@@ -127,10 +94,6 @@
 (= (append (Cons $head $tail) $list) 
    (Cons $head (append $tail $list)))
 
-; (: append-expr (-> Expression Expression Expression))
-; (= (append-expr $expr1 $expr2)
-;    (from-list (append (to-list $expr1) (to-list $expr2))))
-
 (= (filter' Nil $predicate) Nil)
 (= (filter' (Cons $head $tail) $predicate)
    (let $tail-result (filter' $tail $predicate)
@@ -149,15 +112,6 @@
 ;; Find all tokens in a statement that are variables
 (= (find_vars $stmt)
   (filter-atom $stmt $tok (unify &kb (Var $tok $_ (Type "$v")) True False)))
-
-;; Orient pairs as (min, max)
-; (= (orient_pair $x $y)
-;    (((py-atom min) $x $y) ((py-atom max) $x $y))) 
-
-;; This version dies on \s.
-; (= (orient_pair $x $y)
-;   (let ($str_x $str_y) ((repr $x) (repr $y))
-;     ((parse ((py-atom min) $str_x $str_y)) (parse ((py-atom max) $str_x $str_y)))))
 
 ;; The __lt__ trick comparing strings w/o manipulating them is cleaner!  (Ty Claude Sonnet 3.7!)
 (: string< (-> String String Bool))
@@ -191,17 +145,6 @@
       (Error ($x $y) "Disjoint variable violation.")
       ()))
 
-;; Check whether the substitutions satisfy the disjoint variable conditions
-; (= (check_dvs $subst $dvs0)
-;     (map-atom $dvs0 $d 
-;       (let ($d1 $d2) $d ;; the for x, y in dvs0
-;         (let ($x_vars $y_vars)
-;           (match $subst ($d1 $sub1) 
-;             (match $subst ($d2 $sub2) 
-;               ((find_vars $sub1) (find_vars $sub2)))) 
-;           (map-pairs $x_vars $y_vars dv_check)))))
-
-
 (= (check_dvs $subst $dvs0)
     (map-atom $dvs0 $d ;; the for x, y in dvs0
       (let*
@@ -222,6 +165,16 @@
   (unify &kb (Var $tok $_ (Type "$v")) (Error (Var $tok) "Var already declared and active.")
     (unify &kb (Constant $tok (Type "$c")) (Error (Constant $tok) "Var already declared as constant.")
       (add-atom &kb ( Var $tok (FSDepth $level) (Type "$v") )))))
+
+(= (add_dv_pair_if_fresh $x $y $level)Add commentMore actions
+  (if (== $x $y) ()
+    (let ($ox $oy) (orient_pair $x $y)
+      (unify &kb (DVar ($ox $oy) (FSDepth $level) (Type "$d")) () (add-atom &kb (DVar ($ox $oy) (FSDepth $level) (Type "$d") ))))))
+
+(= (add_d $varlist $level)
+  (map-atom $varlist $x
+    (map-atom $varlist $y
+      (add_dv_pair_if_fresh $x $y $level))))
 
 (= (add_f $label $typecode $var $level)
   (unify &kb (Var $var $_ (Type "$v")) 
@@ -254,13 +207,6 @@
       (add-atom &kb ( (Label $label) EHyp (FSDepth $level) ( (Statement $stmt) (Type "$e") )))
     )
 )
-
-; (= (collect_ehyps_by_depth $unordered_list $current $max $ordered_list)
-;   (if (> $current $max)
-;     $ordered_list
-;     (let $current_list (match-atom'' $unordered_list ($current $list) $list Nil)
-;       (let () (println! ("collect list:" $current - $current_list))
-;       (collect_ehyps_by_depth $unordered_list (+ 1 $current) $max (append $ordered_list $current_list))))))
 
 (= (collect_lists_by_depth $unordered_list $current $max $ordered_list)
   (if (> $current $max)
@@ -308,14 +254,9 @@
       (() (println! ("max_level of ehyps frame stack:" $e_max_level)))
       ($e_hyps_list (collect_lists_by_depth $e_hyps_lists 1 $e_max_level Nil))
       (() (println! ("e_hyps_list:" $e_hyps_list)))
-      ; ($e_hyps (from-list $e_hyps_list))
-      ; (() (println! ("e_hyps:" $e_hyps)))
       ; mand_vars = {tok for hyp in itertools.chain(e_hyps, [stmt])
       ; for tok in hyp if self.lookup_v(tok)}
-      ; ($vars (matchc &kb (Var $var $_ (Type "$v")) $var))
-      ; (() (println! ("vars:" $vars)))
       ($e_hyps_toks (from-list (flatten-list $e_hyps_list)))
-      ; (() (println! ("e_hyps_toks:" $e_hyps_toks)))
       ($_0 (map-atom $e_hyps_toks $tok (add_mand_var $tok)))
       ($_1 (map-atom $stmt $tok (add_mand_var $tok)))
       ($mand_vars (matchc &kb (MandVar $var) $var))
@@ -340,38 +281,13 @@
       (() (println! ("max_level of fhyps frame stack:" $f_max_level)))
       ($f_hyps_list (collect_lists_by_depth $f_hyps_lists 1 $f_max_level Nil))
       (() (println! ("f_hyps_list:" $f_hyps_list)))
-      ; ($f_hyps_list_as_expression (from-list $f_hyps_list))
-      ; (() (println! ("f_hyps_list_as_expression:" $f_hyps_list_as_expression)))
-      ; ($f_hyps_list_flattened_expression (from-list (flatten-list $f_hyps_list)))
-      ; (() (println! ("f_hyps_list_flattened_expression:" $f_hyps_list_flattened_expression)))
-      ; (() (println! (assign_f_hyp_to_var ("formula" "x"))))
-      ; (() (println! (eval (assign_f_hyp_to_var ("formula" "x")))))
-      ; ($f_hyps (assign_f_hyps $f_hyps_list))
       ($f_hyps (filter' $f_hyps_list assign_f_hyp_to_var))
-      ; ($f_hyps (filter-atom (from-list $f_hyps_list) $f_hyp (assign_f_hyp_to_var $f_hyp)))
       (() (println! ("f_hyps:" $f_hyps)))
-      ; ($e_hyps_and_stmt_list (append $e_hyps_list (to-list ($stmt))))
-      ; (() (println! ("h_hypes_and_stmt_list:" $e_hyps_and_stmt_list)))
-      ; ($e_toks' (flatten-list $e_hyps_list))
-      ; (() (println! ("e_toks':" $e_toks')))
-      ; ($e_toks (from-list (flatten-list $e_hyps_and_stmt_list)))
-      ; (() (println! ("e_toks:" $e_toks)))
-      ; ; ($mand_vars' (map-atom $e_hyps $e_hyp (find_vars $e_hyp)))
-      ; (() (println! ("mand_vars:" $mand_vars')))
-      ; ($vars (matchc &kb (Var $var $_ (Type "$v")) $var))
-      ; (() (println! ("vars:" $vars)))
-      ; ($mand_vars (find_vars $e_toks))
-      ; ($mand_vars (filter-atom $e_toks $tok (unify &kb (Var $tok $_ (Type "$v")) True False)))
       ($mand_vars' (matchc &kb (MandVar $var) $var))
       (() (println! ("mand_vars':" $mand_vars')))
       ($_2 (remove-patternc &kb (MandVar $var)))
-            ; !(make_assertion "good" ("|-" "(" "(" "x" "y" ")" "(" "z" "w" ")" ")"))
-      ; !(verify ("xf" "yf" "combo" "zf" "wf" "combo" "ax-1") ("|-" "(" "(" "x" "y" ")" "(" "z" "w" ")" ")"))
-      ; !(add-atom &kb ( (Label "good") Proof ( (DVars (("x" "z") ("w" "z") ("y" "z") ("w" "x") ("x" "y") ("w" "y"))) (FHyps (("formula" "x") ("formula" "y") ("formula" "z") ("formula" "w"))) (EHyps ()) (Statement ("|-" "(" "(" "x" "y" ")" "(" "z" "w" ")" ")")) (Type "$p") (ProofSequence ("xf" "yf" "combo" "zf" "wf" "combo" "ax-1")))))
-      ; !(add-atom &kb ( (Label "ax-1") Assertion ( (DVars (("x" "y"))) (FHyps (("formula" "x") ("formula" "y"))) (EHyps ()) (Statement ("|-" "(" "x" "y" ")")) (Type "$a") )))
     ) ( (DVars $dvs) (FHyps (from-list $f_hyps)) (EHyps (from-list $e_hyps_list)) (Statement $stmt) )))
 
-; !(add-atom &kb ( (Label {mettify(label)}) Assertion ( (DVars {mettify(dvs)}) (FHyps {mettify(f_hyps)}) (EHyps {mettify(e_hyps)}) (Statement {mettify(stmt)}) (Type "$a") )))
 (= (add_a $label $stmt)
   (let*
     (
@@ -380,38 +296,6 @@
       (() (println! ("gathered assertion data:" $dvs $f_hyps $e_hyps $stmt)))
     )
       (add-atom &kb ( (Label $label) Assertion ( (DVars $dvs) (FHyps $f_hyps) (EHyps $e_hyps) (Statement $stmt) (Type "$a") )))))
-
-; Next I will make add_a and add_p. 
-
-; add_a will juts wrap make_assertion
-; add_p will call verify.
-; IF it is a normal proof, which I am assuming, there is nothing I am especially doing in the self.verify() functcion for metta, so I can actually just call it all in MeTTa add_p!
-
-;     def make_assertion(self, stmt: Stmt) -> Assertion:
-;         """Return a quadruple (disjoint variable conditions, floating
-;         hypotheses, essential hypotheses, conclusion) describing the given
-;         assertion.
-;         """
-;         e_hyps = [eh for fr in self for eh in fr.e]))
-;         mand_vars = {tok for hyp in itertools.chain(e_hyps, [stmt])
-;                      for tok in hyp if self.lookup_v(tok)}
-;         dvs = {(x, y) for fr in self for (x, y)
-;                in fr.d if x in mand_vars and y in mand_vars}
-;         f_hyps = []
-;         for fr in self:
-;             for typecode, var in fr.f:
-;                 if var in mand_vars:
-;                     f_hyps.append((typecode, var))
-;                     mand_vars.remove(var)
-;         assertion = dvs, f_hyps, e_hyps, stmt
-;         vprint(18, 'Make assertion:', assertion)
-;         return assertion
-
-;; At the end of demo0.mm
-; >>> metta.run('!(match &kb (EList $l) $l)')
-; [[(Cons ("|-" "P") (Cons ("|-" "(" "P" "->" "Q" ")") Nil))]]
-; >>> metta.run('!(match &kb (FList $l) $l)')
-; [[(Cons ("term" "t") (Cons ("term" "r") (Cons ("term" "s") (Cons ("wff" "P") (Cons ("wff" "Q") Nil)))))]]
 
 ;; Substitution Section
 
@@ -456,7 +340,6 @@
         (Error ( (sp $sp) (entry $entry) (ehyp $ehyp) (subst_h $subst_h) ) "Proof stack entry does not match essential hypothesis."))))
 
 
-
 ;; Proof Verification Section
 
 ;; The assertion part of the treat_step function.
@@ -480,21 +363,14 @@
         ($sp (- $stack_len $npop))
         (() (println! (stack_len: $stack_len , npop: $npop , sp: $sp)))
         (() (if (< $sp 0) (Error ((label $label) (npop $npop)) "Stack underflow: proof step requires too many hypotheses") ()))
-        ; (() (add-atom &wm (sp $sp)))
         ($_0 (change-state! &sp $sp))
         ($subst (new-space)) ; ($subst &subst)
         ($_1 (map-atom $fhyps $fhyp (add-subst $subst $fhyp)))
         ($_2 (map-atom $ehyps $ehyp (check_subst $subst $ehyp)))
-        ; ($_3 (collapse-error (check_dvs $subst $dvars)))
         ($_3 (eval (collapse (check_dvs $subst $dvars)))) ;; I don't like this *idc about the return value* part.
-        ; ($_3 (check_dvs $subst $dvars)) ;; I don't like this *idc about the return value* part.
-        ; (() (println! (check_dvs_output: $_3))) ;; (Error ("x" "z") "Disjoint variable violation.")
-        ; ($error (match-atom' $_3 (Error $errorA $errorB) (Error $errorA $errorB)))
-        ; (() (println! (error_check: $error)))
         ($_4 (matchc &stack ( (Num $n) $s ) (if (>= $n $sp) (remove-atom &stack ( (Num $n) $s )) ())))
         ($new_conclusion (let $new_conclusion (apply_subst $subst $statement) (let () (add-atom &stack ((Num $sp) $new_conclusion)) $new_conclusion)))
         (() (println! (new_conclusion: $new_conclusion)))
-        ; ($_5 (empty-space &wm))
       ) (println! (stack ($label): (matchc &stack $s $s)))))
 
 ;; The hypothesis part of the treat_step function
@@ -552,8 +428,6 @@
 (= (verify $proof $conclusion)
     (let*
       (
-        ; (() (println! ""))
-        ; (() (println! (Verifying conclusion $conclusion of proof $proof)))
         ($_0 (treat_normal_proof $proof))
         ($stack_expr (matchc &stack ( (Num  $n) $f) $f))
         (() (if (== () $stack_expr) (Error (assertion: $conclusion) "Empty stack at end of proof.") ()))  
@@ -563,8 +437,6 @@
         (() (if (== $conclusion $stack_top) () (Error ((assertion: $conclusion) (stack: $stack_expr)) "Stack entry does not match proved assertion.")))
         (() (println! "Correct proof!"))
       ) ()));;($stack_top)))
-
-;; Stopped returning stack_top to check in Python because, well, I should 'trust' the == check in MeTTa 🙄
       
 (= (add_p $label $stmt $proof $verify_proofs)
   (let*
