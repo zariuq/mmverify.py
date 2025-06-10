@@ -12,35 +12,13 @@
 (= (matchc $space $pattern $query) (collapse (match $space $pattern $query)))
 
 ;; Codex: use this because matchc doesn't throw the error
-;; Bastardized it and it didin't work.
-; (: collapse-error (-> Atom Atom))
-; (= (collapse-error $expr)
-;     (let $res (collapse $expr)
-;       (trace! $res $res)))
 
-;; Ok, ran into an endless memory error due to collapse_empties.  I'm removing it and ematch.  I'll remove these comments after they're logged in a git commit.
-; ;; Probably silly, but it looks better to pcollapse (() () () ()) into () to match () in a let* statement.
-; (= (collapse_empties $expr)
-;   (foldl-atom $expr () $x $acc (if (== $x $acc) () (Error ($x not_equal_to $acc) "I should only receive ()s"))))
-
-; (: ematch (-> hyperon::space::DynSpace Atom Atom %Undefined%))
-; (= (ematch $space $pattern $query) (collapse_empties (matchc $space $pattern $query)))
-
-; (= (empty-space $space) (matchc $space $atom (remove-atom $space $atom)))
 (= (empty-space $space) (matchc $space $atom (remove-atom $space $atom)))
 
-
-; (= (remove-pattern $space $pattern) (matchc $space $pattern (remove-atom $space $pattern)))
 
 (= (remove-pattern $space $pattern) (let $pattern (match $space $pattern $pattern) (remove-atom $space $pattern)))
 (= (remove-patternc $space $pattern) (collapse (let $pattern (match $space $pattern $pattern) (remove-atom $space $pattern))))
 
-
-;; Unused sequential alternative to the parallel match-statement version
-; (= (remove_from_stack $stack_ptr $stack_len)
-;   (if (> $stack_len $stack_ptr)
-;     (let () (match &stack ( (Num $stack_ptr) $s ) (remove-atom &stack ( (Num $stack_ptr) $s ))) (remove_from_stack (+ 1 $stack_ptr) $stack_len))
-;     ()))
 
 (= (remove_from_stack $stack_ptr $stack_len)
   (if (> $stack_len $stack_ptr)
@@ -127,9 +105,6 @@
 (= (append (Cons $head $tail) $list) 
    (Cons $head (append $tail $list)))
 
-; (: append-expr (-> Expression Expression Expression))
-; (= (append-expr $expr1 $expr2)
-;    (from-list (append (to-list $expr1) (to-list $expr2))))
 
 (= (filter' Nil $predicate) Nil)
 (= (filter' (Cons $head $tail) $predicate)
@@ -157,11 +132,12 @@
 ;; Look up disjoint variables (which are oriented)
 (= (lookup_d $x $y) (let ($x' $y') (orient_pair $x $y) (unify &kb (DVar ($x' $y') $_ (Type "$d")) True False)))
 
-; (= (lookup_d $x $y) 
-;     (let ($x' $y') (orient_pair $x $y) 
+; (= (lookup_d $x $y)
+;     (let ($x' $y') (orient_pair $x $y)
 ;     (let $result (unify &kb (DVar ($x' $y') $_ $_) True False)
 ;     (let () (println! ("lookup_d" $x $y "oriented as" ($x' $y') "found:" $result))
 ;     $result))))
+
 
 ;; Check $x and $y, vars in a substitution: if they're the same or not tagged as disjoint, throw an error 
 ;; (because disjointness must be preserved transively through substitution)
@@ -172,17 +148,7 @@
       (Error ($x $y) "Disjoint variable violation.")
       ()))
 
-;; Check whether the substitutions satisfy the disjoint variable conditions
-; (= (check_dvs $subst $dvs0)
-;     (map-atom $dvs0 $d 
-;       (let ($d1 $d2) $d ;; the for x, y in dvs0
-;         (let ($x_vars $y_vars)
-;           (match $subst ($d1 $sub1) 
-;             (match $subst ($d2 $sub2) 
-;               ((find_vars $sub1) (find_vars $sub2)))) 
-;           (map-pairs $x_vars $y_vars dv_check)))))
-
-
+(;; Check whether the substitutions satisfy the disjoint variable conditions)
 (= (check_dvs $subst $dvs0)
     (map-atom $dvs0 $d ;; the for x, y in dvs0
       (let*
@@ -236,12 +202,6 @@
     )
 )
 
-; (= (collect_ehyps_by_depth $unordered_list $current $max $ordered_list)
-;   (if (> $current $max)
-;     $ordered_list
-;     (let $current_list (match-atom'' $unordered_list ($current $list) $list Nil)
-;       (let () (println! ("collect list:" $current - $current_list))
-;       (collect_ehyps_by_depth $unordered_list (+ 1 $current) $max (append $ordered_list $current_list))))))
 
 (= (collect_lists_by_depth $unordered_list $current $max $ordered_list)
   (if (> $current $max)
@@ -461,21 +421,14 @@
         ($sp (- $stack_len $npop))
         (() (println! (stack_len: $stack_len , npop: $npop , sp: $sp)))
         (() (if (< $sp 0) (Error ((label $label) (npop $npop)) "Stack underflow: proof step requires too many hypotheses") ()))
-        ; (() (add-atom &wm (sp $sp)))
         ($_0 (change-state! &sp $sp))
         ($subst (new-space)) ; ($subst &subst)
         ($_1 (map-atom $fhyps $fhyp (add-subst $subst $fhyp)))
         ($_2 (map-atom $ehyps $ehyp (check_subst $subst $ehyp)))
-        ; ($_3 (collapse-error (check_dvs $subst $dvars)))
         ($_3 (eval (collapse (check_dvs $subst $dvars)))) ;; I don't like this *idc about the return value* part.
-        ; ($_3 (check_dvs $subst $dvars)) ;; I don't like this *idc about the return value* part.
-        ; (() (println! (check_dvs_output: $_3))) ;; (Error ("x" "z") "Disjoint variable violation.")
-        ; ($error (match-atom' $_3 (Error $errorA $errorB) (Error $errorA $errorB)))
-        ; (() (println! (error_check: $error)))
         ($_4 (matchc &stack ( (Num $n) $s ) (if (>= $n $sp) (remove-atom &stack ( (Num $n) $s )) ())))
         ($new_conclusion (let $new_conclusion (apply_subst $subst $statement) (let () (add-atom &stack ((Num $sp) $new_conclusion)) $new_conclusion)))
         (() (println! (new_conclusion: $new_conclusion)))
-        ; ($_5 (empty-space &wm))
       ) (println! (stack ($label): (matchc &stack $s $s)))))
 
 ;; The hypothesis part of the treat_step function
