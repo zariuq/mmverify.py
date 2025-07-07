@@ -1,71 +1,131 @@
-(Verifying conclusion ("|-" "(" "(" "x" "y" ")" "(" "z" "w" ")" ")") of proof ("xf" "yf" "combo" "zf" "wf" "combo" "ax-1"))
+("make_assertion" "combo" - ("formula" "(" "x" "y" ")"))
+("e_hyps lists:" ())
+("e_levels:" (()))
+("max_level of ehyps frame stack:" 0)
+("e_hyps_list:" Nil)
+("mand_vars:" ("x" "y"))
+("dvs:" ())
+("f_hyps lists:" ((1 (Cons ("formula" "x") (Cons ("formula" "y") (Cons ("formula" "z") (Cons ("formula" "w") Nil)))))))
+("f_levels:" (1))
+("max_level of fhyps frame stack:" 1.0)
+("collect list:" 1 - (Cons ("formula" "x") (Cons ("formula" "y") (Cons ("formula" "z") (Cons ("formula" "w") Nil)))))
+("f_hyps_list:" (Cons ("formula" "x") (Cons ("formula" "y") (Cons ("formula" "z") (Cons ("formula" "w") Nil)))))
+("f_hyps:" (Cons ("formula" "x") (Cons ("formula" "y") Nil)))
+("mand_vars':" ())
+("gathered assertion data:" () (("formula" "x") ("formula" "y")) () ("formula" "(" "x" "y" ")"))
+("make_assertion" "ax-1" - ("|-" "(" "x" "y" ")"))
+("e_hyps lists:" ())
+("e_levels:" (()))
+("max_level of ehyps frame stack:" 0)
+("e_hyps_list:" Nil)
+("mand_vars:" ("x" "y"))
+("dvs:" ())
+("f_hyps lists:" ((1 (Cons ("formula" "x") (Cons ("formula" "y") (Cons ("formula" "z") (Cons ("formula" "w") Nil)))))))
+("f_levels:" (1))
+("max_level of fhyps frame stack:" 1.0)
+("collect list:" 1 - (Cons ("formula" "x") (Cons ("formula" "y") (Cons ("formula" "z") (Cons ("formula" "w") Nil)))))
+("f_hyps_list:" (Cons ("formula" "x") (Cons ("formula" "y") (Cons ("formula" "z") (Cons ("formula" "w") Nil)))))
+("f_hyps:" (Cons ("formula" "x") (Cons ("formula" "y") Nil)))
+("mand_vars':" ())
+("gathered assertion data:" () (("formula" "x") ("formula" "y")) () ("|-" "(" "x" "y" ")"))
+
+(Verifying conclusion ("good") ("|-" "(" "(" "x" "y" ")" "(" "z" "w" ")" ")") with proof ("xf" "yf" "combo" "zf" "wf" "combo" "ax-1"))
 (Got Proof: ("xf" "yf" "combo" "zf" "wf" "combo" "ax-1"))
 (»»» treating label "xf")
-("xf" data: ((FSDepth 1) (Typecode "formula") (FVar "x") (Type "$f")))
+(FHyp "xf" data: ((Typecode "formula") (FVar "x") (Type "$f")))
 (»»» treating label "yf")
-("yf" data: ((FSDepth 1) (Typecode "formula") (FVar "y") (Type "$f")))
+(FHyp "yf" data: ((Typecode "formula") (FVar "y") (Type "$f")))
 (»»» treating label "combo")
-("combo" data: ((DVars ()) (FHyps (("formula" "x") ("formula" "y"))) (EHyps ()) (Statement ("formula" "(" "x" "y" ")")) (Type "$a")))
+(Assertion "combo" data: ((DVars ()) (FHyps (("formula" "x") ("formula" "y"))) (EHyps ()) (Statement ("formula" "(" "x" "y" ")")) (Type "$a")))
 (stack_len: 2.0 , npop: 2 , sp: 0.0)
 ("adding subst" "x" ("x"))
 ("adding subst" "y" ("y"))
 (new_conclusion: ("formula" "(" "x" "y" ")"))
 (stack ("combo") : (((Num 0) ("formula" "(" "x" "y" ")"))))
 (»»» treating label "zf")
-("zf" data: ((FSDepth 1) (Typecode "formula") (FVar "z") (Type "$f")))
+(FHyp "zf" data: ((Typecode "formula") (FVar "z") (Type "$f")))
 (»»» treating label "wf")
-("wf" data: ((FSDepth 1) (Typecode "formula") (FVar "w") (Type "$f")))
+(FHyp "wf" data: ((Typecode "formula") (FVar "w") (Type "$f")))
 (»»» treating label "combo")
-("combo" data: ((DVars ()) (FHyps (("formula" "x") ("formula" "y"))) (EHyps ()) (Statement ("formula" "(" "x" "y" ")")) (Type "$a")))
+(Assertion "combo" data: ((DVars ()) (FHyps (("formula" "x") ("formula" "y"))) (EHyps ()) (Statement ("formula" "(" "x" "y" ")")) (Type "$a")))
 (stack_len: 3.0 , npop: 2 , sp: 1.0)
 ("adding subst" "x" ("z"))
 ("adding subst" "y" ("w"))
 (new_conclusion: ("formula" "(" "z" "w" ")"))
 (stack ("combo") : (((Num 0) ("formula" "(" "x" "y" ")")) ((Num 1.0) ("formula" "(" "z" "w" ")"))))
 (»»» treating label "ax-1")
-("ax-1" data: ((DVars (("x" "y"))) (FHyps (("formula" "x") ("formula" "y"))) (EHyps ()) (Statement ("|-" "(" "x" "y" ")")) (Type "$a")))
+(Assertion "ax-1" data: ((DVars ()) (FHyps (("formula" "x") ("formula" "y"))) (EHyps ()) (Statement ("|-" "(" "x" "y" ")")) (Type "$a")))
 (stack_len: 2.0 , npop: 2 , sp: 0.0)
 ("adding subst" "x" ("(" "x" "y" ")"))
 ("adding subst" "y" ("(" "z" "w" ")"))
 (new_conclusion: ("|-" "(" "(" "x" "y" ")" "(" "z" "w" ")" ")"))
 (stack ("ax-1") : (((Num 0) ("|-" "(" "(" "x" "y" ")" "(" "z" "w" ")" ")"))))
-Eval: finished mapping proof.
 (Comparing: ("|-" "(" "(" "x" "y" ")" "(" "z" "w" ")" ")") "==" ("|-" "(" "(" "x" "y" ")" "(" "z" "w" ")" ")"))
 Correct proof!
-(Verifying conclusion ("|-" "(" "(" "x" "y" ")" "(" "z" "w" ")" ")") of proof ("xf" "yf" "combo" "zf" "wf" "combo" "ax-1"))
+("make_assertion" "good" - ("|-" "(" "(" "x" "y" ")" "(" "z" "w" ")" ")"))
+("e_hyps lists:" ())
+("e_levels:" (()))
+("max_level of ehyps frame stack:" 0)
+("e_hyps_list:" Nil)
+("mand_vars:" ("x" "y" "z" "w"))
+("dvs:" ())
+("f_hyps lists:" ((1 (Cons ("formula" "x") (Cons ("formula" "y") (Cons ("formula" "z") (Cons ("formula" "w") Nil)))))))
+("f_levels:" (1))
+("max_level of fhyps frame stack:" 1.0)
+("collect list:" 1 - (Cons ("formula" "x") (Cons ("formula" "y") (Cons ("formula" "z") (Cons ("formula" "w") Nil)))))
+("f_hyps_list:" (Cons ("formula" "x") (Cons ("formula" "y") (Cons ("formula" "z") (Cons ("formula" "w") Nil)))))
+("f_hyps:" (Cons ("formula" "x") (Cons ("formula" "y") (Cons ("formula" "z") (Cons ("formula" "w") Nil)))))
+("mand_vars':" ())
+("gathered assertion data:" () (("formula" "x") ("formula" "y") ("formula" "z") ("formula" "w")) () ("|-" "(" "(" "x" "y" ")" "(" "z" "w" ")" ")"))
+
+(Verifying conclusion ("stillgood") ("|-" "(" "(" "x" "y" ")" "(" "z" "w" ")" ")") with proof ("xf" "yf" "combo" "zf" "wf" "combo" "ax-1"))
 (Got Proof: ("xf" "yf" "combo" "zf" "wf" "combo" "ax-1"))
 (»»» treating label "xf")
-("xf" data: ((FSDepth 1) (Typecode "formula") (FVar "x") (Type "$f")))
+(FHyp "xf" data: ((Typecode "formula") (FVar "x") (Type "$f")))
 (»»» treating label "yf")
-("yf" data: ((FSDepth 1) (Typecode "formula") (FVar "y") (Type "$f")))
+(FHyp "yf" data: ((Typecode "formula") (FVar "y") (Type "$f")))
 (»»» treating label "combo")
-("combo" data: ((DVars ()) (FHyps (("formula" "x") ("formula" "y"))) (EHyps ()) (Statement ("formula" "(" "x" "y" ")")) (Type "$a")))
+(Assertion "combo" data: ((DVars ()) (FHyps (("formula" "x") ("formula" "y"))) (EHyps ()) (Statement ("formula" "(" "x" "y" ")")) (Type "$a")))
 (stack_len: 2.0 , npop: 2 , sp: 0.0)
 ("adding subst" "x" ("x"))
 ("adding subst" "y" ("y"))
 (new_conclusion: ("formula" "(" "x" "y" ")"))
 (stack ("combo") : (((Num 0) ("formula" "(" "x" "y" ")"))))
 (»»» treating label "zf")
-("zf" data: ((FSDepth 1) (Typecode "formula") (FVar "z") (Type "$f")))
+(FHyp "zf" data: ((Typecode "formula") (FVar "z") (Type "$f")))
 (»»» treating label "wf")
-("wf" data: ((FSDepth 1) (Typecode "formula") (FVar "w") (Type "$f")))
+(FHyp "wf" data: ((Typecode "formula") (FVar "w") (Type "$f")))
 (»»» treating label "combo")
-("combo" data: ((DVars ()) (FHyps (("formula" "x") ("formula" "y"))) (EHyps ()) (Statement ("formula" "(" "x" "y" ")")) (Type "$a")))
+(Assertion "combo" data: ((DVars ()) (FHyps (("formula" "x") ("formula" "y"))) (EHyps ()) (Statement ("formula" "(" "x" "y" ")")) (Type "$a")))
 (stack_len: 3.0 , npop: 2 , sp: 1.0)
 ("adding subst" "x" ("z"))
 ("adding subst" "y" ("w"))
 (new_conclusion: ("formula" "(" "z" "w" ")"))
 (stack ("combo") : (((Num 0) ("formula" "(" "x" "y" ")")) ((Num 1.0) ("formula" "(" "z" "w" ")"))))
 (»»» treating label "ax-1")
-("ax-1" data: ((DVars (("x" "y"))) (FHyps (("formula" "x") ("formula" "y"))) (EHyps ()) (Statement ("|-" "(" "x" "y" ")")) (Type "$a")))
+(Assertion "ax-1" data: ((DVars ()) (FHyps (("formula" "x") ("formula" "y"))) (EHyps ()) (Statement ("|-" "(" "x" "y" ")")) (Type "$a")))
 (stack_len: 2.0 , npop: 2 , sp: 0.0)
 ("adding subst" "x" ("(" "x" "y" ")"))
 ("adding subst" "y" ("(" "z" "w" ")"))
 (new_conclusion: ("|-" "(" "(" "x" "y" ")" "(" "z" "w" ")" ")"))
 (stack ("ax-1") : (((Num 0) ("|-" "(" "(" "x" "y" ")" "(" "z" "w" ")" ")"))))
-Eval: finished mapping proof.
 (Comparing: ("|-" "(" "(" "x" "y" ")" "(" "z" "w" ")" ")") "==" ("|-" "(" "(" "x" "y" ")" "(" "z" "w" ")" ")"))
 Correct proof!
+("make_assertion" "stillgood" - ("|-" "(" "(" "x" "y" ")" "(" "z" "w" ")" ")"))
+("e_hyps lists:" ())
+("e_levels:" (()))
+("max_level of ehyps frame stack:" 0)
+("e_hyps_list:" Nil)
+("mand_vars:" ("x" "y" "z" "w"))
+("dvs:" ())
+("f_hyps lists:" ((1 (Cons ("formula" "x") (Cons ("formula" "y") (Cons ("formula" "z") (Cons ("formula" "w") Nil)))))))
+("f_levels:" (1))
+("max_level of fhyps frame stack:" 1.0)
+("collect list:" 1 - (Cons ("formula" "x") (Cons ("formula" "y") (Cons ("formula" "z") (Cons ("formula" "w") Nil)))))
+("f_hyps_list:" (Cons ("formula" "x") (Cons ("formula" "y") (Cons ("formula" "z") (Cons ("formula" "w") Nil)))))
+("f_hyps:" (Cons ("formula" "x") (Cons ("formula" "y") (Cons ("formula" "z") (Cons ("formula" "w") Nil)))))
+("mand_vars':" ())
+("gathered assertion data:" () (("formula" "x") ("formula" "y") ("formula" "z") ("formula" "w")) () ("|-" "(" "(" "x" "y" ")" "(" "z" "w" ")" ")"))
 [()]
 [()]
 [()]
@@ -86,19 +146,24 @@ Correct proof!
 [()]
 [()]
 [()]
+[(((add_dv_pair_if_fresh "x" "x" 2) (add_dv_pair_if_fresh "x" "y" 2)) ((add_dv_pair_if_fresh "y" "x" 2) (add_dv_pair_if_fresh "y" "y" 2)))]
 [()]
+[]
+[]
+[]
+[(((add_dv_pair_if_fresh "x" "x" 2) (add_dv_pair_if_fresh "x" "y" 2) (add_dv_pair_if_fresh "x" "z" 2) (add_dv_pair_if_fresh "x" "w" 2)) ((add_dv_pair_if_fresh "y" "x" 2) (add_dv_pair_if_fresh "y" "y" 2) (add_dv_pair_if_fresh "y" "z" 2) (add_dv_pair_if_fresh "y" "w" 2)) ((add_dv_pair_if_fresh "z" "x" 2) (add_dv_pair_if_fresh "z" "y" 2) (add_dv_pair_if_fresh "z" "z" 2) (add_dv_pair_if_fresh "z" "w" 2)) ((add_dv_pair_if_fresh "w" "x" 2) (add_dv_pair_if_fresh "w" "y" 2) (add_dv_pair_if_fresh "w" "z" 2) (add_dv_pair_if_fresh "w" "w" 2)))]
 [()]
+[]
+[]
+[]
+[(((add_dv_pair_if_fresh "x" "x" 2) (add_dv_pair_if_fresh "x" "z" 2)) ((add_dv_pair_if_fresh "z" "x" 2) (add_dv_pair_if_fresh "z" "z" 2)))]
+[(((add_dv_pair_if_fresh "x" "x" 2) (add_dv_pair_if_fresh "x" "w" 2)) ((add_dv_pair_if_fresh "w" "x" 2) (add_dv_pair_if_fresh "w" "w" 2)))]
+[(((add_dv_pair_if_fresh "y" "y" 2) (add_dv_pair_if_fresh "y" "z" 2)) ((add_dv_pair_if_fresh "z" "y" 2) (add_dv_pair_if_fresh "z" "z" 2)))]
+[(((add_dv_pair_if_fresh "y" "y" 2) (add_dv_pair_if_fresh "y" "w" 2)) ((add_dv_pair_if_fresh "w" "y" 2) (add_dv_pair_if_fresh "w" "w" 2)))]
 [()]
+[]
+[]
+[]
+[]
 [()]
-[()]
-[(("|-" "(" "(" "x" "y" ")" "(" "z" "w" ")" ")"))]
-[()]
-[(), (), (), (), (), ()]
-[()]
-[()]
-[()]
-[()]
-[(("|-" "(" "(" "x" "y" ")" "(" "z" "w" ")" ")"))]
-[()]
-[(), (), (), (), ()]
 [(), (), (), (), (), (), (), ()]
