@@ -553,19 +553,20 @@ class MM:
                     raise MMError('$p must have label')
                 stmt, proof = self.read_p_stmt(toks)
                 normal_proof = proof[0] != '('
-                if run_metta and normal_proof:
+                if normal_proof:
                     mout = mettarl(f'!(add_p {mettify(label)} {mettify(stmt)} {mettify(proof)} {self.verify_proofs})')
-                    print(f'Output of verify: {mout}\n') # Could check this for an error to throw an MMError.
-                    # Simple MeTTa error checker - add this after the mout line:
-                    if mout and mout[0]:
-                        result = str(mout[0][0])
-                        if result.startswith('(Error'):
-                            raise MMError(f"MeTTa verification failed: {result}")
-                        elif result != '()':
-                            raise MMError(f"MeTTa verification returned unexpected result: {result} (expected unit)")
-                        # If result is '()', then success - do nothing
-                    else:
-                        raise MMError(f"MeTTa verification returned malformed output: {mout}")   
+                    if run_metta:
+                        print(f'Output of verify: {mout}\n') # Could check this for an error to throw an MMError.
+                        # Simple MeTTa error checker - add this after the mout line:
+                        if mout and mout[0]:
+                            result = str(mout[0][0])
+                            if result.startswith('(Error'):
+                                raise MMError(f"MeTTa verification failed: {result}")
+                            elif result != '()':
+                                raise MMError(f"MeTTa verification returned unexpected result: {result} (expected unit)")
+                            # If result is '()', then success - do nothing
+                        else:
+                            raise MMError(f"MeTTa verification returned malformed output: {mout}")   
                 dvs, f_hyps, e_hyps, conclusion = self.fs.make_assertion(stmt)
                 if self.verify_proofs and ((not only_metta) or (not normal_proof)):
                     vprint(2, 'Verify:', label)
