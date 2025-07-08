@@ -289,14 +289,28 @@
       ($_2 (remove-patternc &kb (MandVar $var)))
     ) ( (DVars $dvs) (FHyps (from-list $f_hyps)) (EHyps (from-list $e_hyps_list)) (Statement $stmt) )))
 
-(= (add_a $label $stmt)
+;; Something like this may suffice for starters.
+;; fhyps should be type constraints.  dvars?
+;; (: <label> <statement>))
+;; (: <label> (-> <ehyp1> <ehyp2> ... <statement>))
+(= (mettify_assertion $label $e_hyps $stmt)
+  (if (== $e_hyps ())
+    (: $label $stmt)
+    (: $label (from-list (append (Cons -> Nil) (append (to-list $e_hyps) (to-list ($stmt))))))
+  ))
+
+(= (add_a $label $stmt $make_metta_implication)
   (let*
     (
       (() (println! ("make_assertion" $label - $stmt)))
       (( (DVars $dvs) (FHyps $f_hyps) (EHyps $e_hyps) (Statement $stmt) ) (make_assertion $stmt))
       (() (println! ("gathered assertion data:" $dvs $f_hyps $e_hyps $stmt)))
+      ($assertion (if $make_metta_implication
+        (let $metta_implication (mettify_assertion $label $e_hyps $stmt)
+          ( (Label $label) Assertion ( (DVars $dvs) (FHyps $f_hyps) (EHyps $e_hyps) (Statement $stmt) (Type "$a") (MeTTaImp $metta_implication) )) )
+        ( (Label $label) Assertion ( (DVars $dvs) (FHyps $f_hyps) (EHyps $e_hyps) (Statement $stmt) (Type "$a") )) ))
     )
-      (add-atom &kb ( (Label $label) Assertion ( (DVars $dvs) (FHyps $f_hyps) (EHyps $e_hyps) (Statement $stmt) (Type "$a") )))))
+      (add-atom &kb $assertion)))
 
 ;; Substitution Section
 
@@ -446,7 +460,7 @@
         (() (println! "Correct proof!"))
       ) ()));;($stack_top)))
       
-(= (add_p $label $stmt $proof $verify_proofs)
+(= (add_p $label $stmt $proof $verify_proofs $make_metta_implication)
   (let*
     (
       (() (println! ""))
@@ -455,6 +469,10 @@
       (() (println! ("make_assertion" $label - $stmt)))
       (( (DVars $dvs) (FHyps $f_hyps) (EHyps $e_hyps) (Statement $stmt) ) (make_assertion $stmt))
       (() (println! ("gathered assertion data:" $dvs $f_hyps $e_hyps $stmt)))
+      ($assertion (if $make_metta_implication
+        (let $metta_implication (mettify_assertion $label $e_hyps $stmt)
+          ( (Label $label) Proof ( (DVars $dvs) (FHyps $f_hyps) (EHyps $e_hyps) (Statement $stmt) (Type "$p") (MeTTaImp $metta_implication) (ProofSequence $proof) )) )
+        ( (Label $label) Proof ( (DVars $dvs) (FHyps $f_hyps) (EHyps $e_hyps) (Statement $stmt) (Type "$p") (ProofSequence $proof) )) ))
     )
-      (add-atom &kb ( (Label $label) Proof ( (DVars $dvs) (FHyps $f_hyps) (EHyps $e_hyps) (Statement $stmt) (Type "$p") (ProofSequence $proof) )))))
-  
+      (add-atom &kb $assertion)))
+
