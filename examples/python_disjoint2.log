@@ -21,7 +21,7 @@ Statement: ['x', 'y', 'z', 'w']
 Label: good
 Statement: ['|-', '(', '(', 'x', 'y', ')', '(', 'z', 'w', ')', ')']
 Statement: ['xf', 'yf', 'combo', 'zf', 'wf', 'combo', 'ax-1']
-Make assertion: ({('x', 'z'), ('w', 'z'), ('x', 'y'), ('w', 'y'), ('y', 'z'), ('w', 'x')}, [('formula', 'x'), ('formula', 'y'), ('formula', 'z'), ('formula', 'w')], [], ['|-', '(', '(', 'x', 'y', ')', '(', 'z', 'w', ')', ')'])
+Make assertion: ({('w', 'z'), ('w', 'x'), ('y', 'z'), ('w', 'y'), ('x', 'z'), ('x', 'y')}, [('formula', 'x'), ('formula', 'y'), ('formula', 'z'), ('formula', 'w')], [], ['|-', '(', '(', 'x', 'y', ')', '(', 'z', 'w', ')', ')'])
 Verify: good
 Proof step: ('$f', ['formula', 'x'])
 Proof stack: [['formula', 'x']]
@@ -55,7 +55,7 @@ Statement: ['y', 'w']
 Label: stillgood
 Statement: ['|-', '(', '(', 'x', 'y', ')', '(', 'z', 'w', ')', ')']
 Statement: ['xf', 'yf', 'combo', 'zf', 'wf', 'combo', 'ax-1']
-Make assertion: ({('y', 'z'), ('w', 'x'), ('w', 'y'), ('x', 'z')}, [('formula', 'x'), ('formula', 'y'), ('formula', 'z'), ('formula', 'w')], [], ['|-', '(', '(', 'x', 'y', ')', '(', 'z', 'w', ')', ')'])
+Make assertion: ({('y', 'z'), ('x', 'z'), ('w', 'y'), ('w', 'x')}, [('formula', 'x'), ('formula', 'y'), ('formula', 'z'), ('formula', 'w')], [], ['|-', '(', '(', 'x', 'y', ')', '(', 'z', 'w', ')', ')'])
 Verify: stillgood
 Proof step: ('$f', ['formula', 'x'])
 Proof stack: [['formula', 'x']]

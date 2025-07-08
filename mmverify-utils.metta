@@ -125,16 +125,16 @@
          ($y $x))))
 
 ; Look up disjoint variables (which are oriented)
-; (= (lookup_d $x $y) (let ($x' $y') (orient_pair $x $y) (unify &kb (DVar ($x' $y') $_ (Type "$d")) True False)))
+(= (lookup_d $x $y) (let ($x' $y') (orient_pair $x $y) (unify &kb (DVar ($x' $y') $_ (Type "$d")) True False)))
 
 ;; Compact version with debugging
 ;; Look up disjoint variables (which are oriented) with proper debugging
-(= (lookup_d $x $y) 
-   (let ($x' $y') (orient_pair $x $y)
-     (let $result (unify &kb (DVar ($x' $y') $_ (Type "$d")) True False)
-       (trace! (format-args "lookup_d: {} and {} oriented as ({}, {}) found: {}" 
-                           ($x $y $x' $y' $result))
-               $result))))
+; (= (lookup_d $x $y) 
+;    (let ($x' $y') (orient_pair $x $y)
+;      (let $result (unify &kb (DVar ($x' $y') $_ (Type "$d")) True False)
+;        (trace! (format-args "lookup_d: {} and {} oriented as ({}, {}) found: {}" 
+;                            ($x $y $x' $y' $result))
+;                $result))))
 
 ;; Check $x and $y, vars in a substitution: if they're the same or not tagged as disjoint, throw an error 
 ;; (because disjointness must be preserved transively through substitution)
@@ -166,7 +166,7 @@
     (unify &kb (Constant $tok (Type "$c")) (Error (Constant $tok) "Var already declared as constant.")
       (add-atom &kb ( Var $tok (FSDepth $level) (Type "$v") )))))
 
-(= (add_dv_pair_if_fresh $x $y $level)Add commentMore actions
+(= (add_dv_pair_if_fresh $x $y $level)
   (if (== $x $y) ()
     (let ($ox $oy) (orient_pair $x $y)
       (unify &kb (DVar ($ox $oy) (FSDepth $level) (Type "$d")) () (add-atom &kb (DVar ($ox $oy) (FSDepth $level) (Type "$d") ))))))
@@ -203,6 +203,7 @@
       (() (unify &kb (EList (FSDepth $level) $elist)
         (let $elist' (append $elist $elist_entry) (update-atom &kb (EList (FSDepth $level) $elist) (EList (FSDepth $level) $elist')))
         (add-atom &kb (EList (FSDepth $level) $elist_entry))))
+        (() (println! ("add essential hypothesis:" (label $label) (Statement $stmt) (level $level))))
     )
       (add-atom &kb ( (Label $label) EHyp (FSDepth $level) ( (Statement $stmt) (Type "$e") )))
     )
@@ -388,11 +389,18 @@
 ;; Finds the data from the &kb space,
 ;; Calculates the stack length,
 ;; And calls the appropriate function: treat hypothesis or treat assertion
+; (add-atom &kb ( (Label {mettify(label)}) FHyp ( (Typecode {mettify(stmt[0])}) (FVar {mettify(stmt[1])}) (Type "$f") )))
+; (add-atom &kb ( (Label $label) FHyp (FSDepth $level) ( (Typecode $typecode) (FVar $var) (Type "$f") )))
+; (add-atom &kb ( (Label $label) EHyp (FSDepth $level) ( (Statement $stmt) (Type "$e") )))
 (= (treat_step $label) 
     (let*
       (
         (() (println! (»»» treating label $label)))
-        (($Type $Data) (unify &kb ((Label $label) $Type $Data) ($Type $Data) (Error (label $label) "No statement information found for label")))
+        (($Type $Data) (unify &kb ((Label $label) $Type $Data) 
+          ($Type $Data)
+          (unify &kb ((Label $label) $Type (FSDepth $level) $Data) 
+            ($Type $Data) 
+            (Error (label $label) "No statement information found for label")))) ;; There are two forms of expression, one with 3 atoms and one with 4, so I just check both.  Hacky fix, but it's nice having the level out of the $Data block.
         ($stack_len (case (matchc &stack ( (Num $n) $s ) $n) ( ( () 0 ) ( $nums (+ 1 (max-atom $nums))) ))) ;; Stack length is used in all cases.
         (() (println! ($Type $label data: $Data)))
       )

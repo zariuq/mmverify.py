@@ -19,7 +19,7 @@
 ("max_level of ehyps frame stack:" 0)
 ("e_hyps_list:" Nil)
 ("mand_vars:" ("x" "y"))
-("dvs:" ())
+("dvs:" (("x" "y")))
 ("f_hyps lists:" ((1 (Cons ("formula" "x") (Cons ("formula" "y") (Cons ("formula" "z") (Cons ("formula" "w") Nil)))))))
 ("f_levels:" (1))
 ("max_level of fhyps frame stack:" 1.0)
@@ -27,7 +27,7 @@
 ("f_hyps_list:" (Cons ("formula" "x") (Cons ("formula" "y") (Cons ("formula" "z") (Cons ("formula" "w") Nil)))))
 ("f_hyps:" (Cons ("formula" "x") (Cons ("formula" "y") Nil)))
 ("mand_vars':" ())
-("gathered assertion data:" () (("formula" "x") ("formula" "y")) () ("|-" "(" "x" "y" ")"))
+("gathered assertion data:" (("x" "y")) (("formula" "x") ("formula" "y")) () ("|-" "(" "x" "y" ")"))
 
 (Verifying conclusion ("good") ("|-" "(" "(" "x" "y" ")" "(" "z" "w" ")" ")") with proof ("xf" "yf" "combo" "zf" "wf" "combo" "ax-1"))
 (Got Proof: ("xf" "yf" "combo" "zf" "wf" "combo" "ax-1"))
@@ -54,7 +54,7 @@
 (new_conclusion: ("formula" "(" "z" "w" ")"))
 (stack ("combo") : (((Num 0) ("formula" "(" "x" "y" ")")) ((Num 1.0) ("formula" "(" "z" "w" ")"))))
 (»»» treating label "ax-1")
-(Assertion "ax-1" data: ((DVars ()) (FHyps (("formula" "x") ("formula" "y"))) (EHyps ()) (Statement ("|-" "(" "x" "y" ")")) (Type "$a")))
+(Assertion "ax-1" data: ((DVars (("x" "y"))) (FHyps (("formula" "x") ("formula" "y"))) (EHyps ()) (Statement ("|-" "(" "x" "y" ")")) (Type "$a")))
 (stack_len: 2.0 , npop: 2 , sp: 0.0)
 ("adding subst" "x" ("(" "x" "y" ")"))
 ("adding subst" "y" ("(" "z" "w" ")"))
@@ -68,7 +68,7 @@ Correct proof!
 ("max_level of ehyps frame stack:" 0)
 ("e_hyps_list:" Nil)
 ("mand_vars:" ("x" "y" "z" "w"))
-("dvs:" ())
+("dvs:" (("x" "y") ("x" "z") ("w" "x") ("y" "z") ("w" "y") ("w" "z")))
 ("f_hyps lists:" ((1 (Cons ("formula" "x") (Cons ("formula" "y") (Cons ("formula" "z") (Cons ("formula" "w") Nil)))))))
 ("f_levels:" (1))
 ("max_level of fhyps frame stack:" 1.0)
@@ -76,7 +76,7 @@ Correct proof!
 ("f_hyps_list:" (Cons ("formula" "x") (Cons ("formula" "y") (Cons ("formula" "z") (Cons ("formula" "w") Nil)))))
 ("f_hyps:" (Cons ("formula" "x") (Cons ("formula" "y") (Cons ("formula" "z") (Cons ("formula" "w") Nil)))))
 ("mand_vars':" ())
-("gathered assertion data:" () (("formula" "x") ("formula" "y") ("formula" "z") ("formula" "w")) () ("|-" "(" "(" "x" "y" ")" "(" "z" "w" ")" ")"))
+("gathered assertion data:" (("x" "y") ("x" "z") ("w" "x") ("y" "z") ("w" "y") ("w" "z")) (("formula" "x") ("formula" "y") ("formula" "z") ("formula" "w")) () ("|-" "(" "(" "x" "y" ")" "(" "z" "w" ")" ")"))
 
 (Verifying conclusion ("stillgood") ("|-" "(" "(" "x" "y" ")" "(" "z" "w" ")" ")") with proof ("xf" "yf" "combo" "zf" "wf" "combo" "ax-1"))
 (Got Proof: ("xf" "yf" "combo" "zf" "wf" "combo" "ax-1"))
@@ -103,7 +103,7 @@ Correct proof!
 (new_conclusion: ("formula" "(" "z" "w" ")"))
 (stack ("combo") : (((Num 0) ("formula" "(" "x" "y" ")")) ((Num 1.0) ("formula" "(" "z" "w" ")"))))
 (»»» treating label "ax-1")
-(Assertion "ax-1" data: ((DVars ()) (FHyps (("formula" "x") ("formula" "y"))) (EHyps ()) (Statement ("|-" "(" "x" "y" ")")) (Type "$a")))
+(Assertion "ax-1" data: ((DVars (("x" "y"))) (FHyps (("formula" "x") ("formula" "y"))) (EHyps ()) (Statement ("|-" "(" "x" "y" ")")) (Type "$a")))
 (stack_len: 2.0 , npop: 2 , sp: 0.0)
 ("adding subst" "x" ("(" "x" "y" ")"))
 ("adding subst" "y" ("(" "z" "w" ")"))
@@ -117,7 +117,7 @@ Correct proof!
 ("max_level of ehyps frame stack:" 0)
 ("e_hyps_list:" Nil)
 ("mand_vars:" ("x" "y" "z" "w"))
-("dvs:" ())
+("dvs:" (("x" "z") ("w" "x") ("y" "z") ("w" "y")))
 ("f_hyps lists:" ((1 (Cons ("formula" "x") (Cons ("formula" "y") (Cons ("formula" "z") (Cons ("formula" "w") Nil)))))))
 ("f_levels:" (1))
 ("max_level of fhyps frame stack:" 1.0)
@@ -125,7 +125,7 @@ Correct proof!
 ("f_hyps_list:" (Cons ("formula" "x") (Cons ("formula" "y") (Cons ("formula" "z") (Cons ("formula" "w") Nil)))))
 ("f_hyps:" (Cons ("formula" "x") (Cons ("formula" "y") (Cons ("formula" "z") (Cons ("formula" "w") Nil)))))
 ("mand_vars':" ())
-("gathered assertion data:" () (("formula" "x") ("formula" "y") ("formula" "z") ("formula" "w")) () ("|-" "(" "(" "x" "y" ")" "(" "z" "w" ")" ")"))
+("gathered assertion data:" (("x" "z") ("w" "x") ("y" "z") ("w" "y")) (("formula" "x") ("formula" "y") ("formula" "z") ("formula" "w")) () ("|-" "(" "(" "x" "y" ")" "(" "z" "w" ")" ")"))
 [()]
 [()]
 [()]
@@ -142,28 +142,24 @@ Correct proof!
 [()]
 [()]
 [()]
-[()]
-[()]
-[()]
-[()]
-[(((add_dv_pair_if_fresh "x" "x" 2) (add_dv_pair_if_fresh "x" "y" 2)) ((add_dv_pair_if_fresh "y" "x" 2) (add_dv_pair_if_fresh "y" "y" 2)))]
+[((() ()) (() ()))]
 [()]
 []
 []
-[]
-[(((add_dv_pair_if_fresh "x" "x" 2) (add_dv_pair_if_fresh "x" "y" 2) (add_dv_pair_if_fresh "x" "z" 2) (add_dv_pair_if_fresh "x" "w" 2)) ((add_dv_pair_if_fresh "y" "x" 2) (add_dv_pair_if_fresh "y" "y" 2) (add_dv_pair_if_fresh "y" "z" 2) (add_dv_pair_if_fresh "y" "w" 2)) ((add_dv_pair_if_fresh "z" "x" 2) (add_dv_pair_if_fresh "z" "y" 2) (add_dv_pair_if_fresh "z" "z" 2) (add_dv_pair_if_fresh "z" "w" 2)) ((add_dv_pair_if_fresh "w" "x" 2) (add_dv_pair_if_fresh "w" "y" 2) (add_dv_pair_if_fresh "w" "z" 2) (add_dv_pair_if_fresh "w" "w" 2)))]
+[()]
+[((() () () ()) (() () () ()) (() () () ()) (() () () ()))]
 [()]
 []
 []
-[]
-[(((add_dv_pair_if_fresh "x" "x" 2) (add_dv_pair_if_fresh "x" "z" 2)) ((add_dv_pair_if_fresh "z" "x" 2) (add_dv_pair_if_fresh "z" "z" 2)))]
-[(((add_dv_pair_if_fresh "x" "x" 2) (add_dv_pair_if_fresh "x" "w" 2)) ((add_dv_pair_if_fresh "w" "x" 2) (add_dv_pair_if_fresh "w" "w" 2)))]
-[(((add_dv_pair_if_fresh "y" "y" 2) (add_dv_pair_if_fresh "y" "z" 2)) ((add_dv_pair_if_fresh "z" "y" 2) (add_dv_pair_if_fresh "z" "z" 2)))]
-[(((add_dv_pair_if_fresh "y" "y" 2) (add_dv_pair_if_fresh "y" "w" 2)) ((add_dv_pair_if_fresh "w" "y" 2) (add_dv_pair_if_fresh "w" "w" 2)))]
+[(), (), (), (), (), ()]
+[((() ()) (() ()))]
+[((() ()) (() ()))]
+[((() ()) (() ()))]
+[((() ()) (() ()))]
 [()]
 []
 []
-[]
+[(), (), (), ()]
 []
 [()]
 [(), (), (), (), (), (), (), ()]

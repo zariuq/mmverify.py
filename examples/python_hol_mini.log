@@ -1,5 +1,5 @@
 mmverify.py -- Proof verifier for the Metamath language
-Reading source file "../hol_example_normal.mm"...
+Reading source file "hol_example_normal.mm"...
 Statement: ['var']
 Statement: ['type']
 Statement: ['term']
