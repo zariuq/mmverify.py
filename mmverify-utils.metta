@@ -8,7 +8,7 @@
 ;; Generic Utilities Section
 
 ;; Collapse is used to pull-in non-determinism
-(: matchc (-> hyperon::space::DynSpace Atom Atom %Undefined%))
+(: matchc (-> SpaceType Atom Atom %Undefined%))
 (= (matchc $space $pattern $query) (collapse (match $space $pattern $query)))
 
 (= (empty-space $space) (matchc $space $atom (remove-atom $space $atom)))
@@ -22,11 +22,26 @@
     ()))
 
 ;; Super-handy function for matching atoms in an expression.
-(: match-atom (-> Expression Atom Atom %Undefined$))
+; (: match-atom (-> Expression Atom Atom %Undefined$))
+; (= (match-atom $expr $pattern $rewrite)
+;    (if-decons-expr $expr $head $tail (let $pattern $head $rewrite) (empty)))
+; (= (match-atom $expr $pattern $rewrite)
+;    (if-decons-expr $expr $head $tail (match-atom $tail $pattern $rewrite) (empty)))
+
+;; if-decons-expr is deprecated.  Claude Sonnet 4 replaced it with what VItaly recommended (https://github.com/trueagi-io/hyperon-experimental/pull/963)
+;; Rule 1: Try to match the head (direct translation of first rule)
 (= (match-atom $expr $pattern $rewrite)
-   (if-decons-expr $expr $head $tail (let $pattern $head $rewrite) (empty)))
+   (chain (decons-atom $expr) $ht 
+     (unify ($head $tail) $ht 
+       (let $pattern $head $rewrite)
+       (empty))))
+
+;; Rule 2: Recursively search the tail (direct translation of second rule)  
 (= (match-atom $expr $pattern $rewrite)
-   (if-decons-expr $expr $head $tail (match-atom $tail $pattern $rewrite) (empty)))
+   (chain (decons-atom $expr) $ht 
+     (unify ($head $tail) $ht 
+       (match-atom $tail $pattern $rewrite)
+       (empty))))
 
 ;; I think match-atom was pruning the branch of the let*-statement, thus catching Empty helps.
 (: match-atom' (-> Expression Atom Atom %Undefined$))
@@ -239,6 +254,8 @@
         (let () (remove-atom &kb (MandVar $var)) (Cons $head $tail-result))
         $tail-result)))
 
+;; !(add_a ⟨tze⟩ (⟨term⟩ ⟨0⟩))
+
 ;; TODO: gosh, going through all these lists multiple times seems so wasteful.
 ;; The checks should be done on the initial pass through.
 ;; Get the max_level and go through the lists iteratively from the ground up.
@@ -386,26 +403,56 @@
         ($_4 (matchc &stack ( (Num $n) $s ) (if (>= $n $sp) (remove-atom &stack ( (Num $n) $s )) ())))
         ($new_conclusion (let $new_conclusion (apply_subst $subst $statement) (let () (add-atom &stack ((Num $sp) $new_conclusion)) $new_conclusion)))
         (() (println! (new_conclusion: $new_conclusion)))
-      ) (println! (stack ($label): (matchc &stack $s $s)))))
+      ) ()));(println! (stack ($label): (matchc &stack $s $s)))))
 
 ;; The hypothesis part of the treat_step function
 ;; Simply adds the floating or essential hypothesis to the stack, ensuring they are active hypotheses.
-(= (treat_hypothesis $label $Type $Data $stack_len)
+; (= (treat_hypothesis $label $Type $Data $stack_len)
+;   (unify &kb (ActiveHyp $label) 
+;     (case $Type
+;       (
+;         (FHyp (match-atom' $Data (Typecode $t) (match-atom' $Data (FVar $v) (add-atom &stack ((Num $stack_len) ($t $v)))))) 
+;         (EHyp (match-atom' $Data (Statement $s) (add-atom &stack ((Num $stack_len) $s))))
+;       )) 
+;     (Error (label $label) "The label is the label of a nonactive hypothesis.")))
+
+;; Claude Sonnet 4 suggested not chaining the match-atom' calls together.  Seems to work.
+(= (treat_hypothesis $label $Type $Data $stack_len) 
   (unify &kb (ActiveHyp $label) 
-    (case $Type
-      (
-        (FHyp (match-atom' $Data (Typecode $t) (match-atom' $Data (FVar $v) (add-atom &stack ((Num $stack_len) ($t $v)))))) 
-        (EHyp (match-atom' $Data (Statement $s) (add-atom &stack ((Num $stack_len) $s))))
-      )) 
+    (case $Type 
+      ( (FHyp 
+          (let* (
+            ($typecode (match-atom' $Data (Typecode $t) $t))
+            ($var (match-atom' $Data (FVar $v) $v))
+          ) (add-atom &stack ((Num $stack_len) ($typecode $var)))))
+        (EHyp 
+          (let $stmt (match-atom' $Data (Statement $s) $s)
+            (add-atom &stack ((Num $stack_len) $stmt)))) )) 
     (Error (label $label) "The label is the label of a nonactive hypothesis.")))
+
+; ;; Claude Sonnet 4 debug version
+; (= (treat_hypothesis $label $Type $Data $stack_len) 
+;   (unify &kb (ActiveHyp $label) 
+;     (case $Type 
+;       ( (FHyp 
+;           (let* (
+;             (() (println! ("DEBUG: treating FHyp" $label "data:" $Data)))
+;             ($t_result (match-atom' $Data (Typecode $t) $t))
+;             (() (println! ("DEBUG: extracted typecode:" $t_result)))
+;             ($v_result (match-atom' $Data (FVar $v) $v))  
+;             (() (println! ("DEBUG: extracted var:" $v_result)))
+;             ($entry ($t_result $v_result))
+;             (() (println! ("DEBUG: creating stack entry:" $entry)))
+;           ) (add-atom &stack ((Num $stack_len) $entry))))
+;         (EHyp 
+;           (let $s (match-atom' $Data (Statement $s) $s)
+;             (add-atom &stack ((Num $stack_len) $s)))) )) 
+;     (Error (label $label) "The label is the label of a nonactive hypothesis.")))
 
 ;; Treats the step by label.
 ;; Finds the data from the &kb space,
 ;; Calculates the stack length,
 ;; And calls the appropriate function: treat hypothesis or treat assertion
-; (add-atom &kb ( (Label {mettify(label)}) FHyp ( (Typecode {mettify(stmt[0])}) (FVar {mettify(stmt[1])}) (Type "$f") )))
-; (add-atom &kb ( (Label $label) FHyp (FSDepth $level) ( (Typecode $typecode) (FVar $var) (Type "$f") )))
-; (add-atom &kb ( (Label $label) EHyp (FSDepth $level) ( (Statement $stmt) (Type "$e") )))
 (= (treat_step $label) 
     (let*
       (
@@ -418,13 +465,15 @@
         ($stack_len (case (matchc &stack ( (Num $n) $s ) $n) ( ( () 0 ) ( $nums (+ 1 (max-atom $nums))) ))) ;; Stack length is used in all cases.
         (() (println! ($Type $label data: $Data)))
       )
-      (case $Type
-        (
-          (FHyp (treat_hypothesis $label $Type $Data $stack_len)) 
-          (EHyp (treat_hypothesis $label $Type $Data $stack_len)) 
-          (Assertion (treat_assertion $label $Data $stack_len))
-          (Proof (treat_assertion $label $Data $stack_len))
-        ))
+      (let ()
+        (case $Type
+          (
+            (FHyp (treat_hypothesis $label $Type $Data $stack_len)) 
+            (EHyp (treat_hypothesis $label $Type $Data $stack_len)) 
+            (Assertion (treat_assertion $label $Data $stack_len))
+            (Proof (treat_assertion $label $Data $stack_len))
+          ))
+        (println! (stack ($label): (matchc &stack $s $s))))
       ))
 
 ;; Treats a normal proof (e.g., a list of labels).
@@ -476,3 +525,7 @@
     )
       (add-atom &kb $assertion)))
 
+;; Let's just add a default option
+(= (add_p $label $stmt $proof $verify_proofs)
+  (add_p $label $stmt $proof $verify_proofs False))
+  

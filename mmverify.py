@@ -556,9 +556,9 @@ class MM:
                 normal_proof = proof[0] != '('
                 if normal_proof:
                     mout = mettarl(f'!(add_p {mettify(label)} {mettify(stmt)} {mettify(proof)} {self.verify_proofs} {make_metta_implication})')
-                    # Simple MeTTa error checker - add this after the mout line:
                     if run_metta:
                         print(f'Output of verify: {mout}\n') # Could check this for an error to throw an MMError.
+                        # Simple MeTTa error checker - add this after the mout line:
                         if mout and mout[0]:
                             result = str(mout[0][0])
                             if result.startswith('(Error'):
