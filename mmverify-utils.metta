@@ -30,6 +30,7 @@
 
 ;; if-decons-expr is deprecated.  Claude Sonnet 4 replaced it with what VItaly recommended (https://github.com/trueagi-io/hyperon-experimental/pull/963)
 ;; Rule 1: Try to match the head (direct translation of first rule)
+(: match-atom (-> Expression Atom Atom %Undefined$))
 (= (match-atom $expr $pattern $rewrite)
    (chain (decons-atom $expr) $ht 
      (unify ($head $tail) $ht 
@@ -393,28 +394,28 @@
 
 ;; The hypothesis part of the treat_step function
 ;; Simply adds the floating or essential hypothesis to the stack, ensuring they are active hypotheses.
-; (= (treat_hypothesis $label $Type $Data $stack_len)
-;   (unify &kb (ActiveHyp $label) 
-;     (case $Type
-;       (
-;         (FHyp (match-atom' $Data (Typecode $t) (match-atom' $Data (FVar $v) (add-atom &stack ((Num $stack_len) ($t $v)))))) 
-;         (EHyp (match-atom' $Data (Statement $s) (add-atom &stack ((Num $stack_len) $s))))
-;       )) 
-;     (Error (label $label) "The label is the label of a nonactive hypothesis.")))
+(= (treat_hypothesis $label $Type $Data $stack_len)
+  (unify &kb (ActiveHyp $label) 
+    (case $Type
+      (
+        (FHyp (match-atom' $Data (Typecode $t) (match-atom' $Data (FVar $v) (add-atom &stack ((Num $stack_len) ($t $v)))))) 
+        (EHyp (match-atom' $Data (Statement $s) (add-atom &stack ((Num $stack_len) $s))))
+      )) 
+    (Error (label $label) "The label is the label of a nonactive hypothesis.")))
 
 ;; Claude Sonnet 4 suggested not chaining the match-atom' calls together.  Seems to work.
-(= (treat_hypothesis $label $Type $Data $stack_len) 
-  (unify &kb (ActiveHyp $label) 
-    (case $Type 
-      ( (FHyp 
-          (let* (
-            ($typecode (match-atom' $Data (Typecode $t) $t))
-            ($var (match-atom' $Data (FVar $v) $v))
-          ) (add-atom &stack ((Num $stack_len) ($typecode $var)))))
-        (EHyp 
-          (let $stmt (match-atom' $Data (Statement $s) $s)
-            (add-atom &stack ((Num $stack_len) $stmt)))) )) 
-    (Error (label $label) "The label is the label of a nonactive hypothesis.")))
+; (= (treat_hypothesis $label $Type $Data $stack_len) 
+;   (unify &kb (ActiveHyp $label) 
+;     (case $Type 
+;       ( (FHyp 
+;           (let* (
+;             ($typecode (match-atom' $Data (Typecode $t) $t))
+;             ($var (match-atom' $Data (FVar $v) $v))
+;           ) (add-atom &stack ((Num $stack_len) ($typecode $var)))))
+;         (EHyp 
+;           (let $stmt (match-atom' $Data (Statement $s) $s)
+;             (add-atom &stack ((Num $stack_len) $stmt)))) )) 
+;     (Error (label $label) "The label is the label of a nonactive hypothesis.")))
 
 ; ;; Claude Sonnet 4 debug version
 ; (= (treat_hypothesis $label $Type $Data $stack_len) 
