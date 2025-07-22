@@ -69,7 +69,7 @@ def mettarl(cmd: str):
 def log_transform(stmt: str) -> None:
     """Record a transformed MeTTa command for later output."""
     if transformed_metta_file:
-        transform_log.append(stmt)
+        transform_log.append(f'!(add-atom &md {stmt})')
 
 def mettify(expr) -> str:
     """
@@ -152,7 +152,7 @@ def initialize_metta():
         mettarl('!(bind! &kb (new-space))')     # Labels
         mettarl('!(bind! &sp (new-state -1))')  # Stack pointer state
     if transformed_metta_file:
-        # Create space to store transformed statements in the output file
+        # Create space to store transformed statements
         log_transform('!(bind! &md (new-space))')
         # mettarl('!(bind! &step_counter (new-state 1))') # the stack pointer state -1 to throw an error if not updated.
 
