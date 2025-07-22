@@ -139,6 +139,10 @@ def initialize_metta():
     mettarl('!(bind! &stack (new-space))') # Stack in treat_proof
     mettarl('!(bind! &kb (new-space))') # Labels
     mettarl('!(bind! &sp (new-state -1))') # the stack pointer state -1 to throw an error if not updated.
+    if transform_metta:
+        mettarl('!(bind! &md (new-space))') # MeTTaData
+        # mettarl('!(bind! &step_counter (new-state 1))') # the stack pointer state -1 to throw an error if not updated.
+
 
     MeTTa_Utils_Exprs = parse_metta_expressions('mmverify-utils.metta')
     for expr in MeTTa_Utils_Exprs:
@@ -389,6 +393,82 @@ class FrameStack(list[Frame]):
         vprint(18, 'Make assertion:', assertion)
         return assertion
 
+# def varify_expr(expr: Stmt, all_vars: set[str]) -> str:
+#     """Varify a statement expression for MeTTa: prefix variables with '$' and mettify all tokens."""
+#     varified_tokens = [
+#         '$' + mettify(tok) if tok in all_vars else mettify(tok)
+#         for tok in expr
+#     ]
+#     return '(' + ' '.join(varified_tokens) + ')'
+
+# def build_metta_assertion(label: str, dvs: set[Dv], f_hyps: list[Fhyp], e_hyps: list[Ehyp], stmt: Stmt) -> str:
+#     """Build the MeTTa implication string from assertion components."""
+#     all_vars = {var for _, var in f_hyps}  # All vars are from f_hyps (mand_vars should be empty post-make_assertion)
+    
+#     # f_hyps as (: $⟨var⟩ ⟨typecode⟩)
+#     f_args = [
+#         f'(: ${mettify(var)} {mettify(typecode)})'
+#         for typecode, var in f_hyps
+#     ]
+    
+#     # dvs as (: ($⟨x⟩ $⟨y⟩) DVar)
+#     dv_args = [
+#         f'(: (${mettify(x)} ${mettify(y)}) DVar)'
+#         for x, y in dvs  # Already oriented as (min, max)
+#     ]
+    
+#     # e_hyps as varified expressions (already include typecode)
+#     e_args = [varify_expr(e, all_vars) for e in e_hyps]
+    
+#     # stmt as varified expression
+#     s_arg = varify_expr(stmt, all_vars)
+    
+#     # Combine into (-> ...)
+#     imp = '(-> ' + ' '.join(f_args + dv_args + e_args + [s_arg]) + ')'
+    
+#     # Wrap with label: (: ⟨label⟩ imp)
+#     return f'(: {mettify(label)} {imp})'
+
+# Honestly, I'm not *sure* whether I wish to represent single terms like this "(: ⟨0⟩ ⟨term⟩)" or "(: (⟨0⟩) ⟨term⟩)" for consistency.
+def varify_expr(expr: Stmt, all_vars: set[str]) -> tuple[str, str]:
+    """Varify the rest of the expression (after typecode) and return (varified_rest, typecode)."""
+    if not expr:
+        return '', ''
+    typecode = mettify(expr[0])
+    rest_tokens = expr[1:]
+    varified_rest = [
+        '$' + mettify(tok) if tok in all_vars else mettify(tok)
+        for tok in rest_tokens
+    ]
+    if len(varified_rest) > 1:
+        rest_str = '(' + ' '.join(varified_rest) + ')'
+    elif varified_rest:
+        rest_str = varified_rest[0]
+    else:
+        rest_str = ''
+    return rest_str, typecode
+
+def build_metta_assertion(label: str, dvs: set[Dv], f_hyps: list[Fhyp], e_hyps: list[Ehyp], stmt: Stmt) -> str:
+    """Build the MeTTa assertion string from assertion components, including the label."""
+    all_vars = {var for _, var in f_hyps}
+    
+    f_args = [f'(: ${mettify(var)} {mettify(typecode)})' for typecode, var in f_hyps]
+    
+    dv_args = [f'(: (${mettify(x)} ${mettify(y)}) DVar)' for x, y in dvs]
+    
+    e_args = []
+    for e in e_hyps:
+        rest, tcode = varify_expr(e, all_vars)
+        e_args.append(f'(: {rest} {tcode})')
+    
+    s_rest, s_tcode = varify_expr(stmt, all_vars)
+    s_arg = f'(: {s_rest} {s_tcode})'
+    
+    args = f_args + dv_args + e_args + [s_arg]
+    imp = '(-> ' + ' '.join(args) + ')'
+    
+    return f'(: {mettify(label)} {imp})'
+
 def apply_subst(stmt: Stmt, subst: dict[Var, Stmt]) -> Stmt:
     """Return the token list resulting from the given substitution
     (dictionary) applied to the given statement (token list).
@@ -516,10 +596,18 @@ class MM:
                 for tok in self.read_non_p_stmt(tok, toks):
                     mettarl(f'!(add_c {mettify(tok)})')
                     self.add_c(tok)
+                    if transform_metta:
+                        metta_constant = f'(: {mettify(tok)} Const)'
+                        print(f'metamath const: {tok}')
+                        print(f'metta const: {metta_constant}')
             elif tok == '$v':
                 for tok in self.read_non_p_stmt(tok, toks):
                     mettarl(f'!(add_v {mettify(tok)} {len(self.fs)})')
                     self.add_v(tok)
+                    if transform_metta:
+                        metta_var = f'(: {mettify(tok)} Var)'
+                        print(f'metamath var: {tok}')
+                        print(f'metta var: {metta_var}')
             elif tok == '$f':
                 stmt = self.read_non_p_stmt(tok, toks)
                 if not label: # MeTTa-side, I'll consider this purely parsing
@@ -532,6 +620,11 @@ class MM:
                 # mettarl(f'!(add-atom &kb ( (Label {mettify(label)}) FHyp ( (Typecode {mettify(stmt[0])}) (FVar {mettify(stmt[1])}) (Type "$f") )))')
                 self.add_f(stmt[0], stmt[1], label)
                 self.labels[label] = ('$f', [stmt[0], stmt[1]])
+                if transform_metta:
+                    typecode, var = stmt[0], stmt[1]
+                    metta_fhyp = f'(: {mettify(label)} (: ${mettify(var)} {mettify(typecode)}))'
+                    print(f'metamath fhyp: {label} {typecode} {var}')
+                    print(f'metta fhyp: {metta_fhyp}')
                 label = None
             elif tok == '$e':
                 if not label:
@@ -549,6 +642,10 @@ class MM:
                 mettarl(f'!(add_a {mettify(label)} {mettify(stmt)})')
                 dvs, f_hyps, e_hyps, stmt = self.fs.make_assertion(stmt) # make_assertion(self.read_non_p_stmt(tok, toks))
                 self.labels[label] = ('$a', (dvs, f_hyps, e_hyps, stmt))
+                if transform_metta:
+                    metta_assertion = build_metta_assertion(label, dvs, f_hyps, e_hyps, stmt)
+                    print(f"metamath assertion: {dvs, f_hyps, e_hyps, stmt}")
+                    print(f"metta assertion: {metta_assertion}\n")
                 label = None
             elif tok == '$p':
                 if not label:
@@ -574,6 +671,10 @@ class MM:
                     vprint(2, 'Verify:', label)
                     self.verify(f_hyps, e_hyps, conclusion, proof)
                 self.labels[label] = ('$p', (dvs, f_hyps, e_hyps, conclusion))
+                if transform_metta:
+                    metta_assertion = build_metta_assertion(label, dvs, f_hyps, e_hyps, stmt)
+                    print(f"metamath assertion: {dvs, f_hyps, e_hyps, stmt}")
+                    print(f"metta assertion: {metta_assertion}\n")
                 label = None
             elif tok == '$d':
                 varlist = self.read_non_p_stmt(tok, toks)
