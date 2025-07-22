@@ -69,7 +69,7 @@ def mettarl(cmd: str):
 def log_transform(stmt: str) -> None:
     """Record a transformed MeTTa command for later output."""
     if transformed_metta_file:
-        transform_log.append(f'!(add-atom &md {stmt})')
+        transform_log.append(stmt)
 
 def mettify(expr) -> str:
     """
