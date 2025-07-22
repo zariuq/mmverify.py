@@ -48,17 +48,27 @@ metta = hyperon.MeTTa()
 run_metta = False
 only_metta = False
 unicode_delimiters = False
-transform_metta = False
-verify_metta = True # Hack just for testing: set to false and MeTTa won't verify anything.
-metta_log = []
+transformed_metta_file: Optional[str] = None
+metta_log_file: Optional[str] = None
+verify_metta = True  # Hack just for testing: set to false and MeTTa won't verify anything.
 
-# Run and Log a MeTTa Command
+# Log lists for MeTTa commands and transformed assertions
+metta_log: list[str] = []
+transform_log: list[str] = []
+
+# Run and optionally log a MeTTa command
 def mettarl(cmd: str):
-    # print(cmd)
-    metta_log.append(cmd)
+    """Execute a MeTTa command and store it when logging is enabled."""
+    if metta_log_file:
+        metta_log.append(cmd)
     if run_metta:
-        return metta.run(cmd) 
-    return []  
+        return metta.run(cmd)
+    return []
+
+# Log a transformed MeTTa statement if transformation logging is enabled
+def log_transform(stmt: str) -> None:
+    if transformed_metta_file:
+        transform_log.append(stmt)
 
 def mettify(expr) -> str:
     """
@@ -139,7 +149,7 @@ def initialize_metta():
     mettarl('!(bind! &stack (new-space))') # Stack in treat_proof
     mettarl('!(bind! &kb (new-space))') # Labels
     mettarl('!(bind! &sp (new-state -1))') # the stack pointer state -1 to throw an error if not updated.
-    if transform_metta:
+    if transformed_metta_file:
         mettarl('!(bind! &md (new-space))') # MeTTaData
         # mettarl('!(bind! &step_counter (new-state 1))') # the stack pointer state -1 to throw an error if not updated.
 
@@ -596,18 +606,14 @@ class MM:
                 for tok in self.read_non_p_stmt(tok, toks):
                     mettarl(f'!(add_c {mettify(tok)})')
                     self.add_c(tok)
-                    if transform_metta:
-                        metta_constant = f'(: {mettify(tok)} Const)'
-                        print(f'metamath const: {tok}')
-                        print(f'metta const: {metta_constant}')
+                    metta_constant = f'(: {mettify(tok)} Const)'
+                    log_transform(metta_constant)
             elif tok == '$v':
                 for tok in self.read_non_p_stmt(tok, toks):
                     mettarl(f'!(add_v {mettify(tok)} {len(self.fs)})')
                     self.add_v(tok)
-                    if transform_metta:
-                        metta_var = f'(: {mettify(tok)} Var)'
-                        print(f'metamath var: {tok}')
-                        print(f'metta var: {metta_var}')
+                    metta_var = f'(: {mettify(tok)} Var)'
+                    log_transform(metta_var)
             elif tok == '$f':
                 stmt = self.read_non_p_stmt(tok, toks)
                 if not label: # MeTTa-side, I'll consider this purely parsing
@@ -620,11 +626,9 @@ class MM:
                 # mettarl(f'!(add-atom &kb ( (Label {mettify(label)}) FHyp ( (Typecode {mettify(stmt[0])}) (FVar {mettify(stmt[1])}) (Type "$f") )))')
                 self.add_f(stmt[0], stmt[1], label)
                 self.labels[label] = ('$f', [stmt[0], stmt[1]])
-                if transform_metta:
-                    typecode, var = stmt[0], stmt[1]
-                    metta_fhyp = f'(: {mettify(label)} (: ${mettify(var)} {mettify(typecode)}))'
-                    print(f'metamath fhyp: {label} {typecode} {var}')
-                    print(f'metta fhyp: {metta_fhyp}')
+                typecode, var = stmt[0], stmt[1]
+                metta_fhyp = f'(: {mettify(label)} (: ${mettify(var)} {mettify(typecode)}))'
+                log_transform(metta_fhyp)
                 label = None
             elif tok == '$e':
                 if not label:
@@ -642,10 +646,8 @@ class MM:
                 mettarl(f'!(add_a {mettify(label)} {mettify(stmt)})')
                 dvs, f_hyps, e_hyps, stmt = self.fs.make_assertion(stmt) # make_assertion(self.read_non_p_stmt(tok, toks))
                 self.labels[label] = ('$a', (dvs, f_hyps, e_hyps, stmt))
-                if transform_metta:
-                    metta_assertion = build_metta_assertion(label, dvs, f_hyps, e_hyps, stmt)
-                    print(f"metamath assertion: {dvs, f_hyps, e_hyps, stmt}")
-                    print(f"metta assertion: {metta_assertion}\n")
+                metta_assertion = build_metta_assertion(label, dvs, f_hyps, e_hyps, stmt)
+                log_transform(metta_assertion)
                 label = None
             elif tok == '$p':
                 if not label:
@@ -671,10 +673,8 @@ class MM:
                     vprint(2, 'Verify:', label)
                     self.verify(f_hyps, e_hyps, conclusion, proof)
                 self.labels[label] = ('$p', (dvs, f_hyps, e_hyps, conclusion))
-                if transform_metta:
-                    metta_assertion = build_metta_assertion(label, dvs, f_hyps, e_hyps, stmt)
-                    print(f"metamath assertion: {dvs, f_hyps, e_hyps, stmt}")
-                    print(f"metta assertion: {metta_assertion}\n")
+                metta_assertion = build_metta_assertion(label, dvs, f_hyps, e_hyps, stmt)
+                log_transform(metta_assertion)
                 label = None
             elif tok == '$d':
                 varlist = self.read_non_p_stmt(tok, toks)
@@ -954,14 +954,14 @@ if __name__ == '__main__':
         '-m', '--log-metta',
         dest='metta_log_file',
         type=str,
-        default='mettamath.metta',
+        default=None,
         help='output file for logging MeTTa commands (default mettamath.metta)')
     parser.add_argument(
         '-t', '--transform-metta',
-        dest='transform_metta',
-        action='store_true',
-        default=False,
-        help='make a MeTTa-style implication out of assertion statements.  Requires unicode delimeters. (default: False)')
+        dest='transformed_metta_file',
+        type=str,
+        default=None,
+        help='output transformed statements for MeTTa')
     args = parser.parse_args()
     verbosity = args.verbosity
     db_file = args.database
@@ -971,8 +971,8 @@ if __name__ == '__main__':
     if only_metta:
         run_metta = True
     unicode_delimiters = args.unicode_delimiters
-    transform_metta = args.transform_metta
-    if transform_metta:
+    transformed_metta_file = args.transformed_metta_file
+    if transformed_metta_file:
         unicode_delimiters = True
     metta_log_file = args.metta_log_file
     initialize_metta()
@@ -983,10 +983,18 @@ if __name__ == '__main__':
     vprint(1, 'No errors were found.')
     # mm.dump()
 
-    # Write the MeTTa log :)
-    if metta_log:
+    # Write the MeTTa log
+    if metta_log_file and metta_log:
         with open(metta_log_file, 'w') as out:
             for line in metta_log:
+                out.write(line)
+                if not line.endswith('\n'):
+                    out.write('\n')
+
+    # Write transformed statements if requested
+    if transformed_metta_file and transform_log:
+        with open(transformed_metta_file, 'w') as out:
+            for line in transform_log:
                 out.write(line)
                 if not line.endswith('\n'):
                     out.write('\n')
