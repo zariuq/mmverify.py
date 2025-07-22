@@ -67,6 +67,7 @@ def mettarl(cmd: str):
 
 # Log a transformed MeTTa statement if transformation logging is enabled
 def log_transform(stmt: str) -> None:
+    """Record a transformed MeTTa command for later output."""
     if transformed_metta_file:
         transform_log.append(stmt)
 
@@ -145,12 +146,14 @@ def parse_metta_expressions(filename, comment_char=';', encoding='utf-8'):
 
 def initialize_metta():
     # The MeTTa 'stack' to mirror the Metamath one.
-    # Now some utils reference these, so I should define them first.
-    mettarl('!(bind! &stack (new-space))') # Stack in treat_proof
-    mettarl('!(bind! &kb (new-space))') # Labels
-    mettarl('!(bind! &sp (new-state -1))') # the stack pointer state -1 to throw an error if not updated.
+    # Define these only when MeTTa is being run or its commands logged.
+    if run_metta or metta_log_file:
+        mettarl('!(bind! &stack (new-space))')  # Stack in treat_proof
+        mettarl('!(bind! &kb (new-space))')     # Labels
+        mettarl('!(bind! &sp (new-state -1))')  # Stack pointer state
     if transformed_metta_file:
-        mettarl('!(bind! &md (new-space))') # MeTTaData
+        # Create space to store transformed statements in the output file
+        log_transform('!(bind! &md (new-space))')
         # mettarl('!(bind! &step_counter (new-state 1))') # the stack pointer state -1 to throw an error if not updated.
 
 
@@ -607,13 +610,13 @@ class MM:
                     mettarl(f'!(add_c {mettify(tok)})')
                     self.add_c(tok)
                     metta_constant = f'(: {mettify(tok)} Const)'
-                    log_transform(metta_constant)
+                    log_transform(f'!(add-atom &md {metta_constant})')
             elif tok == '$v':
                 for tok in self.read_non_p_stmt(tok, toks):
                     mettarl(f'!(add_v {mettify(tok)} {len(self.fs)})')
                     self.add_v(tok)
                     metta_var = f'(: {mettify(tok)} Var)'
-                    log_transform(metta_var)
+                    log_transform(f'!(add-atom &md {metta_var})')
             elif tok == '$f':
                 stmt = self.read_non_p_stmt(tok, toks)
                 if not label: # MeTTa-side, I'll consider this purely parsing
@@ -628,7 +631,7 @@ class MM:
                 self.labels[label] = ('$f', [stmt[0], stmt[1]])
                 typecode, var = stmt[0], stmt[1]
                 metta_fhyp = f'(: {mettify(label)} (: ${mettify(var)} {mettify(typecode)}))'
-                log_transform(metta_fhyp)
+                log_transform(f'!(add-atom &md {metta_fhyp})')
                 label = None
             elif tok == '$e':
                 if not label:
@@ -647,7 +650,7 @@ class MM:
                 dvs, f_hyps, e_hyps, stmt = self.fs.make_assertion(stmt) # make_assertion(self.read_non_p_stmt(tok, toks))
                 self.labels[label] = ('$a', (dvs, f_hyps, e_hyps, stmt))
                 metta_assertion = build_metta_assertion(label, dvs, f_hyps, e_hyps, stmt)
-                log_transform(metta_assertion)
+                log_transform(f'!(add-atom &md {metta_assertion})')
                 label = None
             elif tok == '$p':
                 if not label:
@@ -674,7 +677,7 @@ class MM:
                     self.verify(f_hyps, e_hyps, conclusion, proof)
                 self.labels[label] = ('$p', (dvs, f_hyps, e_hyps, conclusion))
                 metta_assertion = build_metta_assertion(label, dvs, f_hyps, e_hyps, stmt)
-                log_transform(metta_assertion)
+                log_transform(f'!(add-atom &md {metta_assertion})')
                 label = None
             elif tok == '$d':
                 varlist = self.read_non_p_stmt(tok, toks)
