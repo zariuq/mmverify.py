@@ -48,7 +48,8 @@ metta = hyperon.MeTTa()
 run_metta = False
 only_metta = False
 unicode_delimiters = False
-make_metta_implication = False
+transform_metta = False
+verify_metta = True # Hack just for testing: set to false and MeTTa won't verify anything.
 metta_log = []
 
 # Run and Log a MeTTa Command
@@ -545,7 +546,7 @@ class MM:
                 if not label:
                     raise MMError('$a must have label')
                 stmt = self.read_non_p_stmt(tok, toks) # Just less-compact
-                mettarl(f'!(add_a {mettify(label)} {mettify(stmt)} {make_metta_implication})')
+                mettarl(f'!(add_a {mettify(label)} {mettify(stmt)})')
                 dvs, f_hyps, e_hyps, stmt = self.fs.make_assertion(stmt) # make_assertion(self.read_non_p_stmt(tok, toks))
                 self.labels[label] = ('$a', (dvs, f_hyps, e_hyps, stmt))
                 label = None
@@ -555,7 +556,7 @@ class MM:
                 stmt, proof = self.read_p_stmt(toks)
                 normal_proof = proof[0] != '('
                 if normal_proof:
-                    mout = mettarl(f'!(add_p {mettify(label)} {mettify(stmt)} {mettify(proof)} {self.verify_proofs} {make_metta_implication})')
+                    mout = mettarl(f'!(add_p {mettify(label)} {mettify(stmt)} {mettify(proof)} {verify_metta and self.verify_proofs})')
                     if run_metta:
                         print(f'Output of verify: {mout}\n') # Could check this for an error to throw an MMError.
                         # Simple MeTTa error checker - add this after the mout line:
@@ -856,7 +857,7 @@ if __name__ == '__main__':
         help='output file for logging MeTTa commands (default mettamath.metta)')
     parser.add_argument(
         '-t', '--transform-metta',
-        dest='make_metta_implication',
+        dest='transform_metta',
         action='store_true',
         default=False,
         help='make a MeTTa-style implication out of assertion statements.  Requires unicode delimeters. (default: False)')
@@ -869,8 +870,8 @@ if __name__ == '__main__':
     if only_metta:
         run_metta = True
     unicode_delimiters = args.unicode_delimiters
-    make_metta_implication = args.make_metta_implication
-    if make_metta_implication:
+    transform_metta = args.transform_metta
+    if transform_metta:
         unicode_delimiters = True
     metta_log_file = args.metta_log_file
     initialize_metta()
@@ -889,3 +890,4 @@ if __name__ == '__main__':
                 if not line.endswith('\n'):
                     out.write('\n')
 
+#TODO: replace the option to not verify proofs if it's not set... from the metta_attempt_failed section :)
