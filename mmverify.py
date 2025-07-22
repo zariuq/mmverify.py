@@ -68,7 +68,7 @@ def mettarl(cmd: str):
 # Log a transformed MeTTa statement if transformation logging is enabled
 def log_transform(stmt: str) -> None:
     if transformed_metta_file:
-        transform_log.append(stmt)
+        transform_log.append(f'!(add-atom &md {stmt})')
 
 def mettify(expr) -> str:
     """
@@ -145,12 +145,14 @@ def parse_metta_expressions(filename, comment_char=';', encoding='utf-8'):
 
 def initialize_metta():
     # The MeTTa 'stack' to mirror the Metamath one.
-    # Now some utils reference these, so I should define them first.
-    mettarl('!(bind! &stack (new-space))') # Stack in treat_proof
-    mettarl('!(bind! &kb (new-space))') # Labels
-    mettarl('!(bind! &sp (new-state -1))') # the stack pointer state -1 to throw an error if not updated.
+    # Define these only when MeTTa is being run or its commands logged.
+    if run_metta or metta_log_file:
+        mettarl('!(bind! &stack (new-space))')  # Stack in treat_proof
+        mettarl('!(bind! &kb (new-space))')     # Labels
+        mettarl('!(bind! &sp (new-state -1))')  # Stack pointer state
     if transformed_metta_file:
-        mettarl('!(bind! &md (new-space))') # MeTTaData
+        # Create space to store transformed statements
+        log_transform('!(bind! &md (new-space))')
         # mettarl('!(bind! &step_counter (new-state 1))') # the stack pointer state -1 to throw an error if not updated.
 
 
