@@ -477,8 +477,13 @@ def build_metta_assertion(label: str, dvs: set[Dv], f_hyps: list[Fhyp], e_hyps: 
     s_rest, s_tcode = varify_expr(stmt, all_vars)
     s_arg = f'(: {s_rest} {s_tcode})'
     
-    args = f_args + dv_args + e_args + [s_arg]
-    imp = '(-> ' + ' '.join(args) + ')'
+    prems = f_args + dv_args + e_args
+    if len(prems) == 0:
+        return f'(: {mettify(label)} {s_arg})'
+    imp = '(-> ' + ' '.join(prems + [s_arg]) + ')'
+
+    # args = f_args + dv_args + e_args + [s_arg]
+    # imp = '(-> ' + ' '.join(args) + ')'
     
     return f'(: {mettify(label)} {imp})'
 
@@ -630,7 +635,7 @@ class MM:
                 self.add_f(stmt[0], stmt[1], label)
                 self.labels[label] = ('$f', [stmt[0], stmt[1]])
                 typecode, var = stmt[0], stmt[1]
-                metta_fhyp = f'(: {mettify(label)} (: ${mettify(var)} {mettify(typecode)}))'
+                metta_fhyp = f'(: {mettify(label)} (: {mettify(var)} {mettify(typecode)}))'
                 log_transform(f'!(add-atom &md {metta_fhyp})')
                 label = None
             elif tok == '$e':
