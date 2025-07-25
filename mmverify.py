@@ -71,16 +71,21 @@ def log_transform(stmt: str) -> None:
     if transformed_metta_file:
         transform_log.append(stmt)
 
-def mettify(expr) -> str:
+def mettify(expr, keep_parens=False) -> str:
     """
     Convert Python data structures from mmverify.py to MeTTa syntax.
     Handles nested structures and properly escapes double quotes in tokens.
     """
     # Handle strings (Metamath tokens)
     if isinstance(expr, str):
-        if unicode_delimiters:        
+        if keep_parens and expr in ('(', ')'):
+            # Return parentheses as-is without quotes or unicode conversion
+            return expr
+        
+        elif unicode_delimiters:        
             # Wrap Metamath content in ⟨⟩s and replace paretheses with ⟦⟧ becasue MM only uses ascii characters.
             # And to sidestep any meaningful symbols in MeTTa.
+            # Note that non-standard uses of ()s inside of tokens will remain as ⟦⟧s, but this shouldn't occur in well-behaved metamath files (e.g., set.mm)
             return '⟨' + expr.replace('(', '⟦').replace(')', '⟧') + '⟩'
 
         else:
@@ -450,11 +455,15 @@ def varify_expr(expr: Stmt, all_vars: set[str]) -> tuple[str, str]:
     typecode = mettify(expr[0])
     rest_tokens = expr[1:]
     varified_rest = [
-        '$' + mettify(tok) if tok in all_vars else mettify(tok)
+        '$' + mettify(tok) if tok in all_vars else mettify(tok, True)
         for tok in rest_tokens
     ]
     if len(varified_rest) > 1:
-        rest_str = '(' + ' '.join(varified_rest) + ')'
+        # Skip wrap if already grouped with ( ... )
+        if varified_rest[0] == '(' and varified_rest[-1] == ')':
+            rest_str = ' '.join(varified_rest)
+        else:
+            rest_str = '(' + ' '.join(varified_rest) + ')'
     elif varified_rest:
         rest_str = varified_rest[0]
     else:
@@ -646,6 +655,7 @@ class MM:
                 # mettarl(f'!(add-atom &kb ( (Label {mettify(label)}) EHyp ( (Statement {mettify(stmt)}) (Type "$e") )))')
                 self.fs.add_e(stmt, label)
                 self.labels[label] = ('$e', stmt)
+                # Note: no bc-friendly log_transform of essential hypotheses.
                 label = None
             elif tok == '$a':
                 if not label:
