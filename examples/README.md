@@ -11,3 +11,5 @@ The following commands were used to generate the examples for disjoint2.mm, demo
 
 ```time python3 mmverify.py -v25 disjoint2.mm --logfile disjoint2.log -m disjoint2.metta -r```
 ```metta disjoint2.metta > metta_disjoint2.log```
+
+The demo0_bc.metta file contains the first draft translation of the Metamath into a form in MeTTa that should be usable by a curried backward chainer to enable reasoning over the mathematics, as well as to be in a more native form for use within MeTTA.  Shifting closer to a shallow from a deep embedding of Metamath.
