@@ -1,0 +1,43 @@
+(sort wff provable)
+
+(sort term)
+
+--| Define "term" (part 1 of 2).
+(term tze () (term ()))
+
+--| Define "term" (part 2 of 2).
+(term tpl ((t term ()) (r term ())) (term ()))
+
+--| Define "wff" (part 1 of 2).
+(term weq ((t term ()) (r term ())) (wff ()))
+
+--| Define "wff" (part 2 of 2).
+(term wim ((P wff ()) (Q wff ())) (wff ()))
+
+--| State Axiom ~ a1 .
+(axiom a1 ((t term ()) (r term ()) (s term ()))
+  ()
+  (wim (weq t r) (wim (weq t s) (weq r s))))
+
+--| State Axiom ~ a2 .
+(axiom a2 ((t term ()))
+  ()
+  (weq (tpl t (tze)) t))
+
+--| Define the modus ponens inference rule.
+(axiom mp ((P wff ()) (Q wff ()))
+  (P
+    (wim P Q))
+  Q)
+
+--| Prove a theorem. (Contributed by NM, 1-Jan-2004.)
+(pub theorem th1 ((t term ()))
+  ()
+  (weq t t)
+  ()
+  (mp ((weq (tpl t (tze)) t) (weq t t))
+    (a2 (t))
+    (mp ((weq (tpl t (tze)) t) (wim (weq (tpl t (tze)) t) (weq t t)))
+      (a2 (t))
+      (a1 ((tpl t (tze)) t t)))))
+

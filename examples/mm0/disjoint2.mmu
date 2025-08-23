@@ -1,0 +1,20 @@
+(sort wff provable)
+
+(term combo ((x wff ()) (y wff ())) (wff ()))
+
+(axiom ax_1 ((x wff ()) (y wff ()))
+  ()
+  (combo x y))
+
+(pub theorem good ((x wff ()) (y wff ()) (z wff ()) (w wff ()))
+  ()
+  (combo (combo x y) (combo z w))
+  ()
+  (ax_1 ((combo x y) (combo z w))))
+
+(pub theorem stillgood ((x wff ()) (y wff ()) (z wff ()) (w wff ()))
+  ()
+  (combo (combo x y) (combo z w))
+  ()
+  (ax_1 ((combo x y) (combo z w))))
+

@@ -1,0 +1,611 @@
+delimiter $ ( $ $ ) $;
+
+provable sort wff;
+
+--| (_Note_: This inference rule and the next one, ~ a1ii , will normally never appear in a completed proof. They can be ignored if you are using this database to assist learning logic; please start with the statement ~ wn instead.) This inference says "if ` ph ` is true then ` ph ` is true". This inference requires no axioms for its proof, and is useful as a copy-paste mechanism during proof development in mmj2. It is normally not referenced in the final version of a proof, since it is always redundant. You can remove this using the metamath-exe (Metamath program) Proof Assistant using the "MM-PA> MINIMIZE__WITH *" command. This is the inference associated with ~ id , hence its name. (Contributed by Alan Sare, 31-Dec-2011.) (Proof modification is discouraged.) (New usage is discouraged.)
+theorem idi (ph: wff):
+  $ ph $ >
+  $ ph $;
+
+--| (_Note_: This inference rule and the previous one, ~ idi , will normally never appear in a completed proof.) This is a technical inference to assist proof development. It provides a temporary way to add an independent subproof to a proof under development, for later assignment to a normal proof step. The Metamath (Metamath-exe) program Proof Assistant requires proofs to be developed backwards from the conclusion with no gaps, and it has no mechanism that lets the user work on isolated subproofs. This inference provides a workaround for this limitation. It can be inserted at any point in a proof to allow an independent subproof to be developed on the side, for later use as part of the final proof. _Instructions_: <HTML><ol><li>Assign this inference to any unknown step in the proof. Typically, the last unknown step is the most convenient, since <code>MM-PA&gt; ASSIGN LAST</code> can be used. This step will be replicated in hypothesis a1ii.1, from where the development of the main proof can continue.</li><li>Develop the independent subproof backwards from hypothesis a1ii.2. If desired, use a <code>MM-PA&gt; LET STEP</code> command to pre-assign the conclusion of the independent subproof to a1ii.2.</li><li>After the independent subproof is complete, use <code>MM-PA&gt; IMPROVE ALL</code> to assign it automatically to an unknown step in the main proof that matches it.</li><li>After the entire proof is complete, use <code>MM-PA> MINIMIZE_WITH *</code> to clean up (discard) all ~ a1ii references automatically.</ol></HTML> This can also be used to apply subproofs from other theorems. In step 2, simply assign the theorem to a1ii.2, and run <HTML><code>MM-PA&gt; EXPAND &lt;theorem&gt;</code></HTML> to "import" a subproof from another theorem. This inference was originally designed to assist importing partially completed Proof Worksheets from the mmj2 Proof Assistant GUI, but it can also be useful on its own. Interestingly, no axioms are required for its proof. It is the inference associated with ~ a1i . (Contributed by NM, 7-Feb-2006.) (Proof modification is discouraged.) (New usage is discouraged.)
+theorem a1ii (ph ps: wff):
+  $ ph $ >
+  $ ps $ >
+  $ ph $;
+
+--| If ` ph ` is a wff, so is ` -. ph ` or "not ` ph ` ". Part of the recursive definition of a wff (well-formed formula). In classical logic (which is our logic), a wff is interpreted as either true or false. So if ` ph ` is true, then ` -. ph ` is false; if ` ph ` is false, then ` -. ph ` is true. Traditionally, Greek letters are used to represent wffs, and we follow this convention. In propositional calculus, we define only wffs built up from other wffs, i.e. there is no starting or "atomic" wff. Later, in predicate calculus, we will extend the basic wff definition by including atomic wffs ( ~ weq and ~ wel ).
+term wn (ph: wff): wff;
+
+--| If ` ph ` and ` ps ` are wff's, so is ` ( ph -> ps ) ` or " ` ph ` implies ` ps ` ". Part of the recursive definition of a wff. The resulting wff is (interpreted as) false when ` ph ` is true and ` ps ` is false; it is true otherwise. Think of the truth table for an OR gate with input ` ph ` connected through an inverter. After we state the axioms of propositional calculus ( ~ ax-1 , ~ ax-2 , ~ ax-3 , and ~ ax-mp ) and define the biconditional ( ~ df-bi ), the constant true ` T. ` ( ~ df-tru ), and the constant false ` F. ` ( ~ df-fal ), we will be able to prove these truth table values: ` ( ( T. -> T. ) <-> T. ) ` ( ~ truimtru ), ` ( ( T. -> F. ) <-> F. ) ` ( ~ truimfal ), ` ( ( F. -> T. ) <-> T. ) ` ( ~ falimtru ), and ` ( ( F. -> F. ) <-> T. ) ` ( ~ falimfal ). These have straightforward meanings, for example, ` ( ( T. -> T. ) <-> T. ) ` just means "the value of ` ( T. -> T. ) ` is ` T. ` ". The left-hand wff is called the antecedent, and the right-hand wff is called the consequent. In the case of ` ( ph -> ( ps -> ch ) ) ` , the middle ` ps ` may be informally called either an antecedent or part of the consequent depending on context. Contrast with ` <-> ` ( ~ df-bi ), ` /\ ` ( ~ df-an ), and ` \/ ` ( ~ df-or ). This is called "material implication" and the arrow is usually read as "implies". However, material implication is not identical to the meaning of "implies" in natural language. For example, the word "implies" may suggest a causal relationship in natural language. Material implication does not require any causal relationship. Also, note that in material implication, if the consequent is true then the wff is always true (even if the antecedent is false). Thus, if "implies" means material implication, it is true that "if the moon is made of green cheese that implies that 5=5" (because 5=5). Similarly, if the antecedent is false, the wff is always true. Thus, it is true that, "if the moon is made of green cheese that implies that 5=7" (because the moon is not actually made of green cheese). A contradiction implies anything ( ~ pm2.21i ). In short, material implication has a very specific technical definition, and misunderstandings of it are sometimes called "paradoxes of logical implication".
+term wi (ph ps: wff): wff;
+
+--| Rule of Modus Ponens. The postulated inference rule of propositional calculus. See, e.g., Rule 1 of [Hamilton] p. 73. The rule says, "if ` ph ` is true, and ` ph ` implies ` ps ` , then ` ps ` must also be true". This rule is sometimes called "detachment", since it detaches the minor premise from the major premise. "Modus ponens" is short for "modus ponendo ponens", a Latin phrase that means "the mode that by affirming affirms" - remark in [Sanford] p. 39. This rule is similar to the rule of modus tollens ~ mto . Note: In some web page displays such as the Statement List, the symbols " ` & ` " and " ` => ` " informally indicate the relationship between the hypotheses and the assertion (conclusion), abbreviating the English words "and" and "implies". They are not part of the formal language. (Contributed by NM, 30-Sep-1992.)
+axiom ax_mp (ph ps: wff):
+  $ ph $ >
+  $ wi ph ps $ >
+  $ ps $;
+
+--| Axiom _Simp_. Axiom A1 of [Margaris] p. 49. One of the 3 axioms of propositional calculus. The 3 axioms are also given as Definition 2.1 of [Hamilton] p. 28. This axiom is called _Simp_ or "the principle of simplification" in _Principia Mathematica_ (Theorem *2.02 of [WhiteheadRussell] p. 100) because "it enables us to pass from the joint assertion of ` ph ` and ` ps ` to the assertion of ` ph ` simply". It is Proposition 1 of [Frege1879] p. 26, its first axiom. (Contributed by NM, 30-Sep-1992.)
+axiom ax_1 (ph ps: wff):
+  $ wi ph (wi ps ph) $;
+
+--| Axiom _Frege_. Axiom A2 of [Margaris] p. 49. One of the 3 axioms of propositional calculus. It "distributes" an antecedent over two consequents. This axiom was part of Frege's original system and is known as _Frege_ in the literature; see Proposition 2 of [Frege1879] p. 26. It is also proved as Theorem *2.77 of [WhiteheadRussell] p. 108. The other direction of this axiom also turns out to be true, as demonstrated by ~ pm5.41 . (Contributed by NM, 30-Sep-1992.)
+axiom ax_2 (ph ps ch: wff):
+  $ wi (wi ph (wi ps ch)) (wi (wi ph ps) (wi ph ch)) $;
+
+--| Axiom _Transp_. Axiom A3 of [Margaris] p. 49. One of the 3 axioms of propositional calculus. It swaps or "transposes" the order of the consequents when negation is removed. An informal example is that the statement "if there are no clouds in the sky, it is not raining" implies the statement "if it is raining, there are clouds in the sky". This axiom is called _Transp_ or "the principle of transposition" in _Principia Mathematica_ (Theorem *2.17 of [WhiteheadRussell] p. 103). We will also use the term "contraposition" for this principle, although the reader is advised that in the field of philosophical logic, "contraposition" has a different technical meaning. (Contributed by NM, 30-Sep-1992.) Use its alias ~ con4 instead. (New usage is discouraged.)
+axiom ax_3 (ph ps: wff):
+  $ wi (wi (wn ph) (wn ps)) (wi ps ph) $;
+
+--| A double modus ponens inference. (Contributed by NM, 5-Apr-1994.)
+theorem mp2 (ph ps ch: wff):
+  $ ph $ >
+  $ ps $ >
+  $ wi ph (wi ps ch) $ >
+  $ ch $;
+
+--| A double modus ponens inference. (Contributed by Mario Carneiro, 24-Jan-2013.)
+theorem mp2b (ph ps ch: wff):
+  $ ph $ >
+  $ wi ph ps $ >
+  $ wi ps ch $ >
+  $ ch $;
+
+--| Inference introducing an antecedent. Inference associated with ~ ax-1 . Its associated inference is ~ a1ii . See ~ conventions for a definition of "associated inference". (Contributed by NM, 29-Dec-1992.)
+theorem a1i (ph ps: wff):
+  $ ph $ >
+  $ wi ps ph $;
+
+--| Inference introducing two antecedents. Two applications of ~ a1i . Inference associated with ~ 2a1 . (Contributed by Jeff Hankins, 4-Aug-2009.)
+theorem _2a1i (ph ps ch: wff):
+  $ ph $ >
+  $ wi ps (wi ch ph) $;
+
+--| Inference detaching an antecedent and introducing a new one. (Contributed by Stefan O'Rear, 29-Jan-2015.)
+theorem mp1i (ph ps ch: wff):
+  $ ph $ >
+  $ wi ph ps $ >
+  $ wi ch ps $;
+
+--| Inference distributing an antecedent. Inference associated with ~ ax-2 . Its associated inference is ~ mpd . (Contributed by NM, 29-Dec-1992.)
+theorem a2i (ph ps ch: wff):
+  $ wi ph (wi ps ch) $ >
+  $ wi (wi ph ps) (wi ph ch) $;
+
+--| A modus ponens deduction. A translation of natural deduction rule ` -> ` E ( ` -> ` elimination), see ~ natded . Deduction form of ~ ax-mp . Inference associated with ~ a2i . Commuted form of ~ mpcom . (Contributed by NM, 29-Dec-1992.)
+theorem mpd (ph ps ch: wff):
+  $ wi ph ps $ >
+  $ wi ph (wi ps ch) $ >
+  $ wi ph ch $;
+
+--| Inference adding common antecedents in an implication. Inference associated with ~ imim2 . Its associated inference is ~ syl . (Contributed by NM, 28-Dec-1992.)
+theorem imim2i (ph ps ch: wff):
+  $ wi ph ps $ >
+  $ wi (wi ch ph) (wi ch ps) $;
+
+--| An inference version of the transitive laws for implication ~ imim2 and ~ imim1 (and ~ imim1i and ~ imim2i ), which Russell and Whitehead call "the principle of the syllogism ... because ... the syllogism in Barbara is derived from [[ ~ syl ]" (quote after Theorem *2.06 of [WhiteheadRussell] p. 101). Some authors call this law a "hypothetical syllogism". Its associated inference is ~ mp2b . (A bit of trivia: this is the most commonly referenced assertion in our database (13449 times as of 22-Jul-2021). In second place is ~ eqid (9597 times), followed by ~ adantr (8861 times), ~ syl2anc (7421 times), ~ adantl (6403 times), and ~ simpr (5829 times). The Metamath program command 'show usage' shows the number of references.) (Contributed by NM, 30-Sep-1992.) (Proof shortened by Mel L. O'Cat, 20-Oct-2011.) (Proof shortened by Wolf Lammen, 26-Jul-2012.)
+theorem syl (ph ps ch: wff):
+  $ wi ph ps $ >
+  $ wi ps ch $ >
+  $ wi ph ch $;
+
+--| Inference chaining two syllogisms ~ syl . Inference associated with ~ imim12i . (Contributed by NM, 28-Dec-1992.)
+theorem _3syl (ph ps ch th: wff):
+  $ wi ph ps $ >
+  $ wi ps ch $ >
+  $ wi ch th $ >
+  $ wi ph th $;
+
+--| Inference chaining three syllogisms ~ syl . (Contributed by BJ, 14-Jul-2018.) The use of this theorem is marked "discouraged" because it can cause the Metamath program "MM-PA> MINIMIZE__WITH *" command to have very long run times. However, feel free to use "MM-PA> MINIMIZE__WITH 4syl / OVERRIDE" if you wish. Remember to update the "discouraged" file if it gets used. (New usage is discouraged.)
+theorem _4syl (ph ps ch th ta: wff):
+  $ wi ph ps $ >
+  $ wi ps ch $ >
+  $ wi ch th $ >
+  $ wi th ta $ >
+  $ wi ph ta $;
+
+--| A nested modus ponens inference. Inference associated with ~ com12 . (Contributed by NM, 29-Dec-1992.) (Proof shortened by Stefan Allan, 20-Mar-2006.)
+theorem mpi (ph ps ch: wff):
+  $ ps $ >
+  $ wi ph (wi ps ch) $ >
+  $ wi ph ch $;
+
+--| A syllogism combined with a modus ponens inference. (Contributed by Alan Sare, 25-Jul-2011.)
+theorem mpisyl (ph ps ch th: wff):
+  $ wi ph ps $ >
+  $ ch $ >
+  $ wi ps (wi ch th) $ >
+  $ wi ph th $;
+
+--| Principle of identity. Theorem *2.08 of [WhiteheadRussell] p. 101. For another version of the proof directly from axioms, see ~ idALT . Its associated inference, ~ idi , requires no axioms for its proof, contrary to ~ id . Note that the second occurrences of ` ph ` in Steps 1 and 2 may be simultaneously replaced by any wff ` ps ` , which may ease the understanding of the proof. (Contributed by NM, 29-Dec-1992.) (Proof shortened by Stefan Allan, 20-Mar-2006.)
+theorem id (ph: wff):
+  $ wi ph ph $;
+
+--| Alternate proof of ~ id . This version is proved directly from the axioms for demonstration purposes. This proof is a popular example in the literature and is identical, step for step, to the proofs of Theorem 1 of [Margaris] p. 51, Example 2.7(a) of [Hamilton] p. 31, Lemma 10.3 of [BellMachover] p. 36, and Lemma 1.8 of [Mendelson] p. 36. It is also "Our first proof" in Hirst and Hirst's _A Primer for Logic and Proof_ p. 17 (PDF p. 23) at ~ http://www.appstate.edu/~~hirstjl/primer/hirst.pdf . Note that the second occurrences of ` ph ` in Steps 1 to 4 and the sixth in Step 3 may be simultaneously replaced by any wff ` ps ` , which may ease the understanding of the proof. For a shorter version of the proof that takes advantage of previously proved theorems, see ~ id . (Contributed by NM, 30-Sep-1992.) (Proof modification is discouraged.) Use ~ id instead. (New usage is discouraged.)
+theorem idALT (ph: wff):
+  $ wi ph ph $;
+
+--| Principle of identity ~ id with antecedent. (Contributed by NM, 26-Nov-1995.)
+theorem idd (ph ps: wff):
+  $ wi ph (wi ps ps) $;
+
+--| Deduction introducing an embedded antecedent. Deduction form of ~ ax-1 and ~ a1i . (Contributed by NM, 5-Jan-1993.) (Proof shortened by Stefan Allan, 20-Mar-2006.)
+theorem a1d (ph ps ch: wff):
+  $ wi ph ps $ >
+  $ wi ph (wi ch ps) $;
+
+--| Deduction introducing two antecedents. Two applications of ~ a1d . Deduction associated with ~ 2a1 and ~ 2a1i . (Contributed by BJ, 10-Aug-2020.)
+theorem _2a1d (ph ps ch th: wff):
+  $ wi ph ps $ >
+  $ wi ph (wi ch (wi th ps)) $;
+
+--| Add two antecedents to a wff. (Contributed by Jeff Hankins, 4-Aug-2009.)
+theorem a1i13 (ph ps ch th: wff):
+  $ wi ps th $ >
+  $ wi ph (wi ps (wi ch th)) $;
+
+--| A double form of ~ ax-1 . Its associated inference is ~ 2a1i . Its associated deduction is ~ 2a1d . (Contributed by BJ, 10-Aug-2020.) (Proof shortened by Wolf Lammen, 1-Sep-2020.)
+theorem _2a1 (ph ps ch: wff):
+  $ wi ph (wi ps (wi ch ph)) $;
+
+--| Deduction distributing an embedded antecedent. Deduction form of ~ ax-2 . (Contributed by NM, 23-Jun-1994.)
+theorem a2d (ph ps ch th: wff):
+  $ wi ph (wi ps (wi ch th)) $ >
+  $ wi ph (wi (wi ps ch) (wi ps th)) $;
+
+--| Syllogism inference with commutation of antecedents. (Contributed by NM, 29-Aug-2004.) (Proof shortened by Mel L. O'Cat, 2-Feb-2006.) (Proof shortened by Stefan Allan, 23-Feb-2006.)
+theorem sylcom (ph ps ch th: wff):
+  $ wi ph (wi ps ch) $ >
+  $ wi ps (wi ch th) $ >
+  $ wi ph (wi ps th) $;
+
+--| Syllogism inference with commuted antecedents. (Contributed by NM, 24-May-2005.)
+theorem syl5com (ph ps ch th: wff):
+  $ wi ph ps $ >
+  $ wi ch (wi ps th) $ >
+  $ wi ph (wi ch th) $;
+
+--| Inference that swaps (commutes) antecedents in an implication. Inference associated with ~ pm2.04 . Its associated inference is ~ mpi . (Contributed by NM, 29-Dec-1992.) (Proof shortened by Wolf Lammen, 4-Aug-2012.)
+theorem com12 (ph ps ch: wff):
+  $ wi ph (wi ps ch) $ >
+  $ wi ps (wi ph ch) $;
+
+--| A syllogism inference. Commuted form of an instance of ~ syl . (Contributed by BJ, 25-Oct-2021.)
+theorem syl11 (ph ps ch th: wff):
+  $ wi ph (wi ps ch) $ >
+  $ wi th ph $ >
+  $ wi ps (wi th ch) $;
+
+--| A syllogism rule of inference. The first premise is used to replace the second antecedent of the second premise. (Contributed by NM, 27-Dec-1992.) (Proof shortened by Wolf Lammen, 25-May-2013.)
+theorem syl5 (ph ps ch th: wff):
+  $ wi ph ps $ >
+  $ wi ch (wi ps th) $ >
+  $ wi ch (wi ph th) $;
+
+--| A syllogism rule of inference. The second premise is used to replace the consequent of the first premise. (Contributed by NM, 5-Jan-1993.) (Proof shortened by Wolf Lammen, 30-Jul-2012.)
+theorem syl6 (ph ps ch th: wff):
+  $ wi ph (wi ps ch) $ >
+  $ wi ch th $ >
+  $ wi ph (wi ps th) $;
+
+--| Combine ~ syl5 and ~ syl6 . (Contributed by NM, 14-Nov-2013.)
+theorem syl56 (ph ps ch th ta: wff):
+  $ wi ph ps $ >
+  $ wi ch (wi ps th) $ >
+  $ wi th ta $ >
+  $ wi ch (wi ph ta) $;
+
+--| Syllogism inference with commuted antecedents. (Contributed by NM, 25-May-2005.)
+theorem syl6com (ph ps ch th: wff):
+  $ wi ph (wi ps ch) $ >
+  $ wi ch th $ >
+  $ wi ps (wi ph th) $;
+
+--| Modus ponens inference with commutation of antecedents. Commuted form of ~ mpd . (Contributed by NM, 17-Mar-1996.)
+theorem mpcom (ph ps ch: wff):
+  $ wi ps ph $ >
+  $ wi ph (wi ps ch) $ >
+  $ wi ps ch $;
+
+--| Syllogism inference with common nested antecedent. (Contributed by NM, 4-Nov-2004.)
+theorem syli (ph ps ch th: wff):
+  $ wi ps (wi ph ch) $ >
+  $ wi ch (wi ph th) $ >
+  $ wi ps (wi ph th) $;
+
+--| Replace two antecedents. Implication-only version of ~ syl2an . (Contributed by Wolf Lammen, 14-May-2013.)
+theorem syl2im (ph ps ch th ta: wff):
+  $ wi ph ps $ >
+  $ wi ch th $ >
+  $ wi ps (wi th ta) $ >
+  $ wi ph (wi ch ta) $;
+
+--| A commuted version of ~ syl2im . Implication-only version of ~ syl2anr . (Contributed by BJ, 20-Oct-2021.)
+theorem syl2imc (ph ps ch th ta: wff):
+  $ wi ph ps $ >
+  $ wi ch th $ >
+  $ wi ps (wi th ta) $ >
+  $ wi ch (wi ph ta) $;
+
+--| This theorem, sometimes called "Assertion" or "Pon" (for "ponens"), can be thought of as a closed form of modus ponens ~ ax-mp . Theorem *2.27 of [WhiteheadRussell] p. 104. (Contributed by NM, 15-Jul-1993.)
+theorem pm2_27 (ph ps: wff):
+  $ wi ph (wi (wi ph ps) ps) $;
+
+--| A nested modus ponens deduction. Double deduction associated with ~ ax-mp . Deduction associated with ~ mpd . (Contributed by NM, 12-Dec-2004.)
+theorem mpdd (ph ps ch th: wff):
+  $ wi ph (wi ps ch) $ >
+  $ wi ph (wi ps (wi ch th)) $ >
+  $ wi ph (wi ps th) $;
+
+--| A nested modus ponens deduction. Deduction associated with ~ mpi . (Contributed by NM, 14-Dec-2004.)
+theorem mpid (ph ps ch th: wff):
+  $ wi ph ch $ >
+  $ wi ph (wi ps (wi ch th)) $ >
+  $ wi ph (wi ps th) $;
+
+--| A nested modus ponens deduction. (Contributed by NM, 16-Apr-2005.) (Proof shortened by Mel L. O'Cat, 15-Jan-2008.)
+theorem mpdi (ph ps ch th: wff):
+  $ wi ps ch $ >
+  $ wi ph (wi ps (wi ch th)) $ >
+  $ wi ph (wi ps th) $;
+
+--| A doubly nested modus ponens inference. (Contributed by NM, 31-Dec-1993.) (Proof shortened by Wolf Lammen, 31-Jul-2012.)
+theorem mpii (ph ps ch th: wff):
+  $ ch $ >
+  $ wi ph (wi ps (wi ch th)) $ >
+  $ wi ph (wi ps th) $;
+
+--| Syllogism deduction. Deduction associated with ~ syl . See ~ conventions for the meaning of "associated deduction" or "deduction form". (Contributed by NM, 5-Aug-1993.) (Proof shortened by Mel L. O'Cat, 19-Feb-2008.) (Proof shortened by Wolf Lammen, 3-Aug-2012.)
+theorem syld (ph ps ch th: wff):
+  $ wi ph (wi ps ch) $ >
+  $ wi ph (wi ch th) $ >
+  $ wi ph (wi ps th) $;
+
+--| Syllogism deduction. Commuted form of ~ syld . (Contributed by BJ, 25-Oct-2021.)
+theorem syldc (ph ps ch th: wff):
+  $ wi ph (wi ps ch) $ >
+  $ wi ph (wi ch th) $ >
+  $ wi ps (wi ph th) $;
+
+--| A double modus ponens deduction. Deduction associated with ~ mp2 . (Contributed by NM, 23-May-2013.) (Proof shortened by Wolf Lammen, 23-Jul-2013.)
+theorem mp2d (ph ps ch th: wff):
+  $ wi ph ps $ >
+  $ wi ph ch $ >
+  $ wi ph (wi ps (wi ch th)) $ >
+  $ wi ph th $;
+
+--| Double deduction introducing an antecedent. Deduction associated with ~ a1d . Double deduction associated with ~ ax-1 and ~ a1i . (Contributed by NM, 17-Dec-2004.) (Proof shortened by Mel L. O'Cat, 15-Jan-2008.)
+theorem a1dd (ph ps ch th: wff):
+  $ wi ph (wi ps ch) $ >
+  $ wi ph (wi ps (wi th ch)) $;
+
+--| Double deduction introducing two antecedents. Two applications of ~ 2a1dd . Deduction associated with ~ 2a1d . Double deduction associated with ~ 2a1 and ~ 2a1i . (Contributed by Jeff Hankins, 5-Aug-2009.)
+theorem _2a1dd (ph ps ch th ta: wff):
+  $ wi ph (wi ps ch) $ >
+  $ wi ph (wi ps (wi th (wi ta ch))) $;
+
+--| Inference absorbing redundant antecedent. Inference associated with ~ pm2.43 . (Contributed by NM, 10-Jan-1993.) (Proof shortened by Mel L. O'Cat, 28-Nov-2008.)
+theorem pm2_43i (ph ps: wff):
+  $ wi ph (wi ph ps) $ >
+  $ wi ph ps $;
+
+--| Deduction absorbing redundant antecedent. Deduction associated with ~ pm2.43 and ~ pm2.43i . (Contributed by NM, 18-Aug-1993.) (Proof shortened by Mel L. O'Cat, 28-Nov-2008.)
+theorem pm2_43d (ph ps ch: wff):
+  $ wi ph (wi ps (wi ps ch)) $ >
+  $ wi ph (wi ps ch) $;
+
+--| Inference absorbing redundant antecedent. (Contributed by NM, 7-Nov-1995.) (Proof shortened by Mel L. O'Cat, 28-Nov-2008.)
+theorem pm2_43a (ph ps ch: wff):
+  $ wi ps (wi ph (wi ps ch)) $ >
+  $ wi ps (wi ph ch) $;
+
+--| Inference absorbing redundant antecedent. (Contributed by NM, 31-Oct-1995.)
+theorem pm2_43b (ph ps ch: wff):
+  $ wi ps (wi ph (wi ps ch)) $ >
+  $ wi ph (wi ps ch) $;
+
+--| Absorption of redundant antecedent. Also called the "Contraction" or "Hilbert" axiom. Theorem *2.43 of [WhiteheadRussell] p. 106. (Contributed by NM, 10-Jan-1993.) (Proof shortened by Mel L. O'Cat, 15-Aug-2004.)
+theorem pm2_43 (ph ps: wff):
+  $ wi (wi ph (wi ph ps)) (wi ph ps) $;
+
+--| Deduction adding nested antecedents. Deduction associated with ~ imim2 and ~ imim2i . (Contributed by NM, 10-Jan-1993.)
+theorem imim2d (ph ps ch th: wff):
+  $ wi ph (wi ps ch) $ >
+  $ wi ph (wi (wi th ps) (wi th ch)) $;
+
+--| A closed form of syllogism (see ~ syl ). Theorem *2.05 of [WhiteheadRussell] p. 100. Its associated inference is ~ imim2i . Its associated deduction is ~ imim2d . An alternate proof from more basic results is given by ~ ax-1 followed by ~ a2d . (Contributed by NM, 29-Dec-1992.) (Proof shortened by Wolf Lammen, 6-Sep-2012.)
+theorem imim2 (ph ps ch: wff):
+  $ wi (wi ph ps) (wi (wi ch ph) (wi ch ps)) $;
+
+--| Deduction embedding an antecedent. (Contributed by Wolf Lammen, 4-Oct-2013.)
+theorem embantd (ph ps ch th: wff):
+  $ wi ph ps $ >
+  $ wi ph (wi ch th) $ >
+  $ wi ph (wi (wi ps ch) th) $;
+
+--| Triple syllogism deduction. Deduction associated with ~ 3syld . (Contributed by Jeff Hankins, 4-Aug-2009.)
+theorem _3syld (ph ps ch th ta: wff):
+  $ wi ph (wi ps ch) $ >
+  $ wi ph (wi ch th) $ >
+  $ wi ph (wi th ta) $ >
+  $ wi ph (wi ps ta) $;
+
+--| A double syllogism inference. (Contributed by Alan Sare, 20-Apr-2011.)
+theorem sylsyld (ph ps ch th ta: wff):
+  $ wi ph ps $ >
+  $ wi ph (wi ch th) $ >
+  $ wi ps (wi th ta) $ >
+  $ wi ph (wi ch ta) $;
+
+--| Inference joining two implications. Inference associated with ~ imim12 . Its associated inference is ~ 3syl . (Contributed by NM, 12-Mar-1993.) (Proof shortened by Mel L. O'Cat, 29-Oct-2011.)
+theorem imim12i (ph ps ch th: wff):
+  $ wi ph ps $ >
+  $ wi ch th $ >
+  $ wi (wi ps ch) (wi ph th) $;
+
+--| Inference adding common consequents in an implication, thereby interchanging the original antecedent and consequent. Inference associated with ~ imim1 . Its associated inference is ~ syl . (Contributed by NM, 28-Dec-1992.) (Proof shortened by Wolf Lammen, 4-Aug-2012.)
+theorem imim1i (ph ps ch: wff):
+  $ wi ph ps $ >
+  $ wi (wi ps ch) (wi ph ch) $;
+
+--| Inference adding three nested antecedents. (Contributed by NM, 19-Dec-2006.)
+theorem imim3i (ph ps ch th: wff):
+  $ wi ph (wi ps ch) $ >
+  $ wi (wi th ph) (wi (wi th ps) (wi th ch)) $;
+
+--| A syllogism inference combined with contraction. (Contributed by NM, 4-May-1994.) (Revised by NM, 13-Jul-2013.)
+theorem sylc (ph ps ch th: wff):
+  $ wi ph ps $ >
+  $ wi ph ch $ >
+  $ wi ps (wi ch th) $ >
+  $ wi ph th $;
+
+--| A syllogism inference combined with contraction. (Contributed by Alan Sare, 7-Jul-2011.)
+theorem syl3c (ph ps ch th ta: wff):
+  $ wi ph ps $ >
+  $ wi ph ch $ >
+  $ wi ph th $ >
+  $ wi ps (wi ch (wi th ta)) $ >
+  $ wi ph ta $;
+
+--| A syllogism inference. (Contributed by Alan Sare, 8-Jul-2011.) (Proof shortened by Wolf Lammen, 13-Sep-2012.)
+theorem syl6mpi (ph ps ch th ta: wff):
+  $ wi ph (wi ps ch) $ >
+  $ th $ >
+  $ wi ch (wi th ta) $ >
+  $ wi ph (wi ps ta) $;
+
+--| Modus ponens combined with a syllogism inference. (Contributed by Alan Sare, 20-Apr-2011.)
+theorem mpsyl (ph ps ch th: wff):
+  $ ph $ >
+  $ wi ps ch $ >
+  $ wi ph (wi ch th) $ >
+  $ wi ps th $;
+
+--| Modus ponens combined with a double syllogism inference. (Contributed by Alan Sare, 22-Jul-2012.)
+theorem mpsylsyld (ph ps ch th ta: wff):
+  $ ph $ >
+  $ wi ps (wi ch th) $ >
+  $ wi ph (wi th ta) $ >
+  $ wi ps (wi ch ta) $;
+
+--| Inference combining ~ syl6 with contraction. (Contributed by Alan Sare, 2-May-2011.)
+theorem syl6c (ph ps ch th ta: wff):
+  $ wi ph (wi ps ch) $ >
+  $ wi ph (wi ps th) $ >
+  $ wi ch (wi th ta) $ >
+  $ wi ph (wi ps ta) $;
+
+--| A syllogism inference combined with contraction. (Contributed by Alan Sare, 18-Mar-2012.)
+theorem syl6ci (ph ps ch th ta: wff):
+  $ wi ph (wi ps ch) $ >
+  $ wi ph th $ >
+  $ wi ch (wi th ta) $ >
+  $ wi ph (wi ps ta) $;
+
+--| Nested syllogism deduction. Deduction associated with ~ syld . Double deduction associated with ~ syl . (Contributed by NM, 12-Dec-2004.) (Proof shortened by Wolf Lammen, 11-May-2013.)
+theorem syldd (ph ps ch th ta: wff):
+  $ wi ph (wi ps (wi ch th)) $ >
+  $ wi ph (wi ps (wi th ta)) $ >
+  $ wi ph (wi ps (wi ch ta)) $;
+
+--| A nested syllogism deduction. Deduction associated with ~ syl5 . (Contributed by NM, 14-May-1993.) (Proof shortened by Josh Purinton, 29-Dec-2000.) (Proof shortened by Mel L. O'Cat, 2-Feb-2006.)
+theorem syl5d (ph ps ch th ta: wff):
+  $ wi ph (wi ps ch) $ >
+  $ wi ph (wi th (wi ch ta)) $ >
+  $ wi ph (wi th (wi ps ta)) $;
+
+--| A syllogism rule of inference. The first premise is used to replace the third antecedent of the second premise. (Contributed by NM, 12-Jan-1993.) (Proof shortened by Wolf Lammen, 3-Aug-2012.)
+theorem syl7 (ph ps ch th ta: wff):
+  $ wi ph ps $ >
+  $ wi ch (wi th (wi ps ta)) $ >
+  $ wi ch (wi th (wi ph ta)) $;
+
+--| A nested syllogism deduction. Deduction associated with ~ syl6 . (Contributed by NM, 11-May-1993.) (Proof shortened by Josh Purinton, 29-Dec-2000.) (Proof shortened by Mel L. O'Cat, 2-Feb-2006.)
+theorem syl6d (ph ps ch th ta: wff):
+  $ wi ph (wi ps (wi ch th)) $ >
+  $ wi ph (wi th ta) $ >
+  $ wi ph (wi ps (wi ch ta)) $;
+
+--| A syllogism rule of inference. The second premise is used to replace the consequent of the first premise. (Contributed by NM, 1-Aug-1994.) (Proof shortened by Wolf Lammen, 3-Aug-2012.)
+theorem syl8 (ph ps ch th ta: wff):
+  $ wi ph (wi ps (wi ch th)) $ >
+  $ wi th ta $ >
+  $ wi ph (wi ps (wi ch ta)) $;
+
+--| A nested syllogism inference with different antecedents. (Contributed by NM, 13-May-1993.) (Proof shortened by Josh Purinton, 29-Dec-2000.)
+theorem syl9 (ph ps ch th ta: wff):
+  $ wi ph (wi ps ch) $ >
+  $ wi th (wi ch ta) $ >
+  $ wi ph (wi th (wi ps ta)) $;
+
+--| A nested syllogism inference with different antecedents. (Contributed by NM, 14-May-1993.)
+theorem syl9r (ph ps ch th ta: wff):
+  $ wi ph (wi ps ch) $ >
+  $ wi th (wi ch ta) $ >
+  $ wi th (wi ph (wi ps ta)) $;
+
+--| A nested syllogism inference. (Contributed by Alan Sare, 17-Jul-2011.)
+theorem syl10 (ph ps ch th ta et: wff):
+  $ wi ph (wi ps ch) $ >
+  $ wi ph (wi ps (wi th ta)) $ >
+  $ wi ch (wi ta et) $ >
+  $ wi ph (wi ps (wi th et)) $;
+
+--| Triple deduction introducing an antecedent to a wff. Deduction associated with ~ a1dd . Double deduction associated with ~ a1d . Triple deduction associated with ~ ax-1 and ~ a1i . (Contributed by Jeff Hankins, 4-Aug-2009.)
+theorem a1ddd (ph ps ch th ta: wff):
+  $ wi ph (wi ps (wi ch ta)) $ >
+  $ wi ph (wi ps (wi ch (wi th ta))) $;
+
+--| Deduction combining antecedents and consequents. Deduction associated with ~ imim12 and ~ imim12i . (Contributed by NM, 7-Aug-1994.) (Proof shortened by Mel L. O'Cat, 30-Oct-2011.)
+theorem imim12d (ph ps ch th ta: wff):
+  $ wi ph (wi ps ch) $ >
+  $ wi ph (wi th ta) $ >
+  $ wi ph (wi (wi ch th) (wi ps ta)) $;
+
+--| Deduction adding nested consequents. Deduction associated with ~ imim1 and ~ imim1i . (Contributed by NM, 3-Apr-1994.) (Proof shortened by Wolf Lammen, 12-Sep-2012.)
+theorem imim1d (ph ps ch th: wff):
+  $ wi ph (wi ps ch) $ >
+  $ wi ph (wi (wi ch th) (wi ps th)) $;
+
+--| A closed form of syllogism (see ~ syl ). Theorem *2.06 of [WhiteheadRussell] p. 100. Its associated inference is ~ imim1i . (Contributed by NM, 29-Dec-1992.) (Proof shortened by Wolf Lammen, 25-May-2013.)
+theorem imim1 (ph ps ch: wff):
+  $ wi (wi ph ps) (wi (wi ps ch) (wi ph ch)) $;
+
+--| Theorem *2.83 of [WhiteheadRussell] p. 108. Closed form of ~ syld . (Contributed by NM, 3-Jan-2005.)
+theorem pm2_83 (ph ps ch th: wff):
+  $ wi (wi ph (wi ps ch)) (wi (wi ph (wi ch th)) (wi ph (wi ps th))) $;
+
+--| Over minimal implicational calculus, Peirce's axiom ~ peirce implies an axiom sometimes called "Roll", ` ( ( ( ph -> ps ) -> ch ) -> ( ( ch -> ph ) -> ph ) ) ` , of which ~ looinv is a special instance. The converse also holds: substitute ` ( ph -> ps ) ` for ` ch ` in Roll and use ~ id and ~ ax-mp . (Contributed by BJ, 15-Jun-2021.)
+theorem peirceroll (ph ps ch: wff):
+  $ wi (wi (wi (wi ph ps) ph) ph) (wi (wi (wi ph ps) ch) (wi (wi ch ph) ph)) $;
+
+--| Commutation of antecedents. Swap 2nd and 3rd. Deduction associated with ~ com12 . (Contributed by NM, 27-Dec-1992.) (Proof shortened by Wolf Lammen, 4-Aug-2012.)
+theorem com23 (ph ps ch th: wff):
+  $ wi ph (wi ps (wi ch th)) $ >
+  $ wi ph (wi ch (wi ps th)) $;
+
+--| Commutation of antecedents. Rotate right. (Contributed by NM, 25-Apr-1994.)
+theorem com3r (ph ps ch th: wff):
+  $ wi ph (wi ps (wi ch th)) $ >
+  $ wi ch (wi ph (wi ps th)) $;
+
+--| Commutation of antecedents. Swap 1st and 3rd. (Contributed by NM, 25-Apr-1994.) (Proof shortened by Wolf Lammen, 28-Jul-2012.)
+theorem com13 (ph ps ch th: wff):
+  $ wi ph (wi ps (wi ch th)) $ >
+  $ wi ch (wi ps (wi ph th)) $;
+
+--| Commutation of antecedents. Rotate left. (Contributed by NM, 25-Apr-1994.) (Proof shortened by Wolf Lammen, 28-Jul-2012.)
+theorem com3l (ph ps ch th: wff):
+  $ wi ph (wi ps (wi ch th)) $ >
+  $ wi ps (wi ch (wi ph th)) $;
+
+--| Swap antecedents. Theorem *2.04 of [WhiteheadRussell] p. 100. This was the third axiom in Frege's logic system, specifically Proposition 8 of [Frege1879] p. 35. Its associated inference is ~ com12 . (Contributed by NM, 27-Dec-1992.) (Proof shortened by Wolf Lammen, 12-Sep-2012.)
+theorem pm2_04 (ph ps ch: wff):
+  $ wi (wi ph (wi ps ch)) (wi ps (wi ph ch)) $;
+
+--| Commutation of antecedents. Swap 3rd and 4th. Deduction associated with ~ com23 . Double deduction associated with ~ com12 . (Contributed by NM, 25-Apr-1994.)
+theorem com34 (ph ps ch th ta: wff):
+  $ wi ph (wi ps (wi ch (wi th ta))) $ >
+  $ wi ph (wi ps (wi th (wi ch ta))) $;
+
+--| Commutation of antecedents. Rotate left. (Contributed by NM, 25-Apr-1994.) (Proof shortened by Mel L. O'Cat, 15-Aug-2004.)
+theorem com4l (ph ps ch th ta: wff):
+  $ wi ph (wi ps (wi ch (wi th ta))) $ >
+  $ wi ps (wi ch (wi th (wi ph ta))) $;
+
+--| Commutation of antecedents. Rotate twice. (Contributed by NM, 25-Apr-1994.)
+theorem com4t (ph ps ch th ta: wff):
+  $ wi ph (wi ps (wi ch (wi th ta))) $ >
+  $ wi ch (wi th (wi ph (wi ps ta))) $;
+
+--| Commutation of antecedents. Rotate right. (Contributed by NM, 25-Apr-1994.)
+theorem com4r (ph ps ch th ta: wff):
+  $ wi ph (wi ps (wi ch (wi th ta))) $ >
+  $ wi th (wi ph (wi ps (wi ch ta))) $;
+
+--| Commutation of antecedents. Swap 2nd and 4th. Deduction associated with ~ com13 . (Contributed by NM, 25-Apr-1994.) (Proof shortened by Wolf Lammen, 28-Jul-2012.)
+theorem com24 (ph ps ch th ta: wff):
+  $ wi ph (wi ps (wi ch (wi th ta))) $ >
+  $ wi ph (wi th (wi ch (wi ps ta))) $;
+
+--| Commutation of antecedents. Swap 1st and 4th. (Contributed by NM, 25-Apr-1994.) (Proof shortened by Wolf Lammen, 28-Jul-2012.)
+theorem com14 (ph ps ch th ta: wff):
+  $ wi ph (wi ps (wi ch (wi th ta))) $ >
+  $ wi th (wi ps (wi ch (wi ph ta))) $;
+
+--| Commutation of antecedents. Swap 4th and 5th. Deduction associated with ~ com34 . Double deduction associated with ~ com23 . Triple deduction associated with ~ com12 . (Contributed by Jeff Hankins, 28-Jun-2009.)
+theorem com45 (ph ps ch th ta et: wff):
+  $ wi ph (wi ps (wi ch (wi th (wi ta et)))) $ >
+  $ wi ph (wi ps (wi ch (wi ta (wi th et)))) $;
+
+--| Commutation of antecedents. Swap 3rd and 5th. Deduction associated with ~ com24 . Double deduction associated with ~ com13 . (Contributed by Jeff Hankins, 28-Jun-2009.)
+theorem com35 (ph ps ch th ta et: wff):
+  $ wi ph (wi ps (wi ch (wi th (wi ta et)))) $ >
+  $ wi ph (wi ps (wi ta (wi th (wi ch et)))) $;
+
+--| Commutation of antecedents. Swap 2nd and 5th. Deduction associated with ~ com14 . (Contributed by Jeff Hankins, 28-Jun-2009.)
+theorem com25 (ph ps ch th ta et: wff):
+  $ wi ph (wi ps (wi ch (wi th (wi ta et)))) $ >
+  $ wi ph (wi ta (wi ch (wi th (wi ps et)))) $;
+
+--| Commutation of antecedents. Rotate left. (Contributed by Jeff Hankins, 28-Jun-2009.) (Proof shortened by Wolf Lammen, 29-Jul-2012.)
+theorem com5l (ph ps ch th ta et: wff):
+  $ wi ph (wi ps (wi ch (wi th (wi ta et)))) $ >
+  $ wi ps (wi ch (wi th (wi ta (wi ph et)))) $;
+
+--| Commutation of antecedents. Swap 1st and 5th. (Contributed by Jeff Hankins, 28-Jun-2009.) (Proof shortened by Wolf Lammen, 29-Jul-2012.)
+theorem com15 (ph ps ch th ta et: wff):
+  $ wi ph (wi ps (wi ch (wi th (wi ta et)))) $ >
+  $ wi ta (wi ps (wi ch (wi th (wi ph et)))) $;
+
+--| Commutation of antecedents. Rotate left twice. (Contributed by Jeff Hankins, 28-Jun-2009.)
+theorem com52l (ph ps ch th ta et: wff):
+  $ wi ph (wi ps (wi ch (wi th (wi ta et)))) $ >
+  $ wi ch (wi th (wi ta (wi ph (wi ps et)))) $;
+
+--| Commutation of antecedents. Rotate right twice. (Contributed by Jeff Hankins, 28-Jun-2009.)
+theorem com52r (ph ps ch th ta et: wff):
+  $ wi ph (wi ps (wi ch (wi th (wi ta et)))) $ >
+  $ wi th (wi ta (wi ph (wi ps (wi ch et)))) $;
+
+--| Commutation of antecedents. Rotate right. (Contributed by Wolf Lammen, 29-Jul-2012.)
+theorem com5r (ph ps ch th ta et: wff):
+  $ wi ph (wi ps (wi ch (wi th (wi ta et)))) $ >
+  $ wi ta (wi ph (wi ps (wi ch (wi th et)))) $;
+
+--| Closed form of ~ imim12i and of ~ 3syl . (Contributed by BJ, 16-Jul-2019.)
+theorem imim12 (ph ps ch th: wff):
+  $ wi (wi ph ps) (wi (wi ch th) (wi (wi ps ch) (wi ph th))) $;
+
+--| Elimination of a nested antecedent. Sometimes called "Syll-Simp" since it is a syllogism applied to ~ ax-1 ("Simplification"). (Contributed by Wolf Lammen, 9-May-2013.)
+theorem jarr (ph ps ch: wff):
+  $ wi (wi (wi ph ps) ch) (wi ps ch) $;
+
+--| Inference associated with ~ jarr . Partial converse of ~ ja (the other partial converse being ~ jarli ). (Contributed by Wolf Lammen, 20-Sep-2013.)
+theorem jarri (ph ps ch: wff):
+  $ wi (wi ph ps) ch $ >
+  $ wi ps ch $;
+
+--| Deduction associated with ~ pm2.86 . (Contributed by NM, 29-Jun-1995.) (Proof shortened by Wolf Lammen, 3-Apr-2013.)
+theorem pm2_86d (ph ps ch th: wff):
+  $ wi ph (wi (wi ps ch) (wi ps th)) $ >
+  $ wi ph (wi ps (wi ch th)) $;
+
+--| Converse of Axiom ~ ax-2 . Theorem *2.86 of [WhiteheadRussell] p. 108. (Contributed by NM, 25-Apr-1994.) (Proof shortened by Wolf Lammen, 3-Apr-2013.)
+theorem pm2_86 (ph ps ch: wff):
+  $ wi (wi (wi ph ps) (wi ph ch)) (wi ph (wi ps ch)) $;
+
+--| Inference associated with ~ pm2.86 . (Contributed by NM, 5-Aug-1993.) (Proof shortened by Wolf Lammen, 3-Apr-2013.)
+theorem pm2_86i (ph ps ch: wff):
+  $ wi (wi ph ps) (wi ph ch) $ >
+  $ wi ph (wi ps ch) $;
+
+--| The Linearity Axiom of the infinite-valued sentential logic (L-infinity) of Lukasiewicz. See ~ loowoz for an alternate axiom. (Contributed by Mel L. O'Cat, 12-Aug-2004.)
+theorem loolin (ph ps: wff):
+  $ wi (wi (wi ph ps) (wi ps ph)) (wi ps ph) $;
+
+--| An alternate for the Linearity Axiom of the infinite-valued sentential logic (L-infinity) of Lukasiewicz ~ loolin , due to Barbara Wozniakowska, _Reports on Mathematical Logic_ 10, 129-137 (1978). (Contributed by Mel L. O'Cat, 8-Aug-2004.)
+theorem loowoz (ph ps ch: wff):
+  $ wi (wi (wi ph ps) (wi ph ch)) (wi (wi ps ph) (wi ps ch)) $;
+

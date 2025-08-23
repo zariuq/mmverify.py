@@ -1,0 +1,15 @@
+delimiter $ ( $ $ ) $;
+
+provable sort wff;
+
+term combo (x y: wff): wff;
+
+axiom ax_1 (x y: wff):
+  $ combo x y $;
+
+theorem good (x y z w: wff):
+  $ combo (combo x y) (combo z w) $;
+
+theorem stillgood (x y z w: wff):
+  $ combo (combo x y) (combo z w) $;
+
