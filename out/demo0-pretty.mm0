@@ -1,0 +1,32 @@
+delimiter $ ( ) $;
+
+provable sort wff;
+sort term;
+
+-- core terms
+term tze: term;
+term tpl (t r: term): term;
+term weq (t r: term): wff;
+term wim (P Q: wff): wff;
+
+-- human-friendly notations (MM0 supports infix/prefix declarations)
+infixl weq: $=$  prec 50;   -- equality
+infixr wim: $->$ prec 25;   -- implication
+infixl tpl: $+$  prec 60;   -- addition-like
+
+-- axioms
+axiom a1 (t r s: term):
+  $ t = r -> ( t = s -> r = s ) $;
+
+axiom a2 (t: term):
+  $ t + tze = t $;
+
+-- modus ponens
+axiom mp (P Q: wff):
+  $ P $ >
+  $ P -> Q $ >
+  $ Q $;
+
+-- theorem
+theorem th1 (t: term):
+  $ t = t $;
