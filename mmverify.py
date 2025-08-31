@@ -780,7 +780,7 @@ class MM:
         """Return the proof stack once the given normal proof has been
         processed.
         """
-        stack: list[Stmmt] = []
+        stack: list[Stmt] = []
         active_hypotheses = {label for frame in self.fs for labels in (frame.f_labels, frame.e_labels) for label in labels.values()}
         for label in proof:
             stmt_info = self.labels.get(label)

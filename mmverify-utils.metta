@@ -170,7 +170,7 @@
 ;                $result))))
 
 ;; Check $x and $y, vars in a substitution: if they're the same or not tagged as disjoint, throw an error 
-;; (because disjointness must be preserved transively through substitution)
+;; (because disjointness must be preserved transitively through substitution)
 (= (dv_check $x $y)
   (if (or
         (== $x $y)
@@ -229,6 +229,7 @@
 )
 
 ;; Oh, there are no checks.  So this is nearly trivial.  I actually just keep it as is.  But I do both the e_labels (i.e., e with FSDepth, and e.append, i.e., the $EList)
+;; I could have a check that the label isn't already present but mmverify.py already does that.
 (= (add_e $label $stmt $level)
   (let*
     (
