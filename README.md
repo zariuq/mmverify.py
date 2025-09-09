@@ -14,6 +14,61 @@ Every core function called _after parsing_ in the read() function is implemented
 * mmverify-utils.metta - Contains the MeTTa implementations along with utility functions
 * mmverify.py - The original Python Metamath verifier by Raph Levien, modified with MeTTa integration code
 * examples/ - Contains examples of MeTTa interpretation of Metamath statements and their output
+* go/ - Minimal Metamath verifier written in Go
+
+## Go verifier
+
+The `go` directory contains a small Metamath verifier written in Go. It
+supports both normal and compressed proof formats.
+
+### Build
+
+```
+cd go
+go build -o mmverify
+```
+
+### Verify an `.mm` file
+
+```
+./mmverify ../examples/demo0.mm
+```
+
+The command prints `verification succeeded` when the database checks out.
+
+### Disjoint-variable failures
+
+The `examples` directory also contains files that intentionally break
+disjoint-variable requirements. Running the verifier on them reports the
+missing restrictions:
+
+```
+./mmverify ../examples/disjoint_bad_semigood.mm   # reports missing $d
+./mmverify ../examples/disjoint_bad_almostgood.mm # reports missing $d
+./mmverify ../examples/disjoint_bad_verybad.mm    # disjoint violation
+./mmverify ../examples/disjoint_bad_stillbad.mm   # disjoint violation
+```
+
+### File inclusion and token validation
+
+The Go verifier understands the `$[ file $]` inclusion directive and
+checks labels and math symbols for illegal characters:
+
+```
+./mmverify ../examples/demo0-includer.mm                # includes another file
+./mmverify ../examples/demo0-illegal-label-bad1.mm      # fails: illegal label
+./mmverify ../examples/demo0-dollar-in-math-symbol-bad1.mm # fails: $ in symbol
+```
+
+### Compressed proofs
+
+Compressed proofs are handled transparently. For example, the
+`examples/big-unifier.mm` database contains a theorem whose proof is
+given in compressed form:
+
+```
+./mmverify ../examples/big-unifier.mm
+```
 
 ---
 
