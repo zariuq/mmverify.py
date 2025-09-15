@@ -48,9 +48,10 @@
         (: (($t ⟨=⟩ $r) ⟨->⟩ (($t ⟨=⟩ $s) ⟨->⟩ ($r ⟨=⟩ $s))) ⟨|-⟩))))))
 
 ;; The result of demo0.mm can be constructed.
-; !(include metamath)
-; !(match &md $d (println! $d))
-; !(match &md $d (add-atom &self $d))
+!(include metamath)
+!(match &md $d (println! $d))
+!(match &md $d (add-atom &self $d)
+)
 ; > !(get-type (((a1-curry (tpl tt tze)) tt) tt))
 ; [(: ((⟨t⟩ ⟨+⟩ ⟨0⟩) ⟨=⟩ ⟨t⟩ ⟨->⟩ ((⟨t⟩ ⟨+⟩ ⟨0⟩) ⟨=⟩ ⟨t⟩ ⟨->⟩ ⟨t⟩ ⟨=⟩ ⟨t⟩)) ⟨|-⟩)]
 ; > !(get-type (((a1-curry' (tpl tt tze)) tt) tt))
@@ -59,8 +60,9 @@
 ; [(: (((⟨t⟩ ⟨+⟩ ⟨0⟩) ⟨=⟩ ⟨t⟩) ⟨->⟩ (⟨t⟩ ⟨=⟩ ⟨t⟩)) ⟨|-⟩)]
 ; > !(get-type ((((mp-curry (weq (tpl tt tze) tt)) (weq tt tt)) (a2 tt)) ((((mp-curry (weq (tpl tt tze) tt)) (wim (weq (tpl tt tze) tt) (weq tt tt))) (a2 tt)) (((a1-curry' (tpl tt tze)) tt) tt))))
 ; [(: (⟨t⟩ ⟨=⟩ ⟨t⟩) ⟨|-⟩)]
-; > !(bc &self
-;    Nil
-;    (fromNumber 10)                   
-;    (: ((((mp-curry (weq (tpl tt tze) tt)) (weq tt tt)) (a2 tt)) ((((mp-curry (weq (tpl tt tze) tt)) (wim (weq (tpl tt tze) tt) (weq tt tt))) (a2 tt)) (((a1-curry' (tpl tt tze)) tt) tt))) (: (⟨t⟩ ⟨=⟩ ⟨t⟩) ⟨|-⟩)))
+
+!(bc &self
+   Nil
+   (fromNumber 10)                   
+   (: ((((mp-curry (weq (tpl tt tze) tt)) (weq tt tt)) (a2 tt)) ((((mp-curry (weq (tpl tt tze) tt)) (wim (weq (tpl tt tze) tt) (weq tt tt))) (a2 tt)) (((a1-curry' (tpl tt tze)) tt) tt))) (: (⟨t⟩ ⟨=⟩ ⟨t⟩) ⟨|-⟩)))
 ; [(: ((((mp-curry (weq (tpl tt tze) tt)) (weq tt tt)) (a2 tt)) ((((mp-curry (weq (tpl tt tze) tt)) (wim (weq (tpl tt tze) tt) (weq tt tt))) (a2 tt)) (((a1-curry' (tpl tt tze)) tt) tt))) (: (⟨t⟩ ⟨=⟩ ⟨t⟩) ⟨|-⟩))]

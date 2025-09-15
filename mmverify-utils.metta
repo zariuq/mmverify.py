@@ -202,7 +202,9 @@
 (= (add_dv_pair_if_fresh $x $y $level)
   (if (== $x $y) ()
     (let ($ox $oy) (orient_pair $x $y)
-      (unify &kb (DVar ($ox $oy) (FSDepth $level) (Type "$d")) () (add-atom &kb (DVar ($ox $oy) (FSDepth $level) (Type "$d") ))))))
+      (unify &kb (DVar ($ox $oy) (FSDepth $level) (Type "$d")) 
+        () 
+        (add-atom &kb (DVar ($ox $oy) (FSDepth $level) (Type "$d") ))))))
 
 (= (add_d $varlist $level)
   (map-atom $varlist $x
@@ -230,12 +232,15 @@
 
 ;; Oh, there are no checks.  So this is nearly trivial.  I actually just keep it as is.  But I do both the e_labels (i.e., e with FSDepth, and e.append, i.e., the $EList)
 ;; I could have a check that the label isn't already present but mmverify.py already does that.
+
+
 (= (add_e $label $stmt $level)
   (let*
     (
       ($elist_entry (to-list ($stmt)))
       (() (unify &kb (EList (FSDepth $level) $elist)
-        (let $elist' (append $elist $elist_entry) (update-atom &kb (EList (FSDepth $level) $elist) (EList (FSDepth $level) $elist')))
+        (let $elist' (append $elist $elist_entry) 
+          (update-atom &kb (EList (FSDepth $level) $elist) (EList (FSDepth $level) $elist')))
         (add-atom &kb (EList (FSDepth $level) $elist_entry))))
         (() (println! ("add essential hypothesis:" (label $label) (Statement $stmt) (level $level))))
     )
@@ -733,7 +738,7 @@
       (() (println! ""))
       (() (println! (Verifying conclusion ($label) $stmt with proof $proof)))
       (() (if $verify_proofs (verify $proof $stmt) ()))
-      (() (println! ("make_assertion" $label - $stmt)))
+      (() (println! ("make_assertion" $label - $stmt))) ;; This could just call add_a.
       (( (DVars $dvs) (FHyps $f_hyps) (EHyps $e_hyps) (Statement $stmt) ) (make_assertion $stmt))
       (() (println! ("gathered assertion data:" $dvs $f_hyps $e_hyps $stmt)))
     )
