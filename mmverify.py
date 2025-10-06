@@ -40,9 +40,12 @@ import io
 # Imports added for MeTTaMath
 import re
 from typing import Optional
-import hyperon
-
-metta = hyperon.MeTTa()
+try:
+    import hyperon
+    metta = hyperon.MeTTa()
+except ImportError:
+    hyperon = None  # type: ignore
+    metta = None  # type: ignore
 
 # MeTTa variables:
 run_metta = False
@@ -52,9 +55,18 @@ transformed_metta_file: Optional[str] = None
 metta_log_file: Optional[str] = None
 verify_metta = True  # Hack just for testing: set to false and MeTTa won't verify anything.
 
+# MM2 (Minimal MeTTa 2) variables:
+output_mm2 = False
+mm2_output_file: Optional[str] = None
+mm2_use_unicode = True  # Use ⟨⟩ delimiters like unicode_delimiters
+mm2_output_execs = False  # Generate execs with commands (not just KB facts)
+mm2_priority = 1  # Priority counter for exec ordering (0 reserved for error-block)
+
 # Log lists for MeTTa commands and transformed assertions
 metta_log: list[str] = []
 transform_log: list[str] = []
+mm2_log: list[str] = []  # KB facts for MM2
+mm2_log_execs: list[str] = []  # Execs and commands for MM2
 
 # Run and optionally log a MeTTa command
 def mettarl(cmd: str):
@@ -62,6 +74,8 @@ def mettarl(cmd: str):
     if metta_log_file:
         metta_log.append(cmd)
     if run_metta:
+        if metta is None:
+            raise MMError("Hyperon module not available. Cannot run MeTTa commands.")
         return metta.run(cmd)
     return []
 
@@ -70,6 +84,128 @@ def log_transform(stmt: str) -> None:
     """Record a transformed MeTTa command for later output."""
     if transformed_metta_file:
         transform_log.append(stmt)
+
+# MM2 output functions
+def mm2_log_kb(fact: str) -> None:
+    """Record an MM2 kb fact for later output."""
+    if output_mm2:
+        mm2_log.append(f"; {fact}")  # Add comment for readability
+        mm2_log.append(fact)
+
+def mettify_mm2(expr, use_unicode=None) -> str:
+    """
+    Convert Python data structures to MM2 syntax.
+    Similar to mettify() but always uses unicode delimiters for MM2.
+    """
+    if use_unicode is None:
+        use_unicode = mm2_use_unicode
+
+    if isinstance(expr, str):
+        if use_unicode:
+            # Use ⟨⟩ delimiters for Metamath tokens
+            return '⟨' + expr.replace('(', '⟦').replace(')', '⟧') + '⟩'
+        else:
+            # Use quoted strings
+            return '"' + expr.replace("\\", "\\\\").replace("\"", "\\\"") + '"'
+    elif isinstance(expr, (list, tuple)):
+        elements = " ".join(mettify_mm2(item, use_unicode) for item in expr)
+        return f"({elements})"
+    elif isinstance(expr, set):
+        # For sets (e.g., DVars), convert to list first
+        elements = " ".join(mettify_mm2(item, use_unicode) for item in expr)
+        return f"({elements})"
+    else:
+        return mettify_mm2(str(expr), use_unicode)
+
+# MM2 exec generation functions
+def mm2_priority_str() -> str:
+    """Generate next priority string with 4-digit padding."""
+    global mm2_priority
+    result = f"{mm2_priority:04d}"
+    mm2_priority += 1
+    return result
+
+def mm2_exec_add_c(tok: str) -> str:
+    """Generate exec and command for adding a constant."""
+    priority = mm2_priority_str()
+    tok_metta = mettify_mm2(tok)
+    # Sanitize token for exec name (remove special chars)
+    tok_name = re.sub(r'[^a-zA-Z0-9]', '-', tok)
+    return f"""(exec ({priority} add-c-{tok_name})
+  (, (add_c {tok_metta}))
+  (O (+ (kb (Constant {tok_metta} (Type ⟨$c⟩))))
+     (+ (command-done (add_c {tok_metta})))
+     (- (add_c {tok_metta}))))
+(add_c {tok_metta})
+
+"""
+
+def mm2_exec_add_v(tok: str, level: int) -> str:
+    """Generate exec and command for adding a variable."""
+    priority = mm2_priority_str()
+    tok_metta = mettify_mm2(tok)
+    tok_name = re.sub(r'[^a-zA-Z0-9]', '-', tok)
+    return f"""(exec ({priority} add-v-{tok_name}-{level})
+  (, (add_v {tok_metta} {level}))
+  (O (+ (kb (Var {tok_metta} (FSDepth {level}) (Type ⟨$v⟩))))
+     (+ (command-done (add_v {tok_metta} {level})))
+     (- (add_v {tok_metta} {level}))))
+(add_v {tok_metta} {level})
+
+"""
+
+def mm2_exec_add_f(label: str, typecode: str, var: str, level: int) -> str:
+    """Generate exec and command for adding a floating hypothesis."""
+    priority = mm2_priority_str()
+    label_metta = mettify_mm2(label)
+    tc_metta = mettify_mm2(typecode)
+    var_metta = mettify_mm2(var)
+    label_name = re.sub(r'[^a-zA-Z0-9]', '-', label)
+    return f"""(exec ({priority} add-f-{label_name})
+  (, (add_f {label_metta} {tc_metta} {var_metta} {level}))
+  (O (+ (kb ((Label {label_metta}) FHyp (FSDepth {level})
+             ((Typecode {tc_metta}) (FVar {var_metta}) (Type ⟨$f⟩)))))
+     (+ (command-done (add_f {label_metta} {tc_metta} {var_metta} {level})))
+     (- (add_f {label_metta} {tc_metta} {var_metta} {level}))))
+(add_f {label_metta} {tc_metta} {var_metta} {level})
+
+"""
+
+def mm2_exec_add_e(label: str, stmt, level: int) -> str:
+    """Generate exec and command for adding an essential hypothesis."""
+    priority = mm2_priority_str()
+    label_metta = mettify_mm2(label)
+    stmt_metta = mettify_mm2(stmt)
+    label_name = re.sub(r'[^a-zA-Z0-9]', '-', label)
+    return f"""(exec ({priority} add-e-{label_name})
+  (, (add_e {label_metta} {stmt_metta} {level}))
+  (O (+ (kb ((Label {label_metta}) EHyp (FSDepth {level})
+             ((Statement {stmt_metta}) (Type ⟨$e⟩)))))
+     (+ (command-done (add_e {label_metta} {stmt_metta} {level})))
+     (- (add_e {label_metta} {stmt_metta} {level}))))
+(add_e {label_metta} {stmt_metta} {level})
+
+"""
+
+def mm2_exec_add_a(label: str, dvars, fhyps, ehyps, stmt) -> str:
+    """Generate exec and command for adding an assertion."""
+    priority = mm2_priority_str()
+    label_metta = mettify_mm2(label)
+    dvars_metta = mettify_mm2(list(dvars)) if dvars else "()"
+    fhyps_metta = mettify_mm2(list(fhyps)) if fhyps else "()"
+    ehyps_metta = mettify_mm2(list(ehyps)) if ehyps else "()"
+    stmt_metta = mettify_mm2(stmt)
+    label_name = re.sub(r'[^a-zA-Z0-9]', '-', label)
+    return f"""(exec ({priority} add-a-{label_name})
+  (, (add_a {label_metta} {dvars_metta} {fhyps_metta} {ehyps_metta} {stmt_metta}))
+  (O (+ (kb ((Label {label_metta}) Assertion
+             ((DVars {dvars_metta}) (FHyps {fhyps_metta}) (EHyps {ehyps_metta})
+              (Statement {stmt_metta}) (Type ⟨$a⟩)))))
+     (+ (command-done (add_a {label_metta} {stmt_metta})))
+     (- (add_a {label_metta} {dvars_metta} {fhyps_metta} {ehyps_metta} {stmt_metta}))))
+(add_a {label_metta} {dvars_metta} {fhyps_metta} {ehyps_metta} {stmt_metta})
+
+"""
 
 def mettify(expr, keep_parens=False) -> str:
     """
@@ -625,12 +761,22 @@ class MM:
                     self.add_c(tok)
                     metta_constant = f'(: {mettify(tok)} Const)'
                     log_transform(f'!(add-atom &md {metta_constant})')
+                    # MM2 output
+                    if mm2_output_execs:
+                        mm2_log_execs.append(mm2_exec_add_c(tok))
+                    else:
+                        mm2_log_kb(f'(kb (Constant {mettify_mm2(tok)} (Type "$c")))')
             elif tok == '$v':
                 for tok in self.read_non_p_stmt(tok, toks):
                     mettarl(f'!(add_v {mettify(tok)} {len(self.fs)})')
                     self.add_v(tok)
                     metta_var = f'(: {mettify(tok)} Var)'
                     log_transform(f'!(add-atom &md {metta_var})')
+                    # MM2 output
+                    if mm2_output_execs:
+                        mm2_log_execs.append(mm2_exec_add_v(tok, len(self.fs)))
+                    else:
+                        mm2_log_kb(f'(kb (Var {mettify_mm2(tok)} (FSDepth {len(self.fs)}) (Type "$v")))')
             elif tok == '$f':
                 stmt = self.read_non_p_stmt(tok, toks)
                 if not label: # MeTTa-side, I'll consider this purely parsing
@@ -646,6 +792,11 @@ class MM:
                 typecode, var = stmt[0], stmt[1]
                 metta_fhyp = f'(: {label} (: {mettify(var)} {mettify(typecode)}))'
                 log_transform(f'!(add-atom &md {metta_fhyp})')
+                # MM2 output
+                if mm2_output_execs:
+                    mm2_log_execs.append(mm2_exec_add_f(label, typecode, var, len(self.fs)))
+                else:
+                    mm2_log_kb(f'(kb ((Label {mettify_mm2(label)}) FHyp (FSDepth {len(self.fs)}) ((Typecode {mettify_mm2(typecode)}) (FVar {mettify_mm2(var)}) (Type "$f"))))')
                 label = None
             elif tok == '$e':
                 if not label:
@@ -656,6 +807,11 @@ class MM:
                 self.fs.add_e(stmt, label)
                 self.labels[label] = ('$e', stmt)
                 # Note: no bc-friendly log_transform of essential hypotheses.
+                # MM2 output
+                if mm2_output_execs:
+                    mm2_log_execs.append(mm2_exec_add_e(label, stmt, len(self.fs)))
+                else:
+                    mm2_log_kb(f'(kb ((Label {mettify_mm2(label)}) EHyp (FSDepth {len(self.fs)}) ((Statement {mettify_mm2(stmt)}) (Type "$e"))))')
                 label = None
             elif tok == '$a':
                 if not label:
@@ -666,6 +822,15 @@ class MM:
                 self.labels[label] = ('$a', (dvs, f_hyps, e_hyps, stmt))
                 metta_assertion = build_metta_assertion(label, dvs, f_hyps, e_hyps, stmt)
                 log_transform(f'!(add-atom &md {metta_assertion})')
+                # MM2 output
+                if mm2_output_execs:
+                    mm2_log_execs.append(mm2_exec_add_a(label, sorted(dvs), f_hyps, e_hyps, stmt))
+                else:
+                    dvs_mm2 = mettify_mm2(sorted(dvs)) if dvs else "()"
+                    fhyps_mm2 = mettify_mm2(f_hyps) if f_hyps else "()"
+                    ehyps_mm2 = mettify_mm2(e_hyps) if e_hyps else "()"
+                    stmt_mm2 = mettify_mm2(stmt)
+                    mm2_log_kb(f'(kb ((Label {mettify_mm2(label)}) Assertion ((DVars {dvs_mm2}) (FHyps {fhyps_mm2}) (EHyps {ehyps_mm2}) (Statement {stmt_mm2}) (Type "$a"))))')
                 label = None
             elif tok == '$p':
                 if not label:
@@ -698,6 +863,12 @@ class MM:
                 varlist = self.read_non_p_stmt(tok, toks)
                 mettarl(f'!(add_d {mettify(varlist)} {len(self.fs)})')
                 self.fs.add_d(varlist)
+                # MM2 output - generate all pairs
+                for i, x in enumerate(varlist):
+                    for y in varlist[i+1:]:
+                        # Orient the pair (min, max)
+                        ox, oy = (x, y) if x < y else (y, x)
+                        mm2_log_kb(f'(kb (DVar ({mettify_mm2(ox)} {mettify_mm2(oy)}) (FSDepth {len(self.fs)}) (Type "$d")))')
             elif tok == '${':
                 self.read(toks)
             elif tok == '$)':
@@ -980,6 +1151,17 @@ if __name__ == '__main__':
         type=str,
         default=None,
         help='output transformed statements for MeTTa')
+    parser.add_argument(
+        '--output-mm2',
+        dest='mm2_output_file',
+        type=str,
+        default=None,
+        help='output MM2 (Minimal MeTTa 2) format file for MORK')
+    parser.add_argument(
+        '--mm2-execs',
+        dest='mm2_execs',
+        action='store_true',
+        help='generate MM2 execs with commands (not just KB facts)')
     args = parser.parse_args()
     verbosity = args.verbosity
     db_file = args.database
@@ -993,6 +1175,11 @@ if __name__ == '__main__':
     if transformed_metta_file:
         unicode_delimiters = True
     metta_log_file = args.metta_log_file
+    mm2_output_file = args.mm2_output_file
+    if mm2_output_file:
+        output_mm2 = True
+        mm2_use_unicode = True  # Always use unicode for MM2
+    mm2_output_execs = args.mm2_execs if mm2_output_file else False
     initialize_metta()
     vprint(1, 'mmverify.py -- Proof verifier for the Metamath language')
     mm = MM(args.begin_label, args.stop_label)
@@ -1016,5 +1203,28 @@ if __name__ == '__main__':
                 out.write(line)
                 if not line.endswith('\n'):
                     out.write('\n')
+
+    # Write MM2 output if requested
+    if mm2_output_file:
+        with open(mm2_output_file, 'w') as out:
+            out.write('; MM2 (Minimal MeTTa 2) format output\n')
+            out.write('; Generated from: {}\n'.format(db_file.name))
+            if mm2_output_execs:
+                out.write('; Execs and commands for incremental KB building\n\n')
+                # Add error-block exec first
+                out.write('; Error handler - blocks execution if error occurs\n')
+                out.write('(exec (0000 error-block)\n')
+                out.write('  (, (Error $msg))\n')
+                out.write('  (, (Error $msg)))\n\n')
+                # Write all generated execs
+                for line in mm2_log_execs:
+                    out.write(line)
+            else:
+                out.write('; KB facts for Metamath database\n\n')
+                for line in mm2_log:
+                    out.write(line)
+                if not line.endswith('\n'):
+                    out.write('\n')
+        vprint(1, 'MM2 output written to "{}"'.format(mm2_output_file))
 
 #TODO: replace the option to not verify proofs if it's not set... from the metta_attempt_failed section :)

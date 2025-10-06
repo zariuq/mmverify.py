@@ -1,0 +1,33 @@
+; 3-step chained proof: tt tze tpl
+
+(kb (Constant ⟨0⟩ (Type ⟨$c⟩)))
+(kb (Constant ⟨+⟩ (Type ⟨$c⟩)))
+(kb (Constant ⟨⟦⟩ (Type ⟨$c⟩)))
+(kb (Constant ⟨⟧⟩ (Type ⟨$c⟩)))
+(kb (Constant ⟨term⟩ (Type ⟨$c⟩)))
+(kb (Var ⟨t⟩ (FSDepth 1) (Type ⟨$v⟩)))
+
+(sp 0)
+
+(exec (0001 step-0-tt)
+  (, (sp $n0))
+  (O (- (sp $n0))
+     (+ (sp (S $n0)))
+     (+ (stk $n0 (⟨term⟩ ⟨t⟩)))
+     (+ (exec (0002 step-1-tze)
+           (, (sp $n1))
+           (O (- (sp $n1))
+              (+ (sp (S $n1)))
+              (+ (stk $n1 (⟨term⟩ ⟨0⟩)))
+              (+ (exec (0003 step-2-tpl)
+                    (, (sp (S (S $n2)))
+                       (stk $n2 (⟨term⟩ $t2))
+                       (stk (S $n2) (⟨term⟩ $r2)))
+                    (O (- (sp (S (S $n2))))
+                       (+ (sp (S $n2)))
+                       (- (stk $n2 (⟨term⟩ $t2)))
+                       (- (stk (S $n2) (⟨term⟩ $r2)))
+                       (+ (stk $n2 (⟨term⟩ ⟨⟦⟩ $t2 ⟨+⟩ $r2 ⟨⟧⟩)))
+                       (+ (done))))))))))
+
+; Expected: sp=(S 0), stk at 0 with (t+0), (done)
