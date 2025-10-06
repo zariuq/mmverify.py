@@ -1,7 +1,7 @@
 !(bind! &stack (new-space))
 !(bind! &kb (new-space))
 !(bind! &sp (new-state -1))
-(: matchc (-> hyperon::space::DynSpace Atom Atom %Undefined%))
+(: matchc (-> SpaceType Atom Atom %Undefined%))
 (= (matchc $space $pattern $query) (collapse (match $space $pattern $query)))
 (= (empty-space $space) (matchc $space $atom (remove-atom $space $atom)))
 (= (remove-pattern $space $pattern) (let $pattern (match $space $pattern $pattern) (remove-atom $space $pattern)))
