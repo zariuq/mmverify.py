@@ -422,7 +422,7 @@ th $p |- x $= ( ax ) A
   B
 \tC $.""",
         "should_reject": False,  # Should accept (whitespace ignored)
-        "error_keywords": [],
+        "error_keywords": ["warning"],
     },
 }
 
