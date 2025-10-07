@@ -6,7 +6,9 @@ Tests a verifier against all known unit tests.
 Each test is a minimal database that violates exactly ONE rule.
 
 Usage:
-    python run_unit_tests.py /path/to/verifier
+    python run_unit_tests.py /path/to/verifier [--from-files]
+
+    --from-files: Load test databases from testNN_*.mm files instead of inline definitions
 
 Output:
     Test-by-test report showing which violations are caught/missed
@@ -16,8 +18,9 @@ import subprocess
 import tempfile
 import os
 import sys
+import re
 from pathlib import Path
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Dict
 
 
 # =============================================================================
@@ -192,28 +195,27 @@ $}""",
     },
 
     17: {
-        "name": "Include inside block (not outermost scope)",
-        "database": """$c wff $.
-${
-  $[ /tmp/inner.mm $]
-  $v x $.
-$}""",
-        "should_reject": True,
-        "error_keywords": ["include", "scope", "block", "outermost"],
-        "setup": lambda: create_dummy_include(),
-    },
-
-    # Note: Self-include should be IGNORED, not REJECTED (per spec)
-    # Most verifiers handle this correctly, so no negative test needed
-
-    18: {
-        "name": "Comment in statement",
+        "name": "Include scope violation (use included content outside block)",
         "database": """$c wff |- $.
 $v x $.
-wf $f wff x $.
-bad $a $( comment $) |- x $.""",
+wx $f wff x $.
+${
+  $[ /tmp/inner_test17.mm $]
+$}
+$( Try to use ax-inner outside the block - scope violation $)
+th2 $p |- y $= wy ax-inner $.""",
         "should_reject": True,
-        "error_keywords": ["comment", "statement", "token"],
+        "error_keywords": ["scope", "inactive", "not active", "symbol"],
+        "setup": lambda: create_inner_test17(),
+    },
+
+    18: {
+        "name": "Missing whitespace after comment",
+        "database": """$c wff $.
+$v x $.
+$( No space after comment close $)wf $f wff x $.""",
+        "should_reject": True,
+        "error_keywords": ["whitespace", "comment", "token", "keyword"],
     },
 
     19: {
@@ -323,14 +325,11 @@ bad $p |- y $= wfy ax $.""",
     },
 
     28: {
-        "name": "Include inside block",
+        "name": "Self-include",
         "database": """$c wff $.
-${
-  $[ /tmp/test.mm $]
-$}""",
+$[ __SELF__ $]""",
         "should_reject": True,
-        "error_keywords": ["include", "block", "scope", "outermost"],
-        "setup": lambda: create_dummy_include(),
+        "error_keywords": ["duplicate", "already", "circular", "include", "declared"],
     },
 
     29: {
@@ -422,33 +421,90 @@ th $p |- x $= ( ax ) A
   B
 \tC $.""",
         "should_reject": False,  # Should accept (whitespace ignored)
-        "error_keywords": ["warning"],
+        "error_keywords": [],
     },
 }
+
+
+# =============================================================================
+# File Loading
+# =============================================================================
+
+def load_tests_from_files() -> Dict[int, dict]:
+    """
+    Load test databases from testNN_*.mm files in current directory.
+
+    Returns dict with same structure as UNIT_TESTS.
+    """
+    tests = {}
+    test_dir = Path(__file__).parent
+
+    for test_file in sorted(test_dir.glob("test*.mm")):
+        # Extract test number from filename
+        match = re.match(r"test(\d+)_.*\.mm$", test_file.name)
+        if not match:
+            continue
+
+        test_num = int(match.group(1))
+
+        # Read file content
+        content = test_file.read_text()
+
+        # Extract expected behavior from first comment
+        should_reject = True
+        if "Should reject: False" in content:
+            should_reject = False
+
+        # Extract test name from comment
+        name_match = re.search(r"\$\( Unit Test \d+: (.*?) \$\)", content)
+        name = name_match.group(1) if name_match else test_file.stem
+
+        tests[test_num] = {
+            "name": name,
+            "file_path": str(test_file),
+            "should_reject": should_reject,
+            "error_keywords": [],  # Can't extract from file
+        }
+
+    return tests
 
 
 # =============================================================================
 # Helper Functions
 # =============================================================================
 
-def create_dummy_include():
-    """Create a dummy include file"""
-    path = "/tmp/inner.mm"
+def create_inner_test17():
+    """Create inner file with active content for Test 17."""
+    path = "/tmp/inner_test17.mm"
     with open(path, 'w') as f:
-        f.write("$( dummy include file $)\n")
+        f.write("$v y $.\nwy $f wff y $.\nax-inner $a |- y $.\n")
     return path
 
 
-def run_verifier(verifier_path: str, database: str) -> Tuple[bool, str]:
+def run_verifier(verifier_path: str, database_or_path: str, is_file: bool = False) -> Tuple[bool, str]:
     """
     Run a verifier on a database.
+
+    Args:
+        verifier_path: Path to verifier executable
+        database_or_path: Either database string or file path
+        is_file: True if database_or_path is a file path
 
     Returns:
         (success: bool, output: str)
     """
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.mm', delete=False) as f:
-        f.write(database)
-        temp_file = f.name
+    if is_file:
+        # Use the file directly
+        temp_file = database_or_path
+        delete_after = False
+    else:
+        # Create temp file with database content
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.mm', delete=False) as f:
+            # Replace __SELF__ placeholder with the temp file path (for self-include test)
+            db_text = database_or_path.replace("__SELF__", f.name)
+            f.write(db_text)
+            temp_file = f.name
+        delete_after = True
 
     try:
         result = subprocess.run(
@@ -468,10 +524,11 @@ def run_verifier(verifier_path: str, database: str) -> Tuple[bool, str]:
     except FileNotFoundError:
         return (False, f"ERROR: Verifier not found: {verifier_path}")
     finally:
-        try:
-            os.unlink(temp_file)
-        except:
-            pass
+        if delete_after:
+            try:
+                os.unlink(temp_file)
+            except:
+                pass
 
 
 def check_error_detection(output: str, keywords: list) -> bool:
@@ -484,13 +541,25 @@ def check_error_detection(output: str, keywords: list) -> bool:
 # Test Runner
 # =============================================================================
 
-def test_all_gaps(verifier_path: str):
+def test_all_gaps(verifier_path: str, from_files: bool = False):
     """
     Test verifier against all gaps.
+
+    Args:
+        verifier_path: Path to verifier executable
+        from_files: If True, load tests from testNN_*.mm files
 
     Returns:
         Dict of test_number -> (caught: bool, details: str)
     """
+    # Load tests
+    if from_files:
+        tests = load_tests_from_files()
+        print(f"Loaded {len(tests)} tests from .mm files")
+    else:
+        tests = UNIT_TESTS
+        print(f"Using {len(tests)} inline test definitions")
+
     print(f"Testing verifier: {verifier_path}")
     print("=" * 70)
     print()
@@ -499,19 +568,22 @@ def test_all_gaps(verifier_path: str):
     caught_count = 0
     missed_count = 0
 
-    for test_num in sorted(UNIT_TESTS.keys()):
-        test = UNIT_TESTS[test_num]
+    for test_num in sorted(tests.keys()):
+        test = tests[test_num]
         name = test["name"]
-        database = test["database"]
         should_reject = test["should_reject"]
         keywords = test.get("error_keywords", [])
 
-        # Setup if needed
-        if "setup" in test:
+        # Setup if needed (only for inline tests)
+        if not from_files and "setup" in test:
             test["setup"]()
 
         # Run verifier
-        success, output = run_verifier(verifier_path, database)
+        if from_files:
+            success, output = run_verifier(verifier_path, test["file_path"], is_file=True)
+        else:
+            database = test["database"]
+            success, output = run_verifier(verifier_path, database)
 
         # Check result
         if should_reject:
@@ -568,20 +640,29 @@ def test_all_gaps(verifier_path: str):
 # =============================================================================
 
 if __name__ == "__main__":
+    from_files = False
+
     if len(sys.argv) < 2:
-        print("Usage: python test_verifier_gaps.py /path/to/verifier")
+        print("Usage: python run_unit_tests.py /path/to/verifier [--from-files]")
+        print()
+        print("Options:")
+        print("  --from-files    Load tests from testNN_*.mm files instead of inline definitions")
         print()
         print("Example:")
-        print("  python test_verifier_gaps.py /claude/hyperon/metamath/goverify/goverify")
+        print("  python run_unit_tests.py /usr/local/bin/metamath")
+        print("  python run_unit_tests.py /claude/hyperon/metamath/goverify/goverify --from-files")
         sys.exit(1)
 
     verifier_path = sys.argv[1]
 
-    if not os.path.exists(verifier_path):
+    if len(sys.argv) > 2 and sys.argv[2] == "--from-files":
+        from_files = True
+
+    if not from_files and not os.path.exists(verifier_path):
         print(f"Error: Verifier not found: {verifier_path}")
         sys.exit(1)
 
-    results = test_all_gaps(verifier_path)
+    results = test_all_gaps(verifier_path, from_files=from_files)
 
     # Exit with error code if any tests failed
     missed = sum(1 for status, _ in results.values() if "MISSED" in status)

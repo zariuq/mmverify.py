@@ -426,71 +426,95 @@ $}
 
 ---
 
-## Gap 17: Recursive File Inclusion
+## Test 17: Include Scope Violation
 
-**Description:** File includes itself, directly or indirectly
+**Description:** Include statement inside block, then try to use included content outside the block
 
-**Invalid example:**
-```metamath
-$( In test.mm: $)
-$[ test.mm $]  ← Includes itself!
-```
-
-**Valid:** No circular includes
-
-**Why it matters:** Prevents infinite loops / memory leaks
-
-**Test database:**
-Create `test.mm` containing:
-```metamath
-$[ test.mm $]
-```
-
-**Expected:** Reject with circular include error
-
----
-
-## Gap 18: Comments in Statement Context
-
-**Description:** Comments appear within statements (not between tokens)
+**Background:**
+- metamath.exe accepts `$[ $]` inside blocks (scopes content to block)
+- Spec says "should only exist at outermost scope" (recommendation, not hard requirement)
+- See SPEC_DIVERGENCES.md for details
 
 **Invalid example:**
 ```metamath
-foo $a $( comment $) |- bar $.
+${
+  $[ inner.mm $]  ← Include inside block
+$}
+$( Try to use inner.mm content here $)
+th $p |- y $= wy ax-inner $.  ← ERROR: out of scope!
 ```
 
-This might be parsed as:
-- Typecode: `$(`
-- Expression: `$( comment $) |- bar`
+**Valid:** Include at outermost scope, or use content within the same block
 
-**Valid:** Comments only between statements
-
-**Why it matters:** Comment handling must be consistent
+**Why it matters:** Scope rules must be enforced consistently
 
 **Test database:**
 ```metamath
 $c wff |- $.
 $v x $.
-wf $f wff x $.
-bad $a $( oops $) |- x $.  ← Comment in statement
+wx $f wff x $.
+
+${
+  $[ /tmp/inner_test17.mm $]
+$}
+
+$( ax-inner is not active here $)
+th2 $p |- y $= wy ax-inner $.
 ```
 
-**Expected:** Reject or skip comment consistently
+**Expected:** Reject with scope error
+
+**File:** `test17_include_scope_violation.mm`
 
 ---
 
-## Gap 19: Integer Overflow in Compressed Proofs
+## Test 18: Missing Whitespace After Comment
 
-**Description:** Compressed proof labels use numbers that overflow or have multiple representations
+**Description:** No whitespace between `$)` and next token
+
+**Background:**
+- Comments ARE whitespace (can appear anywhere)
+- But `$)` must be followed by whitespace (tokenization rule)
+
+**Invalid example:**
+```metamath
+$( comment $)wf $f wff x $.  ← No space after $)
+```
+
+**Valid:** `$( comment $) wf $f wff x $.`
+
+**Why it matters:** Tokenizer must enforce whitespace rules
+
+**Test database:**
+```metamath
+$c wff $.
+$v x $.
+$( No space after comment close $)wf $f wff x $.
+```
+
+**Expected:** Reject with tokenization error
+
+**File:** `test18_missing_whitespace_after_comment.mm`
+
+---
+
+## Test 19: Illegal Characters in Compressed Proof
+
+**Description:** Compressed proof contains characters outside the allowed alphabet
+
+**Background:**
+- Compressed proof alphabet: `A-T` (1-20), `UA-YT` (21-120), `Z` (special)
+- Digits (0-9) are NOT allowed in compressed proofs
+- Letters encode step numbers in base-5/base-20
 
 **Invalid examples:**
-- Step number > max int
-- Leading zeros: `A` vs `01A` (both represent same step)
-- `Z` represented as number instead of special code
+- Any digit in compressed payload: `A0B` (contains `0`)
+- Characters outside `A-Y` and `Z`
+- Out-of-range indices or misuse of `Z` (stack/tag errors)
 
-**Valid:** Canonical representation only
+**Valid:** Only letters `A-Y` and `Z` in compressed proofs
 
-**Why it matters:** Verifiers must agree on step numbering
+**Why it matters:** Verifiers must agree on compressed proof encoding
 
 **Test database:**
 ```metamath
@@ -498,10 +522,12 @@ $c wff |- $.
 $v x $.
 wf $f wff x $.
 ax $a |- x $.
-th $p |- x $= ( ax ) 00001 $.  ← Leading zeros
+th $p |- x $= ( ax ) A0B $.  ← Digit '0' is illegal
 ```
 
-**Expected:** Reject non-canonical compressed proof
+**Expected:** Reject with illegal character error
+
+**File:** `test19_illegal_characters_in_compressed_proof.mm`
 
 ---
 
@@ -710,6 +736,59 @@ bad $p |- y $= f1 ax $.  ← Wrong conclusion
 ```
 
 **Expected:** Reject with proof verification failure
+
+---
+
+## Test 27: Disjoint Variable Constraint Violation
+
+**Description:** DV constraints violated during substitution
+
+**(Details in tests 27-36 - see test files for full documentation)**
+
+---
+
+## Test 28: Self-Include
+
+**Description:** File includes itself, causing duplicate declarations
+
+**Background:**
+- Self-include is NOT ignored (unlike duplicate includes)
+- File is read twice, causing all declarations to duplicate
+- See SPEC_DIVERGENCES.md for discussion
+
+**Invalid example:**
+```metamath
+$c wff $.
+$[ THIS_FILE.mm $]  ← Includes itself!
+```
+
+**Result:** `$c wff $.` appears twice → duplicate declaration error
+
+**Valid:** Files can only include OTHER files
+
+**Why it matters:** Prevents duplicate declarations and potential infinite loops
+
+**Test database (placeholder path replaced at runtime):**
+```metamath
+$c wff $.
+$[ __SELF__ $]
+```
+
+**Note:** The `__SELF__` placeholder is replaced with the actual temp file path by the test runner, enabling self-inclusion.
+
+**Expected:** Reject with "symbol already declared" error
+
+**File:** `test28_self_include.mm`
+
+---
+
+## Tests 29-36
+
+**(Tests 29-36 documented in test files - full catalogue update pending)**
+
+See individual test files:
+- test29_*.mm through test36_*.mm
+- Each test has description in file header comment
 
 ---
 
