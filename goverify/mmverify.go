@@ -1,426 +1,584 @@
 package main
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
-	"unicode"
 )
 
 type Statement struct {
-	kind  string
-	label string
-	expr  []string
-	hyps  []string // all hypotheses (floating followed by essential)
-	fHyps []string // floating hypothesis labels
-	eHyps []string // essential hypothesis labels
-	dv    [][2]string
-	proof []string
+	kind       string
+	label      string
+	expr       []string
+	proof      []string
+	fHyps      []string
+	eHyps      []string
+	hyps       []string
+	dvPairs    [][2]string
+	incomplete bool
 }
 
 type Frame struct {
-	floating  []string
-	essential []string
-	dvPairs   [][2]string
+	vars      []string
+	floating  []*Statement
+	essential []*Statement
+	dv        map[[2]string]bool
 }
 
-var (
-	constants = map[string]bool{}
-	variables = map[string]bool{}
-	labels    = map[string]*Statement{}
-)
+type Database struct {
+	constants   map[string]bool
+	allVars     map[string]bool
+	mathSymbols map[string]bool
+	labels      map[string]*Statement
+	frameStack  []*Frame
+	activeVars  map[string]int
+	activeF     map[string]*Statement
+	warnings    []string
+}
+
+type Token struct {
+	value string
+	file  string
+	line  int
+	col   int
+}
+
+type FileContext struct {
+	path            string
+	dir             string
+	data            []byte
+	pos             int
+	line            int
+	col             int
+	afterWhitespace bool
+	blockDepth      int
+}
+
+type Parser struct {
+	stack        []*FileContext
+	seenIncludes map[string]bool
+	lastComment  bool
+}
 
 func main() {
 	if len(os.Args) != 2 {
 		fmt.Println("usage: mmverify <file.mm>")
 		os.Exit(1)
 	}
-	if err := parseFile(os.Args[1]); err != nil {
+	if err := run(os.Args[1]); err != nil {
 		fmt.Fprintf(os.Stderr, "verify failed: %v\n", err)
 		os.Exit(1)
 	}
 	fmt.Println("verification succeeded")
 }
 
-// tokenizer
-
-type tokenizer struct {
-	r *bufio.Reader
-}
-
-func newTokenizer(input string) *tokenizer {
-	return &tokenizer{bufio.NewReader(strings.NewReader(input))}
-}
-
-func (t *tokenizer) next() (string, error) {
-	for {
-		ch, _, err := t.r.ReadRune()
-		if err == io.EOF {
-			return "", io.EOF
-		}
-		if unicode.IsSpace(ch) {
-			continue
-		}
-		if ch == '$' {
-			ch2, _, err := t.r.ReadRune()
-			if err != nil {
-				return "", err
-			}
-			return "$" + string(ch2), nil
-		}
-		tok := []rune{ch}
-		for {
-			ch, _, err := t.r.ReadRune()
-			if err == io.EOF {
-				return string(tok), nil
-			}
-			if unicode.IsSpace(ch) {
-				return string(tok), nil
-			}
-			if ch == '$' {
-				t.r.UnreadRune()
-				return string(tok), nil
-			}
-			tok = append(tok, ch)
-		}
+func run(path string) error {
+	db := &Database{
+		constants:   map[string]bool{},
+		allVars:     map[string]bool{},
+		mathSymbols: map[string]bool{},
+		labels:      map[string]*Statement{},
+		frameStack:  []*Frame{},
+		activeVars:  map[string]int{},
+		activeF:     map[string]*Statement{},
+		warnings:    []string{},
 	}
-}
-
-// parser and verifier
-
-type fileTok struct {
-	tz  *tokenizer
-	dir string
-}
-
-func parseFile(path string) error {
-	frames := []*Frame{{}}
-	stack := []fileTok{}
-	push := func(p string) error {
-		data, err := os.ReadFile(p)
-		if err != nil {
-			return err
-		}
-		stack = append(stack, fileTok{tz: newTokenizer(string(data)), dir: filepath.Dir(p)})
-		return nil
-	}
-	if err := push(path); err != nil {
+	db.pushFrame()
+	parser := &Parser{stack: []*FileContext{}, seenIncludes: map[string]bool{}}
+	if err := parser.pushFile(path); err != nil {
 		return err
 	}
-	next := func() (string, error) {
-		for len(stack) > 0 {
-			tok, err := stack[len(stack)-1].tz.next()
-			if err == io.EOF {
-				stack = stack[:len(stack)-1]
+	for {
+		tok, err := parser.nextToken()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
+		switch tok.value {
+		case "$[":
+			fnameTok, err := parser.nextToken()
+			if err != nil {
+				return err
+			}
+			if fnameTok.value == "" {
+				return parser.errorf(tok, "missing include filename")
+			}
+			endTok, err := parser.nextToken()
+			if err != nil {
+				return err
+			}
+			if endTok.value != "$]" {
+				return parser.errorf(endTok, "include statement must end with $]")
+			}
+			cur := parser.currentFile()
+			resolved := fnameTok.value
+			if !filepath.IsAbs(resolved) {
+				resolved = filepath.Join(cur.dir, resolved)
+			}
+			abs, err := filepath.Abs(resolved)
+			if err != nil {
+				return fmt.Errorf("%s:%d:%d: unable to resolve include path: %v", tok.file, tok.line, tok.col, err)
+			}
+			if parser.isOnStack(abs) {
+				return parser.errorf(fnameTok, "recursive include of '%s'", fnameTok.value)
+			}
+			if parser.seenIncludes[abs] {
 				continue
 			}
-			return tok, err
-		}
-		return "", io.EOF
-	}
-	for {
-		tok, err := next()
-		if err == io.EOF {
-			return nil
-		}
-		if err != nil {
-			return err
-		}
-		switch tok {
-		case "$(":
-			if err := skipComment(next); err != nil {
+			if err := parser.pushFile(abs); err != nil {
 				return err
-			}
-		case "$[":
-			fname, err := next()
-			if err != nil {
-				return err
-			}
-			end, err := next()
-			if err != nil {
-				return err
-			}
-			if end != "$]" {
-				return fmt.Errorf("expected $] after include filename")
-			}
-			curdir := stack[len(stack)-1].dir
-			if err := push(filepath.Join(curdir, fname)); err != nil {
-				return err
-			}
-		case "$c":
-			for {
-				t, err := next()
-				if err != nil {
-					return err
-				}
-				if t == "$(" {
-					if err := skipComment(next); err != nil {
-						return err
-					}
-					continue
-				}
-				if t == "$." {
-					break
-				}
-				if strings.HasPrefix(t, "$") {
-					return fmt.Errorf("invalid math symbol %s", t)
-				}
-				constants[t] = true
-			}
-		case "$v":
-			for {
-				t, err := next()
-				if err != nil {
-					return err
-				}
-				if t == "$(" {
-					if err := skipComment(next); err != nil {
-						return err
-					}
-					continue
-				}
-				if t == "$." {
-					break
-				}
-				if strings.HasPrefix(t, "$") {
-					return fmt.Errorf("invalid math symbol %s", t)
-				}
-				variables[t] = true
-			}
-		case "$d":
-			vars := []string{}
-			for {
-				t, err := next()
-				if err != nil {
-					return err
-				}
-				if t == "$(" {
-					if err := skipComment(next); err != nil {
-						return err
-					}
-					continue
-				}
-				if t == "$." {
-					break
-				}
-				vars = append(vars, t)
-			}
-			cf := frames[len(frames)-1]
-			for i := 0; i < len(vars); i++ {
-				for j := i + 1; j < len(vars); j++ {
-					cf.dvPairs = append(cf.dvPairs, [2]string{vars[i], vars[j]})
-				}
 			}
 		case "${":
-			frames = append(frames, &Frame{})
+			parser.currentFile().blockDepth++
+			db.pushFrame()
 		case "$}":
-			frames = frames[:len(frames)-1]
-		default:
-			label := tok
-			if !isValidLabel(label) {
-				return fmt.Errorf("illegal label %s", label)
+			cf := parser.currentFile()
+			if cf.blockDepth == 0 {
+				return parser.errorf(tok, "unmatched $} closing brace")
 			}
-			stype, err := next()
+			cf.blockDepth--
+			if err := db.popFrame(); err != nil {
+				return parser.errorf(tok, err.Error())
+			}
+		case "$c":
+			if err := db.parseConstants(parser); err != nil {
+				return err
+			}
+		case "$v":
+			if err := db.parseVariables(parser); err != nil {
+				return err
+			}
+		case "$d":
+			if err := db.parseDisjoint(parser); err != nil {
+				return err
+			}
+		default:
+			if !isValidLabel(tok.value) {
+				return parser.errorf(tok, "illegal label '%s'", tok.value)
+			}
+			if db.mathSymbols[tok.value] {
+				return parser.errorf(tok, "label conflicts with existing math symbol '%s'", tok.value)
+			}
+			if _, exists := db.labels[tok.value]; exists {
+				return parser.errorf(tok, "duplicate label '%s'", tok.value)
+			}
+			typeTok, err := parser.nextToken()
 			if err != nil {
 				return err
 			}
-			switch stype {
+			switch typeTok.value {
 			case "$f":
-				typecode, _ := next()
-				varTok, _ := next()
-				if term, _ := next(); term != "$." {
-					return fmt.Errorf("expected $. after $f")
+				if err := db.parseFloating(tok.value, parser); err != nil {
+					return err
 				}
-				stmt := &Statement{kind: "$f", label: label, expr: []string{typecode, varTok}}
-				labels[label] = stmt
-				cf := frames[len(frames)-1]
-				cf.floating = append(cf.floating, label)
 			case "$e":
-				typecode, _ := next()
-				expr := []string{typecode}
-				for {
-					t, err := next()
-					if err != nil {
-						return err
-					}
-					if t == "$(" {
-						if err := skipComment(next); err != nil {
-							return err
-						}
-						continue
-					}
-					if t == "$." {
-						break
-					}
-					expr = append(expr, t)
+				if err := db.parseEssential(tok.value, parser); err != nil {
+					return err
 				}
-				stmt := &Statement{kind: "$e", label: label, expr: expr}
-				labels[label] = stmt
-				cf := frames[len(frames)-1]
-				cf.essential = append(cf.essential, label)
 			case "$a":
-				typecode, _ := next()
-				expr := []string{typecode}
-				for {
-					t, err := next()
-					if err != nil {
-						return err
-					}
-					if t == "$(" {
-						if err := skipComment(next); err != nil {
-							return err
-						}
-						continue
-					}
-					if t == "$." {
-						break
-					}
-					expr = append(expr, t)
+				if err := db.parseAssertion(tok.value, parser, false); err != nil {
+					return err
 				}
-				fHyps, eHyps := gatherHyps(frames, expr)
-				dv := gatherDVs(frames)
-				stmt := &Statement{kind: "$a", label: label, expr: expr, hyps: append(append([]string{}, fHyps...), eHyps...), fHyps: fHyps, eHyps: eHyps, dv: dv}
-				labels[label] = stmt
 			case "$p":
-				typecode, _ := next()
-				expr := []string{typecode}
-				for {
-					t, err := next()
-					if err != nil {
-						return err
-					}
-					if t == "$(" {
-						if err := skipComment(next); err != nil {
-							return err
-						}
-						continue
-					}
-					if t == "$=" {
-						break
-					}
-					expr = append(expr, t)
-				}
-				proof := []string{}
-				for {
-					t, err := next()
-					if err != nil {
-						return err
-					}
-					if t == "$(" {
-						if err := skipComment(next); err != nil {
-							return err
-						}
-						continue
-					}
-					if t == "$." {
-						break
-					}
-					proof = append(proof, t)
-				}
-				fHyps, eHyps := gatherHyps(frames, expr)
-				dv := gatherDVs(frames)
-				stmt := &Statement{kind: "$p", label: label, expr: expr, hyps: append(append([]string{}, fHyps...), eHyps...), fHyps: fHyps, eHyps: eHyps, dv: dv, proof: proof}
-				labels[label] = stmt
-				if err := verify(stmt); err != nil {
-					return fmt.Errorf("%s: %v", label, err)
+				if err := db.parseAssertion(tok.value, parser, true); err != nil {
+					return err
 				}
 			default:
-				return fmt.Errorf("unknown statement type %s", stype)
+				return parser.errorf(typeTok, "unknown statement type '%s'", typeTok.value)
 			}
 		}
 	}
+	if len(db.frameStack) != 1 {
+		return errors.New("unclosed ${ ... $} block at end of input")
+	}
+	if len(parser.stack) != 0 {
+		return errors.New("unexpected parser state at end of input")
+	}
+	for _, w := range db.warnings {
+		fmt.Fprintf(os.Stderr, "warning: %s\n", w)
+	}
+	return nil
 }
 
-func isValidLabel(s string) bool {
-	if s == "" {
-		return false
+func (db *Database) pushFrame() {
+	fr := &Frame{vars: []string{}, floating: []*Statement{}, essential: []*Statement{}, dv: map[[2]string]bool{}}
+	db.frameStack = append(db.frameStack, fr)
+}
+
+func (db *Database) popFrame() error {
+	if len(db.frameStack) <= 1 {
+		return errors.New("attempt to close outermost frame")
 	}
-	for _, r := range s {
-		if !(unicode.IsLetter(r) || unicode.IsDigit(r) || r == '-' || r == '_' || r == '.') {
-			return false
+	fr := db.frameStack[len(db.frameStack)-1]
+	db.frameStack = db.frameStack[:len(db.frameStack)-1]
+	for _, v := range fr.vars {
+		if count, ok := db.activeVars[v]; ok {
+			if count <= 1 {
+				delete(db.activeVars, v)
+			} else {
+				db.activeVars[v] = count - 1
+			}
 		}
 	}
-	return true
+	for _, st := range fr.floating {
+		v := st.expr[1]
+		delete(db.activeF, v)
+	}
+	return nil
 }
 
-func skipComment(next func() (string, error)) error {
+func (db *Database) currentFrame() *Frame {
+	return db.frameStack[len(db.frameStack)-1]
+}
+
+func (db *Database) parseConstants(parser *Parser) error {
 	for {
-		t, err := next()
+		tok, err := parser.nextToken()
 		if err != nil {
 			return err
 		}
-		if t == "$)" {
+		if tok.value == "$." {
 			return nil
 		}
+		if parser.lastComment {
+			return parser.errorf(tok, "comments are not allowed inside $c statements")
+		}
+		if strings.HasPrefix(tok.value, "$") {
+			return parser.errorf(tok, "invalid constant token '%s'", tok.value)
+		}
+		if strings.Contains(tok.value, "$") {
+			return parser.errorf(tok, "constant token '%s' contains '$'", tok.value)
+		}
+		if db.allVars[tok.value] {
+			return parser.errorf(tok, "constant '%s' already declared as variable", tok.value)
+		}
+		if db.constants[tok.value] {
+			return parser.errorf(tok, "redeclaration of constant '%s'", tok.value)
+		}
+		db.constants[tok.value] = true
+		db.mathSymbols[tok.value] = true
 	}
 }
 
-func gatherHyps(frames []*Frame, expr []string) (fHyps []string, eHyps []string) {
-	varsNeeded := map[string]bool{}
-	for _, tok := range expr[1:] {
-		if variables[tok] {
-			varsNeeded[tok] = true
+func (db *Database) parseVariables(parser *Parser) error {
+	fr := db.currentFrame()
+	for {
+		tok, err := parser.nextToken()
+		if err != nil {
+			return err
+		}
+		if tok.value == "$." {
+			return nil
+		}
+		if parser.lastComment {
+			return parser.errorf(tok, "comments are not allowed inside $v statements")
+		}
+		if strings.HasPrefix(tok.value, "$") {
+			return parser.errorf(tok, "invalid variable token '%s'", tok.value)
+		}
+		if strings.Contains(tok.value, "$") {
+			return parser.errorf(tok, "variable token '%s' contains '$'", tok.value)
+		}
+		if db.constants[tok.value] {
+			return parser.errorf(tok, "variable '%s' already declared as constant", tok.value)
+		}
+		if db.activeVars[tok.value] > 0 {
+			return parser.errorf(tok, "redeclaration of active variable '%s'", tok.value)
+		}
+		db.activeVars[tok.value]++
+		db.allVars[tok.value] = true
+		db.mathSymbols[tok.value] = true
+		fr.vars = append(fr.vars, tok.value)
+	}
+}
+
+func (db *Database) parseDisjoint(parser *Parser) error {
+	fr := db.currentFrame()
+	seen := map[string]bool{}
+	vars := []string{}
+	for {
+		tok, err := parser.nextToken()
+		if err != nil {
+			return err
+		}
+		if tok.value == "$." {
+			break
+		}
+		if parser.lastComment {
+			return parser.errorf(tok, "comments are not allowed inside $d statements")
+		}
+		if !db.isVarActive(tok.value) {
+			return parser.errorf(tok, "disjoint variable '%s' is not an active variable", tok.value)
+		}
+		if seen[tok.value] {
+			return parser.errorf(tok, "variable '%s' repeated in $d statement", tok.value)
+		}
+		seen[tok.value] = true
+		vars = append(vars, tok.value)
+	}
+	for i := 0; i < len(vars); i++ {
+		for j := i + 1; j < len(vars); j++ {
+			a := vars[i]
+			b := vars[j]
+			if a > b {
+				a, b = b, a
+			}
+			fr.dv[[2]string{a, b}] = true
 		}
 	}
-	for _, fr := range frames {
-		for _, elabel := range fr.essential {
-			e := labels[elabel]
-			for _, tok := range e.expr[1:] {
-				if variables[tok] {
-					varsNeeded[tok] = true
+	return nil
+}
+
+func (db *Database) parseFloating(label string, parser *Parser) error {
+	typeTok, err := parser.nextToken()
+	if err != nil {
+		return err
+	}
+	if parser.lastComment {
+		return parser.errorf(typeTok, "comments are not allowed inside $f statements")
+	}
+	if !db.constants[typeTok.value] {
+		return parser.errorf(typeTok, "typecode '%s' is not a declared constant", typeTok.value)
+	}
+	varTok, err := parser.nextToken()
+	if err != nil {
+		return err
+	}
+	if parser.lastComment {
+		return parser.errorf(varTok, "comments are not allowed inside $f statements")
+	}
+	if !db.isVarActive(varTok.value) {
+		return parser.errorf(varTok, "variable '%s' is not active", varTok.value)
+	}
+	if _, exists := db.activeF[varTok.value]; exists {
+		return parser.errorf(varTok, "multiple $f statements for variable '%s'", varTok.value)
+	}
+	endTok, err := parser.nextToken()
+	if err != nil {
+		return err
+	}
+	if endTok.value != "$." {
+		return parser.errorf(endTok, "expected $. after $f statement")
+	}
+	stmt := &Statement{kind: "$f", label: label, expr: []string{typeTok.value, varTok.value}}
+	db.labels[label] = stmt
+	fr := db.currentFrame()
+	fr.floating = append(fr.floating, stmt)
+	db.activeF[varTok.value] = stmt
+	return nil
+}
+
+func (db *Database) parseEssential(label string, parser *Parser) error {
+	stmt, err := db.readExpression("$.", parser)
+	if err != nil {
+		return err
+	}
+	stmt.label = label
+	stmt.kind = "$e"
+	db.labels[label] = stmt
+	fr := db.currentFrame()
+	fr.essential = append(fr.essential, stmt)
+	return nil
+}
+
+func (db *Database) parseAssertion(label string, parser *Parser, withProof bool) error {
+	endToken := "$."
+	if withProof {
+		endToken = "$="
+	}
+	stmt, err := db.readExpression(endToken, parser)
+	if err != nil {
+		return err
+	}
+	stmt.label = label
+	if withProof {
+		stmt.kind = "$p"
+		proof, err := db.readProof(parser)
+		if err != nil {
+			return err
+		}
+		stmt.proof = proof
+	} else {
+		stmt.kind = "$a"
+	}
+	fHyps, eHyps, err := db.gatherHyps(stmt.expr)
+	if err != nil {
+		return err
+	}
+	stmt.fHyps = fHyps
+	stmt.eHyps = eHyps
+	stmt.hyps = append(append([]string{}, fHyps...), eHyps...)
+	stmt.dvPairs = db.gatherDV()
+	db.labels[label] = stmt
+	if withProof {
+		if err := db.verify(stmt); err != nil {
+			return fmt.Errorf("%s: %v", label, err)
+		}
+	}
+	return nil
+}
+
+func (db *Database) readExpression(endToken string, parser *Parser) (*Statement, error) {
+	typeTok, err := parser.nextToken()
+	if err != nil {
+		return nil, err
+	}
+	if parser.lastComment {
+		return nil, parser.errorf(typeTok, "comments are not allowed inside statements")
+	}
+	if !db.constants[typeTok.value] {
+		return nil, parser.errorf(typeTok, "typecode '%s' is not a declared constant", typeTok.value)
+	}
+	expr := []string{typeTok.value}
+	for {
+		tok, err := parser.nextToken()
+		if err != nil {
+			return nil, err
+		}
+		if tok.value == endToken {
+			break
+		}
+		if parser.lastComment {
+			return nil, parser.errorf(tok, "comments are not allowed inside statements")
+		}
+		if strings.HasPrefix(tok.value, "$") {
+			return nil, parser.errorf(tok, "unexpected control token '%s' in expression", tok.value)
+		}
+		if strings.Contains(tok.value, "$") {
+			return nil, parser.errorf(tok, "token '%s' contains '$'", tok.value)
+		}
+		if db.isVarToken(tok.value) {
+			if !db.isVarActive(tok.value) {
+				return nil, parser.errorf(tok, "variable '%s' is not active", tok.value)
+			}
+			if _, ok := db.activeF[tok.value]; !ok {
+				return nil, parser.errorf(tok, "variable '%s' lacks active $f hypothesis", tok.value)
+			}
+		}
+		expr = append(expr, tok.value)
+	}
+	return &Statement{expr: expr}, nil
+}
+
+func (db *Database) readProof(parser *Parser) ([]string, error) {
+	proof := []string{}
+	for {
+		tok, err := parser.nextToken()
+		if err != nil {
+			return nil, err
+		}
+		if tok.value == "$." {
+			break
+		}
+		if parser.lastComment {
+			return nil, parser.errorf(tok, "comments are not allowed inside proofs")
+		}
+		proof = append(proof, tok.value)
+	}
+	return proof, nil
+}
+
+func (db *Database) gatherHyps(expr []string) ([]string, []string, error) {
+	needed := map[string]bool{}
+	for _, tok := range expr[1:] {
+		if db.isVarToken(tok) {
+			needed[tok] = true
+		}
+	}
+	for _, fr := range db.frameStack {
+		for _, est := range fr.essential {
+			for _, tok := range est.expr[1:] {
+				if db.isVarToken(tok) {
+					needed[tok] = true
 				}
 			}
 		}
 	}
-	for _, fr := range frames {
-		for _, flabel := range fr.floating {
-			v := labels[flabel].expr[1]
-			if varsNeeded[v] {
-				fHyps = append(fHyps, flabel)
+	fHyps := []string{}
+	eHyps := []string{}
+	for _, fr := range db.frameStack {
+		for _, fst := range fr.floating {
+			v := fst.expr[1]
+			if needed[v] {
+				fHyps = append(fHyps, fst.label)
+				delete(needed, v)
 			}
 		}
-		eHyps = append(eHyps, fr.essential...)
+		for _, est := range fr.essential {
+			eHyps = append(eHyps, est.label)
+		}
 	}
-	return
+	if len(needed) > 0 {
+		vars := []string{}
+		for v := range needed {
+			vars = append(vars, v)
+		}
+		return nil, nil, fmt.Errorf("missing $f hypotheses for variables: %s", strings.Join(vars, ", "))
+	}
+	return fHyps, eHyps, nil
 }
 
-func gatherDVs(frames []*Frame) [][2]string {
-	var dv [][2]string
-	for _, fr := range frames {
-		dv = append(dv, fr.dvPairs...)
+func (db *Database) gatherDV() [][2]string {
+	var res [][2]string
+	for _, fr := range db.frameStack {
+		for pair := range fr.dv {
+			res = append(res, pair)
+		}
 	}
-	return dv
+	return res
 }
 
-// verification
-
-type substMap map[string][]string
-
-func verify(stmt *Statement) error {
+func (db *Database) verify(stmt *Statement) error {
+	for _, tok := range stmt.proof {
+		if tok == "?" {
+			stmt.incomplete = true
+			db.warnings = append(db.warnings, fmt.Sprintf("%s has unknown proof steps", stmt.label))
+			return nil
+		}
+	}
 	if len(stmt.proof) > 0 && stmt.proof[0] == "(" {
-		return verifyCompressed(stmt)
+		return db.verifyCompressed(stmt)
 	}
-	return verifyNormal(stmt)
+	return db.verifyNormal(stmt)
 }
 
-func verifyNormal(stmt *Statement) error {
+func (db *Database) verifyNormal(stmt *Statement) error {
 	allowed := map[[2]string]bool{}
-	for _, pair := range stmt.dv {
-		allowed[[2]string{pair[0], pair[1]}] = true
+	for _, pair := range stmt.dvPairs {
+		allowed[pair] = true
 		allowed[[2]string{pair[1], pair[0]}] = true
 	}
 	needed := map[[2]string]bool{}
 	stack := [][]string{}
+	allowedF := make(map[string]bool)
+	for _, lbl := range stmt.fHyps {
+		allowedF[lbl] = true
+	}
+	allowedE := make(map[string]bool)
+	for _, lbl := range stmt.eHyps {
+		allowedE[lbl] = true
+	}
 	for _, lbl := range stmt.proof {
-		st, ok := labels[lbl]
+		st, ok := db.labels[lbl]
 		if !ok {
 			return fmt.Errorf("unknown label %s", lbl)
 		}
-		if err := applyStep(st, &stack, needed); err != nil {
+		if lbl == stmt.label {
+			return fmt.Errorf("proof may not reference its own label")
+		}
+		if st.kind == "$f" && !allowedF[st.label] {
+			return fmt.Errorf("floating hypothesis %s is not active for this proof", st.label)
+		}
+		if st.kind == "$e" && !allowedE[st.label] {
+			return fmt.Errorf("essential hypothesis %s is not active for this proof", st.label)
+		}
+		if err := db.applyStep(st, &stack, needed, allowedF, allowedE); err != nil {
 			return fmt.Errorf("%s: %v", lbl, err)
 		}
 	}
@@ -432,21 +590,24 @@ func verifyNormal(stmt *Statement) error {
 	}
 	for pair := range needed {
 		if !allowed[pair] {
-			return fmt.Errorf("missing $d %s %s", pair[0], pair[1])
+			return fmt.Errorf("missing $d condition for %s %s", pair[0], pair[1])
 		}
 	}
 	return nil
 }
 
-func verifyCompressed(stmt *Statement) error {
+func (db *Database) verifyCompressed(stmt *Statement) error {
+	if len(stmt.proof) < 3 {
+		return errors.New("compressed proof missing label block")
+	}
 	allowed := map[[2]string]bool{}
-	for _, pair := range stmt.dv {
-		allowed[[2]string{pair[0], pair[1]}] = true
+	for _, pair := range stmt.dvPairs {
+		allowed[pair] = true
 		allowed[[2]string{pair[1], pair[0]}] = true
 	}
 	needed := map[[2]string]bool{}
-	// Build label list from hypotheses and explicit labels
-	labelsList := append(append([]string{}, stmt.fHyps...), stmt.eHyps...)
+	labelsList := append([]string{}, stmt.fHyps...)
+	labelsList = append(labelsList, stmt.eHyps...)
 	idx := 1
 	for idx < len(stmt.proof) && stmt.proof[idx] != ")" {
 		labelsList = append(labelsList, stmt.proof[idx])
@@ -459,36 +620,72 @@ func verifyCompressed(stmt *Statement) error {
 	proofStr := strings.Join(stmt.proof[idx:], "")
 	ints := []int{}
 	cur := 0
+	building := false
 	for _, ch := range proofStr {
 		switch {
 		case ch == 'Z':
+			if building {
+				return errors.New("compressed proof number not terminated before Z")
+			}
 			ints = append(ints, -1)
 		case 'A' <= ch && ch <= 'T':
-			ints = append(ints, 20*cur+int(ch-'A'))
+			building = false
+			if cur > (math.MaxInt-int(ch-'A'))/20 {
+				return errors.New("compressed proof integer overflow")
+			}
+			value := 20*cur + int(ch-'A')
+			if value < 0 {
+				return errors.New("compressed proof integer overflow")
+			}
+			ints = append(ints, value)
 			cur = 0
 		case 'U' <= ch && ch <= 'Y':
+			building = true
+			if cur > (math.MaxInt-5)/5 {
+				return errors.New("compressed proof integer overflow")
+			}
 			cur = 5*cur + int(ch-'U') + 1
 		default:
 			return fmt.Errorf("bad compressed proof char %c", ch)
 		}
+	}
+	if building {
+		return errors.New("compressed proof ended mid-integer")
+	}
+	allowedF := make(map[string]bool)
+	for _, lbl := range stmt.fHyps {
+		allowedF[lbl] = true
+	}
+	allowedE := make(map[string]bool)
+	for _, lbl := range stmt.eHyps {
+		allowedE[lbl] = true
 	}
 	stack := [][]string{}
 	saved := [][]string{}
 	for _, n := range ints {
 		if n == -1 {
 			if len(stack) == 0 {
-				return errors.New("nothing to save")
+				return errors.New("nothing to save in compressed proof")
 			}
 			saved = append(saved, stack[len(stack)-1])
 			continue
 		}
 		if n < len(labelsList) {
 			lbl := labelsList[n]
-			st, ok := labels[lbl]
+			st, ok := db.labels[lbl]
 			if !ok {
 				return fmt.Errorf("unknown label %s", lbl)
 			}
-			if err := applyStep(st, &stack, needed); err != nil {
+			if lbl == stmt.label {
+				return fmt.Errorf("proof may not reference its own label")
+			}
+			if st.kind == "$f" && !allowedF[st.label] {
+				return fmt.Errorf("floating hypothesis %s is not active for this proof", st.label)
+			}
+			if st.kind == "$e" && !allowedE[st.label] {
+				return fmt.Errorf("essential hypothesis %s is not active for this proof", st.label)
+			}
+			if err := db.applyStep(st, &stack, needed, allowedF, allowedE); err != nil {
 				return fmt.Errorf("%s: %v", lbl, err)
 			}
 			continue
@@ -497,8 +694,8 @@ func verifyCompressed(stmt *Statement) error {
 		if idx >= len(saved) {
 			return fmt.Errorf("invalid saved step %d", n)
 		}
-		tmp := &Statement{kind: "$a", expr: saved[idx]}
-		if err := applyStep(tmp, &stack, needed); err != nil {
+		tmp := &Statement{kind: "$a", expr: saved[idx], hyps: []string{}, dvPairs: [][2]string{}}
+		if err := db.applyStep(tmp, &stack, needed, allowedF, allowedE); err != nil {
 			return err
 		}
 	}
@@ -510,16 +707,19 @@ func verifyCompressed(stmt *Statement) error {
 	}
 	for pair := range needed {
 		if !allowed[pair] {
-			return fmt.Errorf("missing $d %s %s", pair[0], pair[1])
+			return fmt.Errorf("missing $d condition for %s %s", pair[0], pair[1])
 		}
 	}
 	return nil
 }
 
-func applyStep(st *Statement, stack *[][]string, needed map[[2]string]bool) error {
+func (db *Database) applyStep(st *Statement, stack *[][]string, needed map[[2]string]bool, allowedF, allowedE map[string]bool) error {
 	switch st.kind {
-	case "$f", "$e":
-		*stack = append(*stack, st.expr)
+	case "$f":
+		*stack = append(*stack, append([]string{}, st.expr...))
+		return nil
+	case "$e":
+		*stack = append(*stack, append([]string{}, st.expr...))
 		return nil
 	case "$a", "$p":
 		n := len(st.hyps)
@@ -528,14 +728,17 @@ func applyStep(st *Statement, stack *[][]string, needed map[[2]string]bool) erro
 		}
 		args := (*stack)[len(*stack)-n:]
 		*stack = (*stack)[:len(*stack)-n]
-		subst := substMap{}
+		subst := map[string][]string{}
 		for i, hlabel := range st.hyps {
-			h := labels[hlabel]
-			arg := args[i]
+			h := db.labels[hlabel]
+			arg := append([]string{}, args[i]...)
 			if h.kind == "$f" {
 				v := h.expr[1]
-				if ex, ok := subst[v]; ok {
-					if !exprEqual(ex, arg) {
+				if arg[0] != h.expr[0] {
+					return fmt.Errorf("typecode mismatch for variable %s", v)
+				}
+				if existing, ok := subst[v]; ok {
+					if !exprEqual(existing, arg) {
 						return fmt.Errorf("mismatch for %s", v)
 					}
 				} else {
@@ -548,20 +751,23 @@ func applyStep(st *Statement, stack *[][]string, needed map[[2]string]bool) erro
 				}
 			}
 		}
-		for _, pair := range st.dv {
-			a, aok := subst[pair[0]]
-			b, bok := subst[pair[1]]
-			if !aok || !bok {
+		for _, pair := range st.dvPairs {
+			a := pair[0]
+			b := pair[1]
+			aExpr, aOk := subst[a]
+			bExpr, bOk := subst[b]
+			if !aOk || !bOk {
 				continue
 			}
-			av := varsIn(a)
-			bv := varsIn(b)
+			av := db.varsIn(aExpr)
+			bv := db.varsIn(bExpr)
 			if intersects(av, bv) {
-				return fmt.Errorf("disjoint variable violation %s %s", pair[0], pair[1])
+				return fmt.Errorf("disjoint variable violation %s %s", a, b)
 			}
 			for x := range av {
 				for y := range bv {
 					needed[[2]string{x, y}] = true
+					needed[[2]string{y, x}] = true
 				}
 			}
 		}
@@ -573,7 +779,7 @@ func applyStep(st *Statement, stack *[][]string, needed map[[2]string]bool) erro
 	}
 }
 
-func substitute(expr []string, subst substMap) []string {
+func substitute(expr []string, subst map[string][]string) []string {
 	out := []string{expr[0]}
 	for _, tok := range expr[1:] {
 		if rep, ok := subst[tok]; ok {
@@ -597,10 +803,10 @@ func exprEqual(a, b []string) bool {
 	return true
 }
 
-func varsIn(expr []string) map[string]bool {
+func (db *Database) varsIn(expr []string) map[string]bool {
 	m := map[string]bool{}
 	for _, tok := range expr[1:] {
-		if variables[tok] {
+		if db.isVarToken(tok) {
 			m[tok] = true
 		}
 	}
@@ -614,4 +820,236 @@ func intersects(a, b map[string]bool) bool {
 		}
 	}
 	return false
+}
+
+func isValidLabel(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, r := range s {
+		if !(r == '-' || r == '_' || r == '.' || r == '\'' || (r >= '0' && r <= '9') || (r >= 'A' && r <= 'Z') || (r >= 'a' && r <= 'z')) {
+			return false
+		}
+	}
+	return true
+}
+
+func (db *Database) isVarActive(v string) bool {
+	return db.activeVars[v] > 0
+}
+
+func (db *Database) isVarToken(v string) bool {
+	return db.allVars[v]
+}
+
+func isWhitespace(b byte) bool {
+	switch b {
+	case ' ', '\t', '\n', '\r', '\f':
+		return true
+	default:
+		return false
+	}
+}
+
+func isAllowedChar(b byte) bool {
+	if b == '\t' || b == '\n' || b == '\f' || b == '\r' {
+		return true
+	}
+	return b >= 32 && b <= 126
+}
+
+func isKeyword(second byte) bool {
+	switch second {
+	case '(', ')', '[', ']', 'c', 'v', 'd', 'f', 'e', 'a', 'p', '=', '.', '{', '}':
+		return true
+	default:
+		return false
+	}
+}
+
+func (p *Parser) pushFile(path string) error {
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return err
+	}
+	data, err := os.ReadFile(abs)
+	if err != nil {
+		return err
+	}
+	for i, b := range data {
+		if !isAllowedChar(b) {
+			return fmt.Errorf("%s contains non-printable ASCII character at offset %d", abs, i)
+		}
+	}
+	ctx := &FileContext{
+		path:            abs,
+		dir:             filepath.Dir(abs),
+		data:            data,
+		pos:             0,
+		line:            1,
+		col:             1,
+		afterWhitespace: true,
+		blockDepth:      0,
+	}
+	p.stack = append(p.stack, ctx)
+	p.seenIncludes[abs] = true
+	return nil
+}
+
+func (p *Parser) currentFile() *FileContext {
+	return p.stack[len(p.stack)-1]
+}
+
+func (p *Parser) isOnStack(path string) bool {
+	for _, ctx := range p.stack {
+		if ctx.path == path {
+			return true
+		}
+	}
+	return false
+}
+
+func (p *Parser) nextToken() (*Token, error) {
+	p.lastComment = false
+	for {
+		if len(p.stack) == 0 {
+			return nil, io.EOF
+		}
+		ctx := p.currentFile()
+		if _, err := ctx.skipWhitespace(); err != nil {
+			return nil, err
+		}
+		if ctx.pos >= len(ctx.data) {
+			if ctx.blockDepth != 0 {
+				return nil, fmt.Errorf("%s:%d:%d: unclosed ${ ... $} block", ctx.path, ctx.line, ctx.col)
+			}
+			p.stack = p.stack[:len(p.stack)-1]
+			continue
+		}
+		ch := ctx.data[ctx.pos]
+		if !ctx.afterWhitespace {
+			return nil, fmt.Errorf("%s:%d:%d: missing whitespace between tokens", ctx.path, ctx.line, ctx.col)
+		}
+		if ch == '$' {
+			if ctx.pos+1 >= len(ctx.data) {
+				return nil, fmt.Errorf("%s:%d:%d: dangling $ at end of file", ctx.path, ctx.line, ctx.col)
+			}
+			second := ctx.data[ctx.pos+1]
+			if !isKeyword(second) {
+				return nil, fmt.Errorf("%s:%d:%d: invalid keyword $%c", ctx.path, ctx.line, ctx.col, second)
+			}
+			tok := &Token{value: "$" + string(second), file: ctx.path, line: ctx.line, col: ctx.col}
+			ctx.pos += 2
+			ctx.col += 2
+			ctx.afterWhitespace = false
+			if tok.value == "$(" {
+				if err := ctx.skipComment(); err != nil {
+					return nil, err
+				}
+				p.lastComment = true
+				ctx.afterWhitespace = true
+				continue
+			}
+			return tok, nil
+		}
+		startLine := ctx.line
+		startCol := ctx.col
+		var sb strings.Builder
+		for ctx.pos < len(ctx.data) {
+			b := ctx.data[ctx.pos]
+			if isWhitespace(b) {
+				break
+			}
+			if b == '$' {
+				return nil, fmt.Errorf("%s:%d:%d: token contains '$'", ctx.path, startLine, startCol)
+			}
+			sb.WriteByte(b)
+			ctx.pos++
+			ctx.col++
+		}
+		ctx.afterWhitespace = false
+		return &Token{value: sb.String(), file: ctx.path, line: startLine, col: startCol}, nil
+	}
+}
+
+func (ctx *FileContext) skipWhitespace() (bool, error) {
+	consumed := false
+	for ctx.pos < len(ctx.data) {
+		b := ctx.data[ctx.pos]
+		if !isWhitespace(b) {
+			break
+		}
+		consumed = true
+		switch b {
+		case '\n':
+			ctx.pos++
+			ctx.line++
+			ctx.col = 1
+		case '\r':
+			ctx.pos++
+			if ctx.pos < len(ctx.data) && ctx.data[ctx.pos] == '\n' {
+				ctx.pos++
+			}
+			ctx.line++
+			ctx.col = 1
+		case '\f':
+			ctx.pos++
+			ctx.line++
+			ctx.col = 1
+		default:
+			ctx.pos++
+			ctx.col++
+		}
+	}
+	if consumed {
+		ctx.afterWhitespace = true
+	}
+	return consumed, nil
+}
+
+func (ctx *FileContext) skipComment() error {
+	for {
+		if ctx.pos >= len(ctx.data) {
+			return fmt.Errorf("%s:%d:%d: unclosed comment", ctx.path, ctx.line, ctx.col)
+		}
+		b := ctx.data[ctx.pos]
+		if b == '$' {
+			if ctx.pos+1 >= len(ctx.data) {
+				return fmt.Errorf("%s:%d:%d: unclosed comment", ctx.path, ctx.line, ctx.col)
+			}
+			next := ctx.data[ctx.pos+1]
+			if next == '(' {
+				return fmt.Errorf("%s:%d:%d: comments may not contain '$( or $)'", ctx.path, ctx.line, ctx.col)
+			}
+			if next == ')' {
+				ctx.pos += 2
+				ctx.col += 2
+				return nil
+			}
+		}
+		switch b {
+		case '\n':
+			ctx.pos++
+			ctx.line++
+			ctx.col = 1
+		case '\r':
+			ctx.pos++
+			if ctx.pos < len(ctx.data) && ctx.data[ctx.pos] == '\n' {
+				ctx.pos++
+			}
+			ctx.line++
+			ctx.col = 1
+		case '\f':
+			ctx.pos++
+			ctx.line++
+			ctx.col = 1
+		default:
+			ctx.pos++
+			ctx.col++
+		}
+	}
+}
+
+func (p *Parser) errorf(tok *Token, format string, args ...interface{}) error {
+	return fmt.Errorf("%s:%d:%d: "+format, append([]interface{}{tok.file, tok.line, tok.col}, args...)...)
 }
