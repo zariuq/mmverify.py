@@ -312,24 +312,27 @@ bad $p |- y $= f1 ax $.""",
 
     27: {
         "name": "Disjoint variable constraint violation",
-        "database": """$c wff |- $.
-$v x y $.
+        "database": """$c wff -> |- ( ) $.
+$v x y z $.
 wfx $f wff x $.
 wfy $f wff y $.
+wfz $f wff z $.
 $d x y $.
-ax $a |- x $.
-$( Proof violates $d: both x and y map to x $)
-bad $p |- y $= wfy ax $.""",
+axxy $a |- ( x -> y ) $.
+$( This proof violates $d: substitutes z for both x and y $)
+bad $p |- ( z -> z ) $= wfz wfz axxy $.""",
         "should_reject": True,
-        "error_keywords": ["disjoint", "constraint", "variable", "$d"],
+        "error_keywords": ["disjoint", "constraint", "variable", "$d", "violation"],
     },
 
     28: {
         "name": "Self-include",
         "database": """$c wff $.
 $[ __SELF__ $]""",
-        "should_reject": True,
-        "error_keywords": ["duplicate", "already", "circular", "include", "declared"],
+        "should_reject": False,  # Spec §4.1.2: "will simply be ignored"
+        "error_keywords": [],
+        "note": "Spec says ignore. metamath.exe rejects (spec divergence).",
+        "is_spec_divergence": True,
     },
 
     29: {
@@ -416,12 +419,42 @@ bad $a |- x $.""",
 $v x $.
 wf $f wff x $.
 ax $a |- x $.
-$( Whitespace inside compressed proof - should be ignored $)
+$( Compressed proof ABC: A=0 (wf), B=1 (ax), C=2 (out of bounds!) $)
 th $p |- x $= ( ax ) A
   B
 \tC $.""",
-        "should_reject": False,  # Should accept (whitespace ignored)
-        "error_keywords": ["whitespace", "warning"],
+        "should_reject": True,  # C references out of bounds (invalid proof)
+        "error_keywords": ["compressed", "label", "reference", "range", "out of bounds"],
+        "note": "Original test was buggy - intended to test whitespace but proof is actually invalid",
+    },
+
+    37: {
+        "name": "RPN interleaving of $f and $e in mandatory hypotheses",
+        "database": """$c wff |- -> ( ) $.
+$v ph ps $.
+${
+  wph $f wff ph $.
+  h1 $e |- ph $.
+  wps $f wff ps $.
+  ax-test $a |- ( ph -> ps ) $.
+$}""",
+        "should_reject": False,  # Documents correct behavior
+        "error_keywords": [],
+        "note": "Mandatory hyps in RPN order must be: wph, h1, wps (appearance order, not 'all $f then $e')",
+    },
+
+    38: {
+        "name": "Whitespace in valid compressed proof",
+        "database": """$c wff |- $.
+$v x $.
+wf $f wff x $.
+ax $a |- x $.
+$( Compressed proof A B with whitespace: spaces, newlines, tabs $)
+th $p |- x $= ( ax )   A
+  B   $.""",
+        "should_reject": False,  # Should accept (whitespace ignored per spec §4.4.2)
+        "error_keywords": [],
+        "note": "Tests that whitespace between valid compressed proof steps is ignored",
     },
 }
 
@@ -601,21 +634,33 @@ def test_all_gaps(verifier_path: str, from_files: bool = False):
                 details = "Accepted invalid database!"
 
         else:
-            # Should accept (Test 20: unknown step ?)
+            # Should accept (Test 20, 30, 36: with warning; Test 28: silently)
             caught = success
             warning_present = check_error_detection(output, keywords)
 
-            if caught and warning_present:
-                status = "✅ CAUGHT"
-                caught_count += 1
-                details = "Accepted with warning"
-            elif caught:
-                status = "⚠️  PARTIAL"
-                details = "Accepted but no warning"
+            # If no keywords specified, don't expect a warning (Test 28: self-include)
+            if not keywords:
+                if caught:
+                    status = "✅ CAUGHT"
+                    caught_count += 1
+                    details = "Accepted (silent, as expected)"
+                else:
+                    status = "❌ MISSED"
+                    missed_count += 1
+                    details = "Rejected when should accept silently"
             else:
-                status = "❌ MISSED"
-                missed_count += 1
-                details = "Rejected valid incomplete proof"
+                # Keywords specified, expect warning
+                if caught and warning_present:
+                    status = "✅ CAUGHT"
+                    caught_count += 1
+                    details = "Accepted with warning"
+                elif caught:
+                    status = "⚠️  PARTIAL"
+                    details = "Accepted but no warning"
+                else:
+                    status = "❌ MISSED"
+                    missed_count += 1
+                    details = "Rejected valid incomplete proof"
 
         results[test_num] = (status, details)
 

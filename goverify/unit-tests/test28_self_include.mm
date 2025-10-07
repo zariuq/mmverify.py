@@ -1,7 +1,8 @@
 $( Unit Test 28: Self-include $)
-$( Should reject: True $)
+$( Should reject: False - Spec section 4.1.2 says "will simply be ignored" $)
+$( Note: metamath.exe REJECTS (spec divergence), mmverify_pure.py ACCEPTS (spec-compliant) $)
 
 $c wff $.
 
 $( Include this file itself - causes duplicate declarations $)
-$[ /home/zar/claude/hyperon/metamath/metamath-test/unit-tests/test28_self_include.mm $]
+$[ ./test28_self_include.mm $]

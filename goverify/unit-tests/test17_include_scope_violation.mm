@@ -7,7 +7,7 @@ wx $f wff x $.
 
 ${
   $( Include inside block - contents scoped to block $)
-  $[ /tmp/inner_test17.mm $]
+  $[ ./inner_test17.mm $]
 
   $( This would work - using inside the block $)
   $( th1 $p |- y $= wy ax-inner $. $)
