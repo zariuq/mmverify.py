@@ -125,7 +125,8 @@ func run(path string) error {
 				return fmt.Errorf("%s:%d:%d: unable to resolve include path: %v", tok.file, tok.line, tok.col, err)
 			}
 			if parser.isOnStack(abs) {
-				return parser.errorf(fnameTok, "recursive include of '%s'", fnameTok.value)
+				// Spec §4.1.2: recursive includes are ignored rather than rejected.
+				continue
 			}
 			if err := parser.pushFile(abs); err != nil {
 				return err
@@ -617,9 +618,6 @@ func (db *Database) verifyCompressed(stmt *Statement) error {
 	if len(compressed) == 0 {
 		return errors.New("compressed proof missing data")
 	}
-	if len(compressed) > 1 {
-		db.warnings = append(db.warnings, fmt.Sprintf("%s compressed proof contains whitespace", stmt.label))
-	}
 	proofStr := strings.Join(compressed, "")
 	ints := []int{}
 	cur := 0
@@ -695,10 +693,6 @@ func (db *Database) verifyCompressed(stmt *Statement) error {
 		}
 		idx := n - len(labelsList)
 		if idx >= len(saved) {
-			if idx == 0 && len(saved) == 0 {
-				db.warnings = append(db.warnings, fmt.Sprintf("%s compressed proof references unsaved step %d", stmt.label, n))
-				continue
-			}
 			return fmt.Errorf("invalid saved step %d", n)
 		}
 		tmp := &Statement{kind: "$a", expr: saved[idx], hyps: []string{}, dvPairs: [][2]string{}}
