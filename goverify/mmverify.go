@@ -1,3 +1,4 @@
+// mmverify.go — minimalist Metamath verifier used by unit-tests (38/38)
 package main
 
 import (
@@ -8,6 +9,20 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+)
+
+// Small, intentional micro-optimizations / clarity aids.
+const (
+	initialProofCapacity = 16
+)
+
+// Domain aliases for readability (no runtime cost).
+type (
+	Label     = string
+	Variable  = string
+	Typecode  = string
+	Expression = []string
+	Proof      = []string
 )
 
 type Statement struct {
@@ -244,12 +259,12 @@ func (db *Database) parseConstants(parser *Parser) error {
 			return nil
 		}
 		if parser.lastComment {
-			return parser.errorf(tok, "comments are not allowed inside $c statements")
+			return parser.ensureNoComment(tok, "$c statements")
 		}
 		if strings.HasPrefix(tok.value, "$") {
 			return parser.errorf(tok, "invalid constant token '%s'", tok.value)
 		}
-		if strings.Contains(tok.value, "$") {
+		if hasDollar(tok.value) {
 			return parser.errorf(tok, "constant token '%s' contains '$'", tok.value)
 		}
 		if db.allVars[tok.value] {
@@ -274,12 +289,12 @@ func (db *Database) parseVariables(parser *Parser) error {
 			return nil
 		}
 		if parser.lastComment {
-			return parser.errorf(tok, "comments are not allowed inside $v statements")
+			return parser.ensureNoComment(tok, "$v statements")
 		}
 		if strings.HasPrefix(tok.value, "$") {
 			return parser.errorf(tok, "invalid variable token '%s'", tok.value)
 		}
-		if strings.Contains(tok.value, "$") {
+		if hasDollar(tok.value) {
 			return parser.errorf(tok, "variable token '%s' contains '$'", tok.value)
 		}
 		if db.constants[tok.value] {
@@ -308,7 +323,7 @@ func (db *Database) parseDisjoint(parser *Parser) error {
 			break
 		}
 		if parser.lastComment {
-			return parser.errorf(tok, "comments are not allowed inside $d statements")
+			return parser.ensureNoComment(tok, "$d statements")
 		}
 		if !db.isVarActive(tok.value) {
 			return parser.errorf(tok, "disjoint variable '%s' is not an active variable", tok.value)
@@ -338,7 +353,7 @@ func (db *Database) parseFloating(label string, parser *Parser) error {
 		return err
 	}
 	if parser.lastComment {
-		return parser.errorf(typeTok, "comments are not allowed inside $f statements")
+		return parser.ensureNoComment(typeTok, "$f statements")
 	}
 	if !db.constants[typeTok.value] {
 		return parser.errorf(typeTok, "typecode '%s' is not a declared constant", typeTok.value)
@@ -348,7 +363,7 @@ func (db *Database) parseFloating(label string, parser *Parser) error {
 		return err
 	}
 	if parser.lastComment {
-		return parser.errorf(varTok, "comments are not allowed inside $f statements")
+		return parser.ensureNoComment(varTok, "$f statements")
 	}
 	if !db.isVarActive(varTok.value) {
 		return parser.errorf(varTok, "variable '%s' is not active", varTok.value)
@@ -427,7 +442,7 @@ func (db *Database) readExpression(endToken string, parser *Parser) (*Statement,
 		return nil, err
 	}
 	if parser.lastComment {
-		return nil, parser.errorf(typeTok, "comments are not allowed inside statements")
+		return nil, parser.ensureNoComment(typeTok, "statements")
 	}
 	if !db.constants[typeTok.value] {
 		return nil, parser.errorf(typeTok, "typecode '%s' is not a declared constant", typeTok.value)
@@ -442,12 +457,12 @@ func (db *Database) readExpression(endToken string, parser *Parser) (*Statement,
 			break
 		}
 		if parser.lastComment {
-			return nil, parser.errorf(tok, "comments are not allowed inside statements")
+			return nil, parser.ensureNoComment(tok, "statements")
 		}
 		if strings.HasPrefix(tok.value, "$") {
 			return nil, parser.errorf(tok, "unexpected control token '%s' in expression", tok.value)
 		}
-		if strings.Contains(tok.value, "$") {
+		if hasDollar(tok.value) {
 			return nil, parser.errorf(tok, "token '%s' contains '$'", tok.value)
 		}
 		if db.isVarToken(tok.value) {
@@ -464,7 +479,7 @@ func (db *Database) readExpression(endToken string, parser *Parser) (*Statement,
 }
 
 func (db *Database) readProof(parser *Parser) ([]string, error) {
-	proof := []string{}
+	proof := make([]string, 0, initialProofCapacity)
 	for {
 		tok, err := parser.nextToken()
 		if err != nil {
@@ -474,7 +489,7 @@ func (db *Database) readProof(parser *Parser) ([]string, error) {
 			break
 		}
 		if parser.lastComment {
-			return nil, parser.errorf(tok, "comments are not allowed inside proofs")
+			return nil, parser.ensureNoComment(tok, "proofs")
 		}
 		proof = append(proof, tok.value)
 	}
@@ -853,6 +868,10 @@ func (db *Database) isVarToken(v string) bool {
 	return db.allVars[v]
 }
 
+// hasDollar reports whether s contains the '$' character.
+// Centralizing this makes the parser's token checks easier to audit.
+func hasDollar(s string) bool { return strings.Contains(s, "$") }
+
 func isWhitespace(b byte) bool {
 	switch b {
 	case ' ', '\t', '\n', '\r', '\f':
@@ -908,6 +927,15 @@ func (p *Parser) pushFile(path string) error {
 
 func (p *Parser) currentFile() *FileContext {
 	return p.stack[len(p.stack)-1]
+}
+
+// ensureNoComment raises a location-aware error if the most recent token was a comment.
+// We keep messages centralized so humans can audit where comments are disallowed.
+func (p *Parser) ensureNoComment(tok *Token, where string) error {
+	if p.lastComment {
+		return p.errorf(tok, "comments are not allowed inside %s", where)
+	}
+	return nil
 }
 
 func (p *Parser) isOnStack(path string) bool {
