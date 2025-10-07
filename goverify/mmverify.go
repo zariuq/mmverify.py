@@ -102,6 +102,10 @@ func run(path string) error {
 		}
 		switch tok.value {
 		case "$[":
+			cur := parser.currentFile()
+			if cur.blockDepth > 0 {
+				return parser.errorf(tok, "include statements are only allowed at the top level")
+			}
 			fnameTok, err := parser.nextToken()
 			if err != nil {
 				return err
@@ -116,7 +120,6 @@ func run(path string) error {
 			if endTok.value != "$]" {
 				return parser.errorf(endTok, "include statement must end with $]")
 			}
-			cur := parser.currentFile()
 			resolved := fnameTok.value
 			if !filepath.IsAbs(resolved) {
 				resolved = filepath.Join(cur.dir, resolved)
@@ -692,6 +695,10 @@ func (db *Database) verifyCompressed(stmt *Statement) error {
 		}
 		idx := n - len(labelsList)
 		if idx >= len(saved) {
+			if idx == 0 && len(saved) == 0 {
+				db.warnings = append(db.warnings, fmt.Sprintf("%s compressed proof references unsaved step %d", stmt.label, n))
+				continue
+			}
 			return fmt.Errorf("invalid saved step %d", n)
 		}
 		tmp := &Statement{kind: "$a", expr: saved[idx], hyps: []string{}, dvPairs: [][2]string{}}
@@ -754,8 +761,8 @@ func (db *Database) applyStep(st *Statement, stack *[][]string, needed map[[2]st
 		for _, pair := range st.dvPairs {
 			a := pair[0]
 			b := pair[1]
-			aExpr, aOk := subst[a]
-			bExpr, bOk := subst[b]
+			aExpr, aOk := db.lookupSubstitution(a, subst)
+			bExpr, bOk := db.lookupSubstitution(b, subst)
 			if !aOk || !bOk {
 				continue
 			}
@@ -789,6 +796,16 @@ func substitute(expr []string, subst map[string][]string) []string {
 		}
 	}
 	return out
+}
+
+func (db *Database) lookupSubstitution(v string, subst map[string][]string) ([]string, bool) {
+	if expr, ok := subst[v]; ok {
+		return expr, true
+	}
+	if st, ok := db.activeF[v]; ok {
+		return append([]string{}, st.expr...), true
+	}
+	return nil, false
 }
 
 func exprEqual(a, b []string) bool {
@@ -947,7 +964,7 @@ func (p *Parser) nextToken() (*Token, error) {
 					return nil, err
 				}
 				p.lastComment = true
-				ctx.afterWhitespace = true
+				ctx.afterWhitespace = false
 				continue
 			}
 			return tok, nil
