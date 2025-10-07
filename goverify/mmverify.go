@@ -59,9 +59,8 @@ type FileContext struct {
 }
 
 type Parser struct {
-	stack        []*FileContext
-	seenIncludes map[string]bool
-	lastComment  bool
+	stack       []*FileContext
+	lastComment bool
 }
 
 func main() {
@@ -88,7 +87,7 @@ func run(path string) error {
 		warnings:    []string{},
 	}
 	db.pushFrame()
-	parser := &Parser{stack: []*FileContext{}, seenIncludes: map[string]bool{}}
+	parser := &Parser{stack: []*FileContext{}}
 	if err := parser.pushFile(path); err != nil {
 		return err
 	}
@@ -103,9 +102,6 @@ func run(path string) error {
 		switch tok.value {
 		case "$[":
 			cur := parser.currentFile()
-			if cur.blockDepth > 0 {
-				return parser.errorf(tok, "include statements are only allowed at the top level")
-			}
 			fnameTok, err := parser.nextToken()
 			if err != nil {
 				return err
@@ -130,9 +126,6 @@ func run(path string) error {
 			}
 			if parser.isOnStack(abs) {
 				return parser.errorf(fnameTok, "recursive include of '%s'", fnameTok.value)
-			}
-			if parser.seenIncludes[abs] {
-				continue
 			}
 			if err := parser.pushFile(abs); err != nil {
 				return err
@@ -620,7 +613,14 @@ func (db *Database) verifyCompressed(stmt *Statement) error {
 		return errors.New("unterminated label block in compressed proof")
 	}
 	idx++
-	proofStr := strings.Join(stmt.proof[idx:], "")
+	compressed := stmt.proof[idx:]
+	if len(compressed) == 0 {
+		return errors.New("compressed proof missing data")
+	}
+	if len(compressed) > 1 {
+		db.warnings = append(db.warnings, fmt.Sprintf("%s compressed proof contains whitespace", stmt.label))
+	}
+	proofStr := strings.Join(compressed, "")
 	ints := []int{}
 	cur := 0
 	building := false
@@ -909,7 +909,6 @@ func (p *Parser) pushFile(path string) error {
 		blockDepth:      0,
 	}
 	p.stack = append(p.stack, ctx)
-	p.seenIncludes[abs] = true
 	return nil
 }
 
@@ -964,7 +963,12 @@ func (p *Parser) nextToken() (*Token, error) {
 					return nil, err
 				}
 				p.lastComment = true
-				ctx.afterWhitespace = false
+				if ctx.pos < len(ctx.data) {
+					if !isWhitespace(ctx.data[ctx.pos]) {
+						return nil, fmt.Errorf("%s:%d:%d: missing whitespace after comment", ctx.path, ctx.line, ctx.col)
+					}
+				}
+				ctx.afterWhitespace = true
 				continue
 			}
 			return tok, nil
