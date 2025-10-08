@@ -77,20 +77,6 @@ func newVError(code ErrCode, file string, line, col int, format string, args ...
 // SECTION: Core Data Structures
 // ═══════════════════════════════════════════════════════════════
 
-// Small, intentional micro-optimizations / clarity aids.
-const (
-	initialProofCapacity = 16
-)
-
-// Domain aliases for readability (no runtime cost).
-type (
-	Label     = string
-	Variable  = string
-	Typecode  = string
-	Expression = []string
-	Proof      = []string
-)
-
 type Statement struct {
 	kind       string
 	label      Label
@@ -152,18 +138,10 @@ type FileContext struct {
 // Parser drives tokenization across nested include files.
 // INVARIANTS:
 //   - stack[i].path is always an absolute, canonical path
-//   - lastComment is true iff the most recently produced token was a $( ... $) comment
+//   - seen[path] is true iff the file has been processed at least once
 type Parser struct {
-	stack       []*FileContext
-	lastComment bool
-}
-
-func (p *Parser) ensureNotAfterComment(tok *Token) error {
-	if p.lastComment {
-		p.lastComment = false
-		return newVError(EWhitespace, tok.file, tok.line, tok.col, "token must be separated by whitespace after $) (spec §4.4.1)")
-	}
-	return nil
+	stack []*FileContext
+	seen  map[string]bool
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -199,7 +177,7 @@ func run(path string, traceSteps, explain bool) error {
 		explain:     explain,
 	}
 	db.pushFrame()
-	parser := &Parser{stack: []*FileContext{}}
+	parser := &Parser{stack: []*FileContext{}, seen: map[string]bool{}}
 	if err := parser.pushFile(path); err != nil {
 		return err
 	}
@@ -213,9 +191,12 @@ func run(path string, traceSteps, explain bool) error {
 		}
 		switch tok.value {
 		case "$[":
-			// Include resolution (Spec §4.1.2): resolve relative paths, detect cycles,
-			// and ignore recursive includes instead of erroring like metamath.exe.
+			// Include resolution (Spec §4.1.2): includes are allowed only in the
+			// outermost scope and each file is processed at most once.
 			cur := parser.currentFile()
+			if cur.blockDepth > 0 {
+				return parser.errorf(tok, "include statements are only allowed in the outermost scope (spec §4.1.2)")
+			}
 			fnameTok, err := parser.nextToken()
 			if err != nil {
 				return err
@@ -238,11 +219,9 @@ func run(path string, traceSteps, explain bool) error {
 			if err != nil {
 				return fmt.Errorf("%s:%d:%d: unable to resolve include path: %v", tok.file, tok.line, tok.col, err)
 			}
-			if parser.isOnStack(abs) {
-				// Spec §4.1.2: "A file may include itself...will simply be ignored".
-				// The canonical-path comparison detects self-includes and longer cycles
-				// (e.g. A → B → A) so we can skip them without recursing forever.
-				db.warnings = append(db.warnings, fmt.Sprintf("%s ignored (code=%s)", abs, EIncludeCycle))
+			abs = filepath.Clean(abs)
+			if parser.seen[abs] {
+				// Subsequent references to the same file are ignored (Spec §4.1.2).
 				continue
 			}
 			if err := parser.pushFile(abs); err != nil {
@@ -261,6 +240,9 @@ func run(path string, traceSteps, explain bool) error {
 				return parser.errorf(tok, err.Error())
 			}
 		case "$c":
+			if len(db.frameStack) != 1 {
+				return parser.errorf(tok, "$c statements are only allowed in the outermost block (Spec Section 4.1.3)")
+			}
 			if err := db.parseConstants(parser); err != nil {
 				return err
 			}
@@ -368,11 +350,6 @@ func (db *Database) parseConstants(parser *Parser) error {
 		if tok.value == "$." {
 			return nil
 		}
-		if err := parser.ensureNotAfterComment(tok); err != nil {
-			return err
-		if parser.lastComment {
-			return parser.ensureNoComment(tok, "$c statements")
-		}
 		if strings.HasPrefix(tok.value, "$") {
 			return parser.errorf(tok, "invalid constant token '%s'", tok.value)
 		}
@@ -399,11 +376,6 @@ func (db *Database) parseVariables(parser *Parser) error {
 		}
 		if tok.value == "$." {
 			return nil
-		}
-		if err := parser.ensureNotAfterComment(tok); err != nil {
-			return err
-		if parser.lastComment {
-			return parser.ensureNoComment(tok, "$v statements")
 		}
 		if strings.HasPrefix(tok.value, "$") {
 			return parser.errorf(tok, "invalid variable token '%s'", tok.value)
@@ -436,11 +408,6 @@ func (db *Database) parseDisjoint(parser *Parser) error {
 		if tok.value == "$." {
 			break
 		}
-		if err := parser.ensureNotAfterComment(tok); err != nil {
-			return err
-		if parser.lastComment {
-			return parser.ensureNoComment(tok, "$d statements")
-		}
 		if !db.isVarActive(tok.value) {
 			// SPEC COMPLIANCE: Per §4.2.5, every variable in a $d must be active in the current frame.
 			return parser.errorf(tok, "disjoint variable '%s' is not an active variable", tok.value)
@@ -469,22 +436,12 @@ func (db *Database) parseFloating(label string, parser *Parser) error {
 	if err != nil {
 		return err
 	}
-	if err := parser.ensureNotAfterComment(typeTok); err != nil {
-		return err
-	if parser.lastComment {
-		return parser.ensureNoComment(typeTok, "$f statements")
-	}
 	if !db.constants[typeTok.value] {
 		return parser.errorf(typeTok, "typecode '%s' is not a declared constant", typeTok.value)
 	}
 	varTok, err := parser.nextToken()
 	if err != nil {
 		return err
-	}
-	if err := parser.ensureNotAfterComment(varTok); err != nil {
-		return err
-	if parser.lastComment {
-		return parser.ensureNoComment(varTok, "$f statements")
 	}
 	if !db.isVarActive(varTok.value) {
 		return parser.errorf(varTok, "variable '%s' is not active", varTok.value)
@@ -567,11 +524,6 @@ func (db *Database) readExpression(endToken string, parser *Parser) (*Statement,
 	if err != nil {
 		return nil, err
 	}
-	if err := parser.ensureNotAfterComment(typeTok); err != nil {
-		return nil, err
-	if parser.lastComment {
-		return nil, parser.ensureNoComment(typeTok, "statements")
-	}
 	if !db.constants[typeTok.value] {
 		return nil, parser.errorf(typeTok, "typecode '%s' is not a declared constant", typeTok.value)
 	}
@@ -584,11 +536,6 @@ func (db *Database) readExpression(endToken string, parser *Parser) (*Statement,
 		}
 		if tok.value == endToken {
 			break
-		}
-		if err := parser.ensureNotAfterComment(tok); err != nil {
-			return nil, err
-		if parser.lastComment {
-			return nil, parser.ensureNoComment(tok, "statements")
 		}
 		if strings.HasPrefix(tok.value, "$") {
 			return nil, parser.errorf(tok, "unexpected control token '%s' in expression", tok.value)
@@ -611,8 +558,6 @@ func (db *Database) readExpression(endToken string, parser *Parser) (*Statement,
 
 func (db *Database) readProof(parser *Parser) (Proof, error) {
 	proof := make(Proof, 0, initialProofCap)
-func (db *Database) readProof(parser *Parser) ([]string, error) {
-	proof := make([]string, 0, initialProofCapacity)
 	for {
 		tok, err := parser.nextToken()
 		if err != nil {
@@ -620,11 +565,6 @@ func (db *Database) readProof(parser *Parser) ([]string, error) {
 		}
 		if tok.value == "$." {
 			break
-		}
-		if err := parser.ensureNotAfterComment(tok); err != nil {
-			return nil, err
-		if parser.lastComment {
-			return nil, parser.ensureNoComment(tok, "proofs")
 		}
 		proof = append(proof, tok.value)
 	}
@@ -1124,6 +1064,7 @@ func (p *Parser) pushFile(path string) error {
 	if err != nil {
 		return err
 	}
+	abs = filepath.Clean(abs)
 	data, err := os.ReadFile(abs)
 	if err != nil {
 		return err
@@ -1144,6 +1085,10 @@ func (p *Parser) pushFile(path string) error {
 		blockDepth:      0,
 	}
 	p.stack = append(p.stack, ctx)
+	if p.seen == nil {
+		p.seen = map[string]bool{}
+	}
+	p.seen[abs] = true
 	return nil
 }
 
@@ -1151,26 +1096,7 @@ func (p *Parser) currentFile() *FileContext {
 	return p.stack[len(p.stack)-1]
 }
 
-// ensureNoComment raises a location-aware error if the most recent token was a comment.
-// We keep messages centralized so humans can audit where comments are disallowed.
-func (p *Parser) ensureNoComment(tok *Token, where string) error {
-	if p.lastComment {
-		return p.errorf(tok, "comments are not allowed inside %s", where)
-	}
-	return nil
-}
-
-func (p *Parser) isOnStack(path string) bool {
-	for _, ctx := range p.stack {
-		if ctx.path == path {
-			return true
-		}
-	}
-	return false
-}
-
 func (p *Parser) nextToken() (*Token, error) {
-	p.lastComment = false
 	for {
 		if len(p.stack) == 0 {
 			return nil, io.EOF
@@ -1206,10 +1132,9 @@ func (p *Parser) nextToken() (*Token, error) {
 				if err := ctx.skipComment(); err != nil {
 					return nil, err
 				}
-				p.lastComment = true
 				if ctx.pos < len(ctx.data) {
 					if !isWhitespace(ctx.data[ctx.pos]) {
-						return nil, fmt.Errorf("%s:%d:%d: missing whitespace after comment", ctx.path, ctx.line, ctx.col)
+						return nil, newVError(EWhitespace, ctx.path, ctx.line, ctx.col, "missing whitespace after comment (spec §4.1.2)")
 					}
 				}
 				ctx.afterWhitespace = true

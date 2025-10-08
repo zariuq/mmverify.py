@@ -426,27 +426,22 @@ $}
 
 ---
 
-## Test 17: Include Scope Violation
+## Test 17: Include Inside Block (Forbidden)
 
-**Description:** Include statement inside block, then try to use included content outside the block
+**Description:** Include command appears between `${` and `$}`.
 
-**Background:**
-- metamath.exe accepts `$[ $]` inside blocks (scopes content to block)
-- Spec says "should only exist at outermost scope" (recommendation, not hard requirement)
-- See SPEC_DIVERGENCES.md for details
+**Spec Clause:** Section 4.1.2 — "$[ ... $]" is only allowed in the outermost scope and must not occur between `${` and `$}`.
 
 **Invalid example:**
 ```metamath
 ${
-  $[ inner.mm $]  ← Include inside block
+  $[ inner.mm $]  ← Illegal: include inside a block
 $}
-$( Try to use inner.mm content here $)
-th $p |- y $= wy ax-inner $.  ← ERROR: out of scope!
 ```
 
-**Valid:** Include at outermost scope, or use content within the same block
+**Valid:** Place `$[ ... $]` only at the top level of the database.
 
-**Why it matters:** Scope rules must be enforced consistently
+**Why it matters:** Ignoring this rule silently reintroduces symbols in inner scopes and breaks the spec's preprocessing guarantees.
 
 **Test database:**
 ```metamath
@@ -455,14 +450,11 @@ $v x $.
 wx $f wff x $.
 
 ${
-  $[ /tmp/inner_test17.mm $]
+  $[ ./inner_test17.mm $]
 $}
-
-$( ax-inner is not active here $)
-th2 $p |- y $= wy ax-inner $.
 ```
 
-**Expected:** Reject with scope error
+**Expected:** Reject with an error referencing the outermost scope requirement.
 
 **File:** `test17_include_scope_violation.mm`
 
@@ -749,24 +741,22 @@ bad $p |- y $= f1 ax $.  ← Wrong conclusion
 
 ## Test 28: Self-Include
 
-**Description:** File includes itself, causing duplicate declarations
+**Description:** File includes itself; spec says this must be ignored.
 
 **Background:**
-- Self-include is NOT ignored (unlike duplicate includes)
-- File is read twice, causing all declarations to duplicate
-- See SPEC_DIVERGENCES.md for discussion
+- Spec Section 4.1.2: "A file may include itself...will simply be ignored."
+- The include preprocessor treats subsequent references to the same file as whitespace.
+- Implementations should therefore accept a database that includes itself once.
 
-**Invalid example:**
+**Invalid example:** None — the spec defines the behaviour as acceptance with no effect.
+
+**Valid:**
 ```metamath
 $c wff $.
-$[ THIS_FILE.mm $]  ← Includes itself!
+$[ THIS_FILE.mm $]  ← Include is ignored
 ```
 
-**Result:** `$c wff $.` appears twice → duplicate declaration error
-
-**Valid:** Files can only include OTHER files
-
-**Why it matters:** Prevents duplicate declarations and potential infinite loops
+**Why it matters:** Guarantees that self-references do not trigger duplicate declarations or infinite loops.
 
 **Test database (placeholder path replaced at runtime):**
 ```metamath
@@ -776,7 +766,7 @@ $[ __SELF__ $]
 
 **Note:** The `__SELF__` placeholder is replaced with the actual temp file path by the test runner, enabling self-inclusion.
 
-**Expected:** Reject with "symbol already declared" error
+**Expected:** Accept (no error); inclusion acts as whitespace.
 
 **File:** `test28_self_include.mm`
 
@@ -812,7 +802,7 @@ See individual test files:
 | 14 | Type | Missing $f | High |
 | 15 | Type | Multiple $f | High |
 | 16 | Type | Conflicting types | High |
-| 17 | Include | Recursive include | High |
+| 17 | Include | Include inside block | High |
 | 18 | Syntactic | Comment in statement | Medium |
 | 19 | Proof | Compressed overflow | Low |
 | 20 | Proof | Unknown step ? | Special |

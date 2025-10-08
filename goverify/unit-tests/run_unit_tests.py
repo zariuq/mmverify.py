@@ -195,18 +195,15 @@ $}""",
     },
 
     17: {
-        "name": "Include scope violation (use included content outside block)",
+        "name": "Include inside block (not outermost scope)",
         "database": """$c wff |- $.
 $v x $.
 wx $f wff x $.
 ${
-  $[ /tmp/inner_test17.mm $]
-$}
-$( Try to use ax-inner outside the block - scope violation $)
-th2 $p |- y $= wy ax-inner $.""",
+  $[ inner.mm $]
+$}""",
         "should_reject": True,
-        "error_keywords": ["scope", "inactive", "not active", "symbol"],
-        "setup": lambda: create_inner_test17(),
+        "error_keywords": ["include", "outermost", "scope", "block"],
     },
 
     18: {
@@ -329,7 +326,7 @@ bad $p |- ( z -> z ) $= wfz wfz axxy $.""",
         "name": "Self-include",
         "database": """$c wff $.
 $[ __SELF__ $]""",
-        "should_reject": False,  # Spec §4.1.2: "will simply be ignored"
+        "should_reject": False,  # Spec Section 4.1.2: "will simply be ignored"
         "error_keywords": [],
         "note": "Spec says ignore. metamath.exe rejects (spec divergence).",
         "is_spec_divergence": True,
@@ -452,7 +449,7 @@ ax $a |- x $.
 $( Compressed proof A B with whitespace: spaces, newlines, tabs $)
 th $p |- x $= ( ax )   A
   B   $.""",
-        "should_reject": False,  # Should accept (whitespace ignored per spec §4.4.2)
+        "should_reject": False,  # Should accept (whitespace ignored per Spec Section 4.4.2)
         "error_keywords": [],
         "note": "Tests that whitespace between valid compressed proof steps is ignored",
     },
@@ -505,14 +502,6 @@ def load_tests_from_files() -> Dict[int, dict]:
 # =============================================================================
 # Helper Functions
 # =============================================================================
-
-def create_inner_test17():
-    """Create inner file with active content for Test 17."""
-    path = "/tmp/inner_test17.mm"
-    with open(path, 'w') as f:
-        f.write("$v y $.\nwy $f wff y $.\nax-inner $a |- y $.\n")
-    return path
-
 
 def run_verifier(verifier_path: str, database_or_path: str, is_file: bool = False) -> Tuple[bool, str]:
     """
