@@ -1,7 +1,6 @@
 $( Unit Test 50: Include as token splice in proof $)
-$( Should reject: False - token splice is valid macro expansion $)
-$( Spec Section 4.4.4: File includes are token splices $)
-$( This demonstrates proof steps can be in separate file $)
+$( Should reject: True - Spec Section 4.1.2 forbids $[ ... $] inside statements $)
+$( Proof steps cannot be spliced from includes $)
 
 $c wff |- $.
 $v x $.

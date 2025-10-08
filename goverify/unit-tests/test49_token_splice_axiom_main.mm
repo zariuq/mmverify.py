@@ -1,7 +1,6 @@
 $( Unit Test 49: Include as token splice in axiom $)
-$( Should reject: False - token splice is valid macro expansion $)
-$( Spec Section 4.4.4: File includes are token splices, can appear anywhere $)
-$( This is MALICIOUS but VALID per spec! $)
+$( Should reject: True - Spec Section 4.1.2 forbids $[ ... $] inside statements $)
+$( Attempting to splice tokens into an assertion must fail $)
 
 $c wff |- $.
 $v x $.
