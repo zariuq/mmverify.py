@@ -1,5 +1,5 @@
-$( Unit Test 40 Helper: Provides declarations for include tests $)
-$( Contains statements that would be spliced if includes were allowed $)
+$( Unit Test 40 Inner: Include inside block - correct usage $)
+$( Declarations in this file are scoped to the including block $)
 
 $v y $.
 wy $f wff y $.

@@ -1,13 +1,23 @@
-$( Unit Test 46: Duplicate include at outermost scope $)
-$( Should reject: False - second include is ignored per Spec Section 4.1.2 $)
+$( Unit Test 46: Duplicate include in different scopes $)
+$( Should reject: False - second include is ignored per spec Section 4.4.4 $)
+$( Category: POLICY - Permissive include mode $)
+$( Spec: "only the first reference to this common file will be read in" $)
 
 $c wff |- $.
 
-$( First include: processes the helper file $)
-$[ ./test46_duplicate_include_helper.mm $]
+${
+  $( First include: processes the file $)
+  $[ ./test46_duplicate_include_helper.mm $]
 
-$( Second include: must be ignored, avoiding duplicate declarations $)
-$[ ./test46_duplicate_include_helper.mm $]
+  $( Use the included content $)
+  th1 $p |- y $= wy ax-y $.
+$}
 
-$( Use the declarations provided by the first include $)
-th1 $p |- y $= wy ax-y $.
+${
+  $( Second include: should be ignored as whitespace $)
+  $[ ./test46_duplicate_include_helper.mm $]
+
+  $( This would fail if file processed twice (y redeclared) $)
+  $( But since second include ignored, ax-y and wy are still available globally $)
+  th2 $p |- y $= wy ax-y $.
+$}

@@ -1,9 +1,18 @@
-$( Unit Test 40: Include inside statement (forbidden) $)
-$( Should reject: True - Spec Section 4.1.2 forbids $[ ... $] inside statements $)
+$( Unit Test 40: Include inside block - correct usage $)
+$( Should reject: False - using included content inside block is valid $)
 
 $c wff |- $.
 $v x $.
 wx $f wff x $.
 ax-x $a |- x $.
 
-th-bad $p |- x $= $[ ./test40_include_scope_correct_inner.mm $] $.
+${
+  $( Include inside block $)
+  $[ ./test40_include_scope_correct_inner.mm $]
+
+  $( Use included axiom INSIDE the block - this should work $)
+  th1 $p |- y $= wy ax-inner $.
+$}
+
+$( Outside the block, only x is available $)
+th2 $p |- x $= wx ax-x $.
