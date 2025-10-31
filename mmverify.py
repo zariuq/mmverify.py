@@ -513,14 +513,15 @@ def apply_subst(stmt: Stmt, subst: dict[Var, Stmt]) -> Stmt:
 class MM:
     """Class of ("abstract syntax trees" describing) Metamath databases."""
 
-    def __init__(self, begin_label: Label, stop_label: Label) -> None:
+    def __init__(self, begin_label: Label, stop_label: Label, skip_verification: bool = False) -> None:
         """Construct an empty Metamath database."""
         self.constants: set[Const] = set()
         self.fs = FrameStack()
         self.labels: dict[Label, FullStmt] = {}
         self.begin_label = begin_label
         self.stop_label = stop_label
-        self.verify_proofs = not self.begin_label
+        self.skip_verification = skip_verification
+        self.verify_proofs = not self.begin_label and not skip_verification
 
     def add_c(self, tok: Const) -> None:
         """Add a constant to the database."""
@@ -673,7 +674,7 @@ class MM:
                 stmt, proof = self.read_p_stmt(toks)
                 normal_proof = proof[0] != '('
                 if normal_proof:
-                    mout = mettarl(f'!(add_p {mettify(label)} {mettify(stmt)} {mettify(proof)} {verify_metta and self.verify_proofs})')
+                    mout = mettarl(f'!(add_p {mettify(label)} {mettify(stmt)} {mettify(proof)} {verify_metta and (self.verify_proofs or self.skip_verification)})')
                     if run_metta:
                         print(f'Output of verify: {mout}\n') # Could check this for an error to throw an MMError.
                         # Simple MeTTa error checker - add this after the mout line:
@@ -980,6 +981,12 @@ if __name__ == '__main__':
         type=str,
         default=None,
         help='output transformed statements for MeTTa')
+    parser.add_argument(
+        '--only-metta-log',
+        dest='skip_verification',
+        action='store_true',
+        default=False,
+        help='only generate MeTTa log with verification enabled, skip Python verification (default: False)')
     args = parser.parse_args()
     verbosity = args.verbosity
     db_file = args.database
@@ -993,9 +1000,10 @@ if __name__ == '__main__':
     if transformed_metta_file:
         unicode_delimiters = True
     metta_log_file = args.metta_log_file
+    skip_verification = args.skip_verification
     initialize_metta()
     vprint(1, 'mmverify.py -- Proof verifier for the Metamath language')
-    mm = MM(args.begin_label, args.stop_label)
+    mm = MM(args.begin_label, args.stop_label, skip_verification)
     vprint(1, 'Reading source file "{}"...'.format(db_file.name))
     mm.read(Toks(db_file))
     vprint(1, 'No errors were found.')
