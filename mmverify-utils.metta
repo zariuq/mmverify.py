@@ -103,11 +103,11 @@
 ; (: flatten-expr (-> Expression Expression))
 (= (flatten-expr $expr) (from-list (flatten-list (to-list $expr))))
 
-;; The sacred union of lists - append brings two into one
-; (: append (-> (List $a) (List $a) (List $a)))
-(= (append Nil $list) $list)
-(= (append (Cons $head $tail) $list) 
-   (Cons $head (append $tail $list)))
+;; The sacred union of lists - mappend brings two into one (renamed to avoid Prolog conflict)
+; (: mappend (-> (List $a) (List $a) (List $a)))
+(= (mappend Nil $list) $list)
+(= (mappend (Cons $head $tail) $list)
+   (Cons $head (mappend $tail $list)))
 
 (= (filter' Nil $predicate) Nil)
 (= (filter' (Cons $head $tail) $predicate)
@@ -146,7 +146,8 @@
 (= (find_vars $kb $stmt)
   (filter-atom $stmt $tok (unify $kb (Var $tok $_ (Type "$v")) True False)))
 
-;; The __lt__ trick comparing strings w/o manipulating them is cleaner!  (Ty Claude Sonnet 3.7!)
+;; String comparison using Python's __lt__ method (HE only for now)
+;; TODO: Need PeTTa-compatible implementation
 (: string< (-> String String Bool))
 (= (string< $x $y)
    ((py-dot $x __lt__) $y))
@@ -226,7 +227,7 @@
           (
             ($flist_entry (to-list (($typecode $var))))
             (() (unify $kb (FList (FSDepth $level) $flist)
-              (let $flist' (append $flist $flist_entry) (update-atom $kb (FList (FSDepth $level) $flist) (FList (FSDepth $level) $flist')))
+              (let $flist' (mappend $flist $flist_entry) (update-atom $kb (FList (FSDepth $level) $flist) (FList (FSDepth $level) $flist')))
               (add-atom $kb (FList (FSDepth $level) $flist_entry))))
           )
             (add-atom $kb ( (Label $label) FHyp (FSDepth $level) ( (Typecode $typecode) (FVar $var) (Type "$f") )))
@@ -236,7 +237,7 @@
     (Error (Var $var) "Var in $f not declared."))
 )
 
-;; Oh, there are no checks.  So this is nearly trivial.  I actually just keep it as is.  But I do both the e_labels (i.e., e with FSDepth, and e.append, i.e., the $EList)
+;; Oh, there are no checks.  So this is nearly trivial.  I actually just keep it as is.  But I do both the e_labels (i.e., e with FSDepth, and e.mappend, i.e., the $EList)
 ;; I could have a check that the label isn't already present but mmverify.py already does that.
 
 
@@ -245,7 +246,7 @@
     (
       ($elist_entry (to-list ($stmt)))
       (() (unify $kb (EList (FSDepth $level) $elist)
-        (let $elist' (append $elist $elist_entry)
+        (let $elist' (mappend $elist $elist_entry)
           (update-atom $kb (EList (FSDepth $level) $elist) (EList (FSDepth $level) $elist')))
         (add-atom $kb (EList (FSDepth $level) $elist_entry))))
         (() (println! ("add essential hypothesis:" (label $label) (Statement $stmt) (level $level))))
@@ -259,7 +260,7 @@
     $ordered_list
     (let $current_list (match-atom'' $unordered_list ($current $list) $list Nil)
       (let () (println! ("collect list:" $current - $current_list))
-      (collect_lists_by_depth $unordered_list (+ 1 $current) $max (append $ordered_list $current_list))))))
+      (collect_lists_by_depth $unordered_list (+ 1 $current) $max (mappend $ordered_list $current_list))))))
 
 (= (add_mand_var $kb $tok)
   (unify $kb (Var $tok $_ (Type "$v"))
@@ -319,7 +320,7 @@
       ;    for fr in self:
       ;        for typecode, var in fr.f:
       ;            if var in mand_vars:
-      ;                f_hyps.append((typecode, var))
+      ;                f_hyps.mappend((typecode, var))
       ;                mand_vars.remove(var)
       ($f_hyps_lists (matchc $kb (FList (FSDepth $level) $flist) ($level $flist)))
       (() (println! ("f_hyps lists:" $f_hyps_lists)))
