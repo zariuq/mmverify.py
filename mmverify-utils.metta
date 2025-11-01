@@ -730,19 +730,19 @@
         (() (println! (Comparing: $stack_top "==" $conclusion)))
         (() (if (== $conclusion $stack_top) () (Error ((assertion: $conclusion) (stack: $stack_expr)) "Stack entry does not match proved assertion.")))
         (() (println! "Correct proof!"))
-      ) ()));;($stack_top)))
+      ) $stack_top))
       
 (= (add_p $label $stmt $proof $verify_proofs)
   (let*
     (
       (() (println! ""))
       (() (println! (Verifying conclusion ($label) $stmt with proof $proof)))
-      (() (if $verify_proofs (verify $proof $stmt) ()))
+      ($verify_result (if $verify_proofs (verify $proof $stmt) ()))
       (() (println! ("make_assertion" $label - $stmt))) ;; This could just call add_a.
       (( (DVars $dvs) (FHyps $f_hyps) (EHyps $e_hyps) (Statement $stmt) ) (make_assertion $stmt))
       (() (println! ("gathered assertion data:" $dvs $f_hyps $e_hyps $stmt)))
     )
-      (add-atom &kb ( (Label $label) Proof ( (DVars $dvs) (FHyps $f_hyps) (EHyps $e_hyps) (Statement $stmt) (Type "$p") (ProofSequence $proof) )))))
+      (let () (add-atom &kb ( (Label $label) Proof ( (DVars $dvs) (FHyps $f_hyps) (EHyps $e_hyps) (Statement $stmt) (Type "$p") (ProofSequence $proof) ))) $verify_result)))
 
 ;; Let's just add a default option
 ; (= (add_p $label $stmt $proof $verify_proofs)
