@@ -156,15 +156,11 @@ def initialize_metta():
         mettarl('!(bind! &stack (new-space))')  # Stack in treat_proof
         mettarl('!(bind! &kb (new-space))')     # Labels
         mettarl('!(bind! &sp (new-state -1))')  # Stack pointer state
+        mettarl('!(import! &self mmverify-utils)')  # Import modular utilities
     if transformed_metta_file:
         # Create space to store transformed statements
         log_transform('!(bind! &md (new-space))')
         # mettarl('!(bind! &step_counter (new-state 1))') # the stack pointer state -1 to throw an error if not updated.
-
-
-    MeTTa_Utils_Exprs = parse_metta_expressions('mmverify-utils.metta')
-    for expr in MeTTa_Utils_Exprs:
-        mettarl(str(expr))
 
 Label = str
 Var = str
@@ -622,13 +618,13 @@ class MM:
         while tok and tok != '$}':
             if tok == '$c':
                 for tok in self.read_non_p_stmt(tok, toks):
-                    mettarl(f'!(add_c {mettify(tok)})')
+                    mettarl(f'!(add_c &kb {mettify(tok)})')
                     self.add_c(tok)
                     metta_constant = f'(: {mettify(tok)} Const)'
                     log_transform(f'!(add-atom &md {metta_constant})')
             elif tok == '$v':
                 for tok in self.read_non_p_stmt(tok, toks):
-                    mettarl(f'!(add_v {mettify(tok)} {len(self.fs)})')
+                    mettarl(f'!(add_v &kb {mettify(tok)} {len(self.fs)})')
                     self.add_v(tok)
                     metta_var = f'(: {mettify(tok)} Var)'
                     log_transform(f'!(add-atom &md {metta_var})')
@@ -640,7 +636,7 @@ class MM:
                 if len(stmt) != 2: # MeTTa: not sure but let's consider this parsing
                     raise MMError(
                         '$f must have length two but is {}'.format(stmt))
-                mettarl(f'!(add_f {mettify(label)} {mettify(stmt[0])} {mettify(stmt[1])} {len(self.fs)})')
+                mettarl(f'!(add_f &kb {mettify(label)} {mettify(stmt[0])} {mettify(stmt[1])} {len(self.fs)})')
                 # mettarl(f'!(add-atom &kb ( (Label {mettify(label)}) FHyp ( (Typecode {mettify(stmt[0])}) (FVar {mettify(stmt[1])}) (Type "$f") )))')
                 self.add_f(stmt[0], stmt[1], label)
                 self.labels[label] = ('$f', [stmt[0], stmt[1]])
@@ -652,7 +648,7 @@ class MM:
                 if not label:
                     raise MMError('$e must have label')
                 stmt = self.read_non_p_stmt(tok, toks)
-                mettarl(f'!(add_e {mettify(label)} {mettify(stmt)} {len(self.fs)})')
+                mettarl(f'!(add_e &kb {mettify(label)} {mettify(stmt)} {len(self.fs)})')
                 # mettarl(f'!(add-atom &kb ( (Label {mettify(label)}) EHyp ( (Statement {mettify(stmt)}) (Type "$e") )))')
                 self.fs.add_e(stmt, label)
                 self.labels[label] = ('$e', stmt)
@@ -662,7 +658,7 @@ class MM:
                 if not label:
                     raise MMError('$a must have label')
                 stmt = self.read_non_p_stmt(tok, toks) # Just less-compact
-                mettarl(f'!(add_a {mettify(label)} {mettify(stmt)})')
+                mettarl(f'!(add_a &kb {mettify(label)} {mettify(stmt)})')
                 dvs, f_hyps, e_hyps, stmt = self.fs.make_assertion(stmt) # make_assertion(self.read_non_p_stmt(tok, toks))
                 self.labels[label] = ('$a', (dvs, f_hyps, e_hyps, stmt))
                 metta_assertion = build_metta_assertion(label, dvs, f_hyps, e_hyps, stmt)
@@ -674,7 +670,7 @@ class MM:
                 stmt, proof = self.read_p_stmt(toks)
                 normal_proof = proof[0] != '('
                 if normal_proof:
-                    mout = mettarl(f'!(add_p {mettify(label)} {mettify(stmt)} {mettify(proof)} {verify_metta and (self.verify_proofs or self.skip_verification)})')
+                    mout = mettarl(f'!(add_p &kb &stack &sp {mettify(label)} {mettify(stmt)} {mettify(proof)} {verify_metta and (self.verify_proofs or self.skip_verification)})')
                     if run_metta:
                         print(f'Output of verify: {mout}\n') # Could check this for an error to throw an MMError.
                         # Simple MeTTa error checker - add this after the mout line:
@@ -697,7 +693,7 @@ class MM:
                 label = None
             elif tok == '$d':
                 varlist = self.read_non_p_stmt(tok, toks)
-                mettarl(f'!(add_d {mettify(varlist)} {len(self.fs)})')
+                mettarl(f'!(add_d &kb {mettify(varlist)} {len(self.fs)})')
                 self.fs.add_d(varlist)
             elif tok == '${':
                 self.read(toks)
