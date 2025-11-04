@@ -156,6 +156,7 @@ def initialize_metta():
         mettarl('!(bind! &stack (new-space))')  # Stack in treat_proof
         mettarl('!(bind! &kb (new-space))')     # Labels
         mettarl('!(bind! &sp (new-state -1))')  # Stack pointer state
+        mettarl('!(bind! &fd (new-state 0))')   # Frame depth state
         mettarl('!(import! &self mmverify-utils)')  # Import modular utilities
     if transformed_metta_file:
         # Create space to store transformed statements
@@ -614,7 +615,7 @@ class MM:
         """
         self.fs.push()
         # Explicit frame management for bijection
-        mettarl('!(push-frame)')
+        mettarl('!(push-frame &fd)')
         label = None
         tok = toks.readc()
         while tok and tok != '$}':
@@ -717,7 +718,7 @@ class MM:
                 raise MMError("Unknown token: '{}'.".format(tok))
             tok = toks.readc()
         # Explicit frame management for bijection
-        mettarl(f'!(pop-frame &kb {len(self.fs)})')  # This does all the remove-pattern work!
+        mettarl(f'!(pop-frame &kb &fd)')  # This should use &fd state to get level
         self.fs.pop()
       
     def treat_step(self,

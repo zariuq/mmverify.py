@@ -59,15 +59,18 @@
 
 ;; Frame Management Section
 ;; Explicit frame management for elegant bijection
+;; TODO: Future work - pass &fd state and use get-state to avoid explicit level params
 
-(= (push-frame) ())
+(= (push-frame $fd)
+  (adjust-state-additive $fd 1))
 
-(= (pop-frame $kb $level)
-  (let* (
-    (() (remove-pattern $kb (EList (FSDepth $level) $elist)))
-    (() (remove-pattern $kb (FList (FSDepth $level) $flist)))
-    (() (remove-pattern $kb ($1 $2 (FSDepth $level) $Data)))
-  ) ()))
+(= (pop-frame $kb $fd)
+  (let $level (get-state $fd)
+    (let* (
+      (() (remove-pattern $kb (EList (FSDepth $level) $elist)))
+      (() (remove-pattern $kb (FList (FSDepth $level) $flist)))
+      (() (remove-pattern $kb ($1 $2 (FSDepth $level) $Data)))
+    ) (adjust-state-additive $fd -1))))
 
 ;; List Utility Section
 
