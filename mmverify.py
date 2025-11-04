@@ -613,6 +613,8 @@ class MM:
         proofs.
         """
         self.fs.push()
+        # Explicit frame management for bijection
+        mettarl('!(push-frame)')
         label = None
         tok = toks.readc()
         while tok and tok != '$}':
@@ -714,9 +716,8 @@ class MM:
             else:
                 raise MMError("Unknown token: '{}'.".format(tok))
             tok = toks.readc()
-        mettarl(f'!(remove-pattern &kb (EList (FSDepth {len(self.fs)}) $elist))')
-        mettarl(f'!(remove-pattern &kb (FList (FSDepth {len(self.fs)}) $flist))')
-        mettarl(f'!(remove-pattern &kb ($1 $2 (FSDepth {len(self.fs)}) $Data))')
+        # Explicit frame management for bijection
+        mettarl(f'!(pop-frame &kb {len(self.fs)})')  # This does all the remove-pattern work!
         self.fs.pop()
       
     def treat_step(self,

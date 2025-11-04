@@ -57,6 +57,18 @@
    (chain (get-state $state) $current
      (change-state! $state (+ $current $delta))))
 
+;; Frame Management Section
+;; Explicit frame management for elegant bijection
+
+(= (push-frame) ())
+
+(= (pop-frame $kb $level)
+  (let* (
+    (() (remove-pattern $kb (EList (FSDepth $level) $elist)))
+    (() (remove-pattern $kb (FList (FSDepth $level) $flist)))
+    (() (remove-pattern $kb ($1 $2 (FSDepth $level) $Data)))
+  ) ()))
+
 ;; List Utility Section
 
 ;; Declaration of List data type and constructors
