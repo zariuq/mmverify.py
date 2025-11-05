@@ -57,6 +57,11 @@
    (chain (get-state $state) $current
      (change-state! $state (+ $current $delta))))
 
+;; using -1 or (-1) was breaking additive
+(= (adjust-state-subtractive $state $delta)
+   (chain (get-state $state) $current
+     (change-state! $state (- $current $delta))))
+
 ;; Frame Management Section
 ;; Explicit frame management for elegant bijection
 ;; TODO: Future work - pass &fd state and use get-state to avoid explicit level params
@@ -67,10 +72,21 @@
 (= (pop-frame $kb $fd)
   (let $level (get-state $fd)
     (let* (
-      (() (remove-pattern $kb (EList (FSDepth $level) $elist)))
-      (() (remove-pattern $kb (FList (FSDepth $level) $flist)))
-      (() (remove-pattern $kb ($1 $2 (FSDepth $level) $Data)))
+      (() (println! (pop-from-level: $level)))
+      ($_1 (remove-patternc $kb (EList (FSDepth $level) $elist)))
+      ($_2 (remove-patternc $kb (FList (FSDepth $level) $flist)))
+      ($_3 (remove-patternc $kb ($1 $2 (FSDepth $level) $Data)))
     ) (adjust-state-additive $fd -1))))
+    ;   ($dec_level (- $level 1))
+    ;   (() (println! (next-level: $dec_level)))
+    ; ) (change-state! $fd $dec_level))))
+
+; !(remove-pattern &kb (EList (FSDepth 2) $elist))
+; !(remove-pattern &kb (FList (FSDepth 2) $flist))
+; !(remove-pattern &kb ($1 $2 (FSDepth 2) $Data))
+; mettarl(f'!(remove-pattern &kb (EList (FSDepth {len(self.fs)}) $elist))')
+; mettarl(f'!(remove-pattern &kb (FList (FSDepth {len(self.fs)}) $flist))')
+; mettarl(f'!(remove-pattern &kb ($1 $2 (FSDepth {len(self.fs)}) $Data))')
 
 ;; List Utility Section
 
