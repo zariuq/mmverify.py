@@ -1004,6 +1004,12 @@ if __name__ == '__main__':
         action='store_true',
         default=False,
         help='inline mmverify-utils.metta content instead of importing (useful for MM2/MORK)')
+    parser.add_argument(
+        '--as-mm2',
+        dest='as_mm2',
+        action='store_true',
+        default=False,
+        help='output as MM2 format: remove ! prefixes and replace () with Empty (implies --inline-library)')
     args = parser.parse_args()
     verbosity = args.verbosity
     db_file = args.database
@@ -1018,6 +1024,11 @@ if __name__ == '__main__':
         unicode_delimiters = True
     metta_log_file = args.metta_log_file
     skip_verification = args.skip_verification
+
+    # Handle --as-mm2 flag (implies --inline-library)
+    if args.as_mm2:
+        args.inline_library = True
+
     initialize_metta()
     vprint(1, 'mmverify.py -- Proof verifier for the Metamath language')
     mm = MM(args.begin_label, args.stop_label, skip_verification)
@@ -1030,6 +1041,14 @@ if __name__ == '__main__':
     if metta_log_file and metta_log:
         with open(metta_log_file, 'w') as out:
             for line in metta_log:
+                # Apply MM2 transformations if --as-mm2 flag is set
+                if args.as_mm2:
+                    # Remove ! prefix from commands
+                    if line.startswith('!'):
+                        line = line[1:]
+                    # Replace () with Empty
+                    line = line.replace('()', 'Empty')
+
                 out.write(line)
                 if not line.endswith('\n'):
                     out.write('\n')
