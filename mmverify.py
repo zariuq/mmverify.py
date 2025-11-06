@@ -157,7 +157,20 @@ def initialize_metta():
         mettarl('!(bind! &kb (new-space))')     # Labels
         mettarl('!(bind! &sp (new-state -1))')  # Stack pointer state
         mettarl('!(bind! &fd (new-state 0))')   # Frame depth state
-        mettarl('!(import! &self mmverify-utils)')  # Import modular utilities
+
+        # Import or inline mmverify-utils
+        if args.inline_library:
+            # Inline the library content using the existing parser
+            import pathlib
+            utils_path = pathlib.Path(__file__).parent / 'mmverify-utils.metta'
+            if utils_path.exists():
+                expressions = parse_metta_expressions(str(utils_path))
+                for expr in expressions:
+                    mettarl(expr)
+            else:
+                print(f"Warning: mmverify-utils.metta not found at {utils_path}", file=sys.stderr)
+        else:
+            mettarl('!(import! &self mmverify-utils)')  # Import modular utilities
     if transformed_metta_file:
         # Create space to store transformed statements
         log_transform('!(bind! &md (new-space))')
@@ -985,6 +998,12 @@ if __name__ == '__main__':
         action='store_true',
         default=False,
         help='only generate MeTTa log with verification enabled, skip Python verification (default: False)')
+    parser.add_argument(
+        '--inline-library',
+        dest='inline_library',
+        action='store_true',
+        default=False,
+        help='inline mmverify-utils.metta content instead of importing (useful for MM2/MORK)')
     args = parser.parse_args()
     verbosity = args.verbosity
     db_file = args.database
