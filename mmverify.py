@@ -50,7 +50,7 @@ only_metta = False
 unicode_delimiters = False
 transformed_metta_file: Optional[str] = None
 metta_log_file: Optional[str] = None
-verify_metta = True  # Hack just for testing: set to false and MeTTa won't verify anything.
+verify_metta = True  # Can be set to False via --no-metta-verify flag
 
 # Log lists for MeTTa commands and transformed assertions
 metta_log: list[str] = []
@@ -999,6 +999,12 @@ if __name__ == '__main__':
         default=False,
         help='only generate MeTTa log with verification enabled, skip Python verification (default: False)')
     parser.add_argument(
+        '--no-metta-verify',
+        dest='no_metta_verify',
+        action='store_true',
+        default=False,
+        help='generate MeTTa with verify=False in add_p calls (useful for testing database building)')
+    parser.add_argument(
         '--inline-library',
         dest='inline_library',
         action='store_true',
@@ -1024,6 +1030,10 @@ if __name__ == '__main__':
         unicode_delimiters = True
     metta_log_file = args.metta_log_file
     skip_verification = args.skip_verification
+
+    # Handle --no-metta-verify flag
+    if args.no_metta_verify:
+        verify_metta = False
 
     # Handle --as-mm2 flag (implies --inline-library)
     if args.as_mm2:
