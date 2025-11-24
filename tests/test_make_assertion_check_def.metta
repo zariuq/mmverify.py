@@ -1,0 +1,5 @@
+!(import! &self mmverify-utils_petta_partial)
+!(println! "Checking if make_assertion definition exists...")
+!(match &self (= (make_assertion $kb $stmt) $body)
+  (println! "Found make_assertion definition!"))
+!(println! "Done!")

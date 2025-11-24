@@ -1,0 +1,40 @@
+!(import! &self mmverify-utils_petta_partial)
+
+!(println! "=== Testing DV constraint processing ===")
+
+!(println! "Setup: Add two variables with DV constraint")
+!(add_v kb1 x 1)
+!(add_v kb1 y 1)
+!(add_d kb1 (x y) 1)
+
+!(println! "")
+!(println! "Test 1: Check if both are in MandVar after calling make_assertion")
+!(add_f kb1 vx setvar x 1)
+!(add_f kb1 vy setvar y 1)
+!(let $result (make_assertion kb1 (|- x != y))
+  (println! ("Full result:" $result)))
+
+!(println! "")
+!(println! "Test 2: Manually test the DV filtering logic")
+!(add-atom &self (kb2 (DVar (a b) (FSDepth 1) (Type "$d"))))
+!(add-atom &self (kb2 (MandVar a)))
+!(add-atom &self (kb2 (MandVar b)))
+
+!(let $dvs (matchc &self (kb2 (DVar ($x $y) $_ (Type "$d")))
+              (case (collapse (match &self (kb2 (MandVar $x)) found))
+                (((found)
+                   (case (collapse (match &self (kb2 (MandVar $y)) found))
+                     (((found) ($x $y)))
+                      (() ()))))
+                 (() ())
+              )
+            )
+      )
+  (println! ("DVs result:" $dvs)))
+
+!(println! "")
+!(println! "Test 3: Check what collapse (match ...) returns")
+!(println! ("Match x:" (collapse (match &self (kb2 (MandVar a)) found))))
+!(println! ("Match y:" (collapse (match &self (kb2 (MandVar b)) found))))
+
+!(println! "Done!")
