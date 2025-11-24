@@ -38,6 +38,22 @@
              (((Error $info $msg) (Error $info $msg))
               ($_ (process_ehyps $stack $sp $subst $rest))))))))
 
+;; Frame Management Section
+;; Explicit frame management for elegant bijection
+;; TODO: Future work - pass &fd state and use get-state to avoid explicit level params
+
+(= (push-frame $fd)
+  (adjust-state-additive $fd 1))
+
+(= (pop-frame $kb $fd)
+  (let $level (get-state $fd)
+    (let* (
+      ($_ (println! (pop-from-level: $level)))
+      ($_1 (remove-patternc $kb (EList (FSDepth $level) $elist)))
+      ($_2 (remove-patternc $kb (FList (FSDepth $level) $flist)))
+      ($_3 (remove-patternc $kb ($1 $2 (FSDepth $level) $Data)))
+    ) (adjust-state-additive $fd -1))))
+
 ;; add_c
 (= (add_c $kb $tok)
   (case (collapse (match $kb (Constant $tok (Type "$c")) found))
@@ -495,8 +511,16 @@
       ($_0 (println! ""))
       ($_1 (println! (Verifying conclusion ($label) $stmt with proof $proof)))
       ($verify_result (if $verify_proofs (verify $kb $stack $sp $proof $stmt) ()))
-      ($_2 (println! ("make_assertion" $label - $stmt)))
-      (( (DVars $dvs) (FHyps $f_hyps) (EHyps $e_hyps) (Statement $stmt) ) (make_assertion $kb $stmt))
-      ($_3 (println! ("gathered assertion data:" $dvs $f_hyps $e_hyps $stmt)))
     )
-      (let $_4 (add-atom $kb ( (Label $label) Proof ( (DVars $dvs) (FHyps $f_hyps) (EHyps $e_hyps) (Statement $stmt) (Type "$p") (ProofSequence $proof) ))) $verify_result)))
+    ; Check if verification produced an error - if so, return it without adding to KB
+    (case $verify_result
+      (((Error $info $msg)
+         (Error $info $msg))
+       ($_
+         (let*
+           (
+             ($_2 (println! ("make_assertion" $label - $stmt)))
+             (( (DVars $dvs) (FHyps $f_hyps) (EHyps $e_hyps) (Statement $stmt) ) (make_assertion $kb $stmt))
+             ($_3 (println! ("gathered assertion data:" $dvs $f_hyps $e_hyps $stmt)))
+           )
+           (let $_4 (add-atom $kb ( (Label $label) Proof ( (DVars $dvs) (FHyps $f_hyps) (EHyps $e_hyps) (Statement $stmt) (Type "$p") (ProofSequence $proof) ))) $verify_result)))))))

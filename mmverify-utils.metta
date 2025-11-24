@@ -450,10 +450,16 @@
         ; ($dv_check (eval (collapse (check_dvs $subst $dvars)))) ;; I don't like this *idc about the return value* part.
         ($dv_check (collapse (check_dvs $kb $subst $dvars))) ;; I don't like this *idc about the return value* part.
         (() (println! (dv_check: $dv_check))) ;; The print seems to lead to the error being correctly "thrown", damn, this is fucked up.  When it's so fucked up, it's hard to take seriosuly trying to implement something correctly!
-        ($_4 (matchc $stack ( (Num $n) $s ) (if (>= $n $sp_val) (remove-atom $stack ( (Num $n) $s )) ())))
-        ($new_conclusion (let $new_conclusion (apply_subst $subst $statement) (let () (add-atom $stack ((Num $sp_val) $new_conclusion)) $new_conclusion)))
-        (() (println! (new_conclusion: $new_conclusion)))
-      ) ()));(println! (stack ($label): (matchc $stack $s $s)))))
+      )
+      ; Check if DV check produced an error - if so, return it, otherwise continue
+      (unify $dv_check ((Error $info $msg) $rest)
+          (Error $info $msg)
+          (let*
+            (
+              ($_4 (matchc $stack ( (Num $n) $s ) (if (>= $n $sp_val) (remove-atom $stack ( (Num $n) $s )) ())))
+              ($new_conclusion (let $new_conclusion (apply_subst $subst $statement) (let () (add-atom $stack ((Num $sp_val) $new_conclusion)) $new_conclusion)))
+              (() (println! (new_conclusion: $new_conclusion)))
+            ) ()))))
 
 ;; The hypothesis part of the treat_step function
 ;; Simply adds the floating or essential hypothesis to the stack, ensuring they are active hypotheses.
@@ -526,38 +532,51 @@
         (println! (stack ($label): (matchc $stack $s $s))))
       ))
 
+;; Wrapper to collect errors from treat_step instead of propagating them
+(= (treat_step_with_errors $kb $stack $sp $errors $label)
+    (let $result (treat_step $kb $stack $sp $label)
+      (unify $result (Error $info $msg)
+          (add-atom $errors (Error $info $msg))
+          ())))
+
 ;; Treats a normal proof (e.g., a list of labels).
 ;; Adds all hypothesis in the &kb space to the active hypotheses set.  (Q: Is this redundant because the data is extracted via the &kb set, so failing to match the label would indicate it is not active?  I don't fully understand the failure mode here.)
 ;; Calls treat step for each label in the proof.
+;; Collects errors in a space and returns first error if any
 ;; Removes the active hypotheses
 (= (treat_normal_proof $kb $stack $sp $proof)
-    (let*
-      (
-        (() (println! (Got Proof: $proof)))
-        ($_0 (empty-space $stack)) ;; stack: list[Stmmt] = []
-        ;; active_hypotheses = {label for frame in self.fs for labels in (frame.f_labels, frame.e_labels) for label in labels.values()}
-        ($_1 (matchc $kb ((Label $label) FHyp $FSDepth $Data) (add-atom $kb (ActiveHyp $label))))
-        ($_2 (matchc $kb ((Label $label) EHyp $FSDepth $Data) (add-atom $kb (ActiveHyp $label))))
-        ($_3 (map-atom $proof $label (treat_step $kb $stack $sp $label)))
-      )
-      (remove-patternc $kb (ActiveHyp $_))))
+    (let $errors (new-space)
+      (let*
+        (
+          (() (println! (Got Proof: $proof)))
+          ($_0 (empty-space $stack)) ;; stack: list[Stmmt] = []
+          ;; active_hypotheses = {label for frame in self.fs for labels in (frame.f_labels, frame.e_labels) for label in labels.values()}
+          ($_1 (matchc $kb ((Label $label) FHyp $FSDepth $Data) (add-atom $kb (ActiveHyp $label))))
+          ($_2 (matchc $kb ((Label $label) EHyp $FSDepth $Data) (add-atom $kb (ActiveHyp $label))))
+          ($_3 (map-atom $proof $label (treat_step_with_errors $kb $stack $sp $errors $label)))
+          ($_4 (remove-patternc $kb (ActiveHyp $_)))
+          ($error_list (matchc $errors $e $e))
+        )
+        (if (== (size-atom $error_list) 0) () (car-atom $error_list)))))
 
 ;; Verifies that a proof of a conclusion holds.
 ;; Calls treat normal proof on the proof,
 ;; Checks that the resulting stack contains exactly one element, which is the desired conclusion.
 ;; Empties the stack and returns the conclusion (which helps for checking the checker).
 (= (verify $kb $stack $sp $proof $conclusion)
-    (let*
-      (
-        ($_0 (treat_normal_proof $kb $stack $sp $proof))
-        ($stack_expr (matchc $stack ( (Num  $n) $f) $f))
-        (() (if (== () $stack_expr) (Error (assertion: $conclusion) "Empty stack at end of proof.") ()))
-        (() (if (> (size-atom $stack_expr) 1) (Error ((assertion: $conclusion) (stack: $stack_expr)) "Stack has more than one entry at end of proof.") ()))
-        ($stack_top (car-atom $stack_expr))
-        (() (println! (Comparing: $stack_top "==" $conclusion)))
-        (() (if (== $conclusion $stack_top) () (Error ((assertion: $conclusion) (stack: $stack_expr)) "Stack entry does not match proved assertion.")))
-        (() (println! "Correct proof!"))
-      ) $stack_top))
+    (let $proof_result (treat_normal_proof $kb $stack $sp $proof)
+      (unify $proof_result (Error $info $msg)
+        (Error $info $msg)
+        (let*
+          (
+            ($stack_expr (matchc $stack ( (Num  $n) $f) $f))
+            (() (if (== () $stack_expr) (Error (assertion: $conclusion) "Empty stack at end of proof.") ()))
+            (() (if (> (size-atom $stack_expr) 1) (Error ((assertion: $conclusion) (stack: $stack_expr)) "Stack has more than one entry at end of proof.") ()))
+            ($stack_top (car-atom $stack_expr))
+            (() (println! (Comparing: $stack_top "==" $conclusion)))
+            (() (if (== $conclusion $stack_top) () (Error ((assertion: $conclusion) (stack: $stack_expr)) "Stack entry does not match proved assertion.")))
+            (() (println! "Correct proof!"))
+          ) $stack_top))))
       
 (= (add_p $kb $stack $sp $label $stmt $proof $verify_proofs)
   (let*
@@ -565,11 +584,17 @@
       (() (println! ""))
       (() (println! (Verifying conclusion ($label) $stmt with proof $proof)))
       ($verify_result (if $verify_proofs (verify $kb $stack $sp $proof $stmt) ()))
-      (() (println! ("make_assertion" $label - $stmt))) ;; This could just call add_a.
-      (( (DVars $dvs) (FHyps $f_hyps) (EHyps $e_hyps) (Statement $stmt) ) (make_assertion $kb $stmt))
-      (() (println! ("gathered assertion data:" $dvs $f_hyps $e_hyps $stmt)))
     )
-      (let () (add-atom $kb ( (Label $label) Proof ( (DVars $dvs) (FHyps $f_hyps) (EHyps $e_hyps) (Statement $stmt) (Type "$p") (ProofSequence $proof) ))) $verify_result)))
+    ; Check if verification produced an error - if so, return it immediately
+    (unify $verify_result (Error $info $msg)
+      (Error $info $msg)
+      (let*
+        (
+          (() (println! ("make_assertion" $label - $stmt))) ;; This could just call add_a.
+          (( (DVars $dvs) (FHyps $f_hyps) (EHyps $e_hyps) (Statement $stmt) ) (make_assertion $kb $stmt))
+          (() (println! ("gathered assertion data:" $dvs $f_hyps $e_hyps $stmt)))
+        )
+        (let () (add-atom $kb ( (Label $label) Proof ( (DVars $dvs) (FHyps $f_hyps) (EHyps $e_hyps) (Statement $stmt) (Type "$p") (ProofSequence $proof) ))) $verify_result)))))
 
 ;; Let's just add a default option
 ; (= (add_p $label $stmt $proof $verify_proofs)

@@ -53,6 +53,7 @@ metta_log_file: Optional[str] = None
 verify_metta = True  # Can be set to False via --no-metta-verify flag
 petta_mode = False  # Can be set to True via --petta flag
 petta_lib_path = '../lib'  # Can be set via --petta-lib-path
+petta_utils_import = '../mmverify-utils_petta'  # Can be set via --petta-utils-import
 
 # Log lists for MeTTa commands and transformed assertions
 metta_log: list[str] = []
@@ -68,8 +69,8 @@ def mettarl(cmd: str):
     return []
 
 # Log a transformed MeTTa statement if transformation logging is enabled
-def log_transform(stmt: str) -> None:
-    """Record a transformed MeTTa command for later output."""
+def log_bc_transform(stmt: str) -> None:
+    """Record a backward chainer MeTTa command for later output."""
     if transformed_metta_file:
         transform_log.append(stmt)
 
@@ -151,31 +152,20 @@ def parse_metta_expressions(filename, comment_char=';', encoding='utf-8'):
 
     return expressions
 
-def kb_ref():
-    """Return 'kb' for PeTTa mode, '&kb' for HE mode"""
-    return 'kb' if petta_mode else '&kb'
-
-def stack_ref():
-    """Return 'stack' for PeTTa mode, '&stack' for HE mode"""
-    return 'stack' if petta_mode else '&stack'
-
-def md_ref():
-    """Return 'md' for PeTTa mode, '&md' for HE mode (for transformed output)"""
-    return 'md' if petta_mode else '&md'
-
 def initialize_metta():
     # The MeTTa 'stack' to mirror the Metamath one.
     # Define these only when MeTTa is being run or its commands logged.
     if run_metta or metta_log_file:
         if petta_mode:
-            # PeTTa mode: use tagged atoms, no space bindings for kb/stack
-            mettarl('!(bind! &sp (new-state 0))')   # Stack pointer state
+            # PeTTa mode: use spaces (&kb, &stack) created in mmverify-utils_petta
+            mettarl('!(bind! &stack (new-space))')  # Stack in treat_proof
+            mettarl('!(bind! &kb (new-space))')     # Labels
+            mettarl('!(bind! &sp (new-state -1))')  # Stack pointer state (-1 to detect errors)
             mettarl('!(bind! &fd (new-state 0))')   # Frame depth state
-            # Import PeTTa-specific libraries
-            mettarl(f'!(import! &self {petta_lib_path}/lib_he)')
-            mettarl('!(import! &self mmverify-utils_petta)')
+            # Import PeTTa-specific library (mmverify-utils_petta imports lib_he itself)
+            mettarl(f'!(import! &self {petta_utils_import})')
         else:
-            # HE MeTTa mode: use spaces for kb/stack
+            # HE MeTTa mode: also uses spaces (&kb, &stack)
             mettarl('!(bind! &stack (new-space))')  # Stack in treat_proof
             mettarl('!(bind! &kb (new-space))')     # Labels
             mettarl('!(bind! &sp (new-state -1))')  # Stack pointer state
@@ -195,13 +185,13 @@ def initialize_metta():
             else:
                 mettarl('!(import! &self mmverify-utils)')  # Import modular utilities
     if transformed_metta_file:
-        # Create space to store transformed statements
+        # Create space to store transformed MM2 backward chainer statements
         if petta_mode:
-            # PeTTa mode: use tagged atoms, no space binding needed
-            pass  # No initialization needed for PeTTa md tag
+            # PeTTa mode: backward chainer not used, no md space needed
+            pass  # No initialization needed for backward chainer in PeTTa
         else:
-            # HE mode: create space
-            log_transform(f'!(bind! {md_ref()} (new-space))')
+            # HE mode: create space for backward chainer
+            log_bc_transform('!(bind! &md (new-space))')
         # mettarl('!(bind! &step_counter (new-state 1))') # the stack pointer state -1 to throw an error if not updated.
 
 Label = str
@@ -662,16 +652,16 @@ class MM:
         while tok and tok != '$}':
             if tok == '$c':
                 for tok in self.read_non_p_stmt(tok, toks):
-                    mettarl(f'!(add_c {kb_ref()} {mettify(tok)})')
+                    mettarl(f'!(add_c &kb {mettify(tok)})')
                     self.add_c(tok)
                     metta_constant = f'(: {mettify(tok)} Const)'
-                    log_transform(f'!(add-atom {md_ref()} {metta_constant})')
+                    log_bc_transform(f'!(add-atom &md {metta_constant})')
             elif tok == '$v':
                 for tok in self.read_non_p_stmt(tok, toks):
-                    mettarl(f'!(add_v {kb_ref()} {mettify(tok)} {len(self.fs)})')
+                    mettarl(f'!(add_v &kb {mettify(tok)} {len(self.fs)})')
                     self.add_v(tok)
                     metta_var = f'(: {mettify(tok)} Var)'
-                    log_transform(f'!(add-atom {md_ref()} {metta_var})')
+                    log_bc_transform(f'!(add-atom &md {metta_var})')
             elif tok == '$f':
                 stmt = self.read_non_p_stmt(tok, toks)
                 if not label: # MeTTa-side, I'll consider this purely parsing
@@ -680,33 +670,33 @@ class MM:
                 if len(stmt) != 2: # MeTTa: not sure but let's consider this parsing
                     raise MMError(
                         '$f must have length two but is {}'.format(stmt))
-                mettarl(f'!(add_f {kb_ref()} {mettify(label)} {mettify(stmt[0])} {mettify(stmt[1])} {len(self.fs)})')
-                # mettarl(f'!(add-atom {kb_ref()} ( (Label {mettify(label)}) FHyp ( (Typecode {mettify(stmt[0])}) (FVar {mettify(stmt[1])}) (Type "$f") )))')
+                mettarl(f'!(add_f &kb {mettify(label)} {mettify(stmt[0])} {mettify(stmt[1])} {len(self.fs)})')
+                # mettarl(f'!(add-atom &kb ( (Label {mettify(label)}) FHyp ( (Typecode {mettify(stmt[0])}) (FVar {mettify(stmt[1])}) (Type "$f") )))')
                 self.add_f(stmt[0], stmt[1], label)
                 self.labels[label] = ('$f', [stmt[0], stmt[1]])
                 typecode, var = stmt[0], stmt[1]
                 metta_fhyp = f'(: {label} (: {mettify(var)} {mettify(typecode)}))'
-                log_transform(f'!(add-atom {md_ref()} {metta_fhyp})')
+                log_bc_transform(f'!(add-atom &md {metta_fhyp})')
                 label = None
             elif tok == '$e':
                 if not label:
                     raise MMError('$e must have label')
                 stmt = self.read_non_p_stmt(tok, toks)
-                mettarl(f'!(add_e {kb_ref()} {mettify(label)} {mettify(stmt)} {len(self.fs)})')
-                # mettarl(f'!(add-atom {kb_ref()} ( (Label {mettify(label)}) EHyp ( (Statement {mettify(stmt)}) (Type "$e") )))')
+                mettarl(f'!(add_e &kb {mettify(label)} {mettify(stmt)} {len(self.fs)})')
+                # mettarl(f'!(add-atom &kb ( (Label {mettify(label)}) EHyp ( (Statement {mettify(stmt)}) (Type "$e") )))')
                 self.fs.add_e(stmt, label)
                 self.labels[label] = ('$e', stmt)
-                # Note: no bc-friendly log_transform of essential hypotheses.
+                # Note: no bc-friendly log_bc_transform of essential hypotheses.
                 label = None
             elif tok == '$a':
                 if not label:
                     raise MMError('$a must have label')
                 stmt = self.read_non_p_stmt(tok, toks) # Just less-compact
-                mettarl(f'!(add_a {kb_ref()} {mettify(label)} {mettify(stmt)})')
+                mettarl(f'!(add_a &kb {mettify(label)} {mettify(stmt)})')
                 dvs, f_hyps, e_hyps, stmt = self.fs.make_assertion(stmt) # make_assertion(self.read_non_p_stmt(tok, toks))
                 self.labels[label] = ('$a', (dvs, f_hyps, e_hyps, stmt))
                 metta_assertion = build_metta_assertion(label, dvs, f_hyps, e_hyps, stmt)
-                log_transform(f'!(add-atom {md_ref()} {metta_assertion})')
+                log_bc_transform(f'!(add-atom &md {metta_assertion})')
                 label = None
             elif tok == '$p':
                 if not label:
@@ -714,7 +704,7 @@ class MM:
                 stmt, proof = self.read_p_stmt(toks)
                 normal_proof = proof[0] != '('
                 if normal_proof:
-                    mout = mettarl(f'!(add_p {kb_ref()} {stack_ref()} &sp {mettify(label)} {mettify(stmt)} {mettify(proof)} {verify_metta and (self.verify_proofs or self.skip_verification)})')
+                    mout = mettarl(f'!(add_p &kb &stack &sp {mettify(label)} {mettify(stmt)} {mettify(proof)} {verify_metta and (self.verify_proofs or self.skip_verification)})')
                     if run_metta:
                         print(f'Output of verify: {mout}\n') # Could check this for an error to throw an MMError.
                         # Simple MeTTa error checker - add this after the mout line:
@@ -726,18 +716,18 @@ class MM:
                                 raise MMError(f"MeTTa verification returned unexpected result: {result} (expected unit)")
                             # If result is '()', then success - do nothing
                         else:
-                            raise MMError(f"MeTTa verification returned malformed output: {mout}")   
+                            raise MMError(f"MeTTa verification returned malformed output: {mout}")
                 dvs, f_hyps, e_hyps, conclusion = self.fs.make_assertion(stmt)
                 if self.verify_proofs and ((not only_metta) or (not normal_proof)):
                     vprint(2, 'Verify:', label)
                     self.verify(f_hyps, e_hyps, conclusion, proof)
                 self.labels[label] = ('$p', (dvs, f_hyps, e_hyps, conclusion))
                 metta_assertion = build_metta_assertion(label, dvs, f_hyps, e_hyps, stmt)
-                log_transform(f'!(add-atom {md_ref()} {metta_assertion})')
+                log_bc_transform(f'!(add-atom &md {metta_assertion})')
                 label = None
             elif tok == '$d':
                 varlist = self.read_non_p_stmt(tok, toks)
-                mettarl(f'!(add_d {kb_ref()} {mettify(varlist)} {len(self.fs)})')
+                mettarl(f'!(add_d &kb {mettify(varlist)} {len(self.fs)})')
                 self.fs.add_d(varlist)
             elif tok == '${':
                 self.read(toks)
@@ -759,7 +749,7 @@ class MM:
                 raise MMError("Unknown token: '{}'.".format(tok))
             tok = toks.readc()
         # Explicit frame management for bijection
-        mettarl(f'!(pop-frame {kb_ref()} &fd)')  # This should use &fd state to get level
+        mettarl('!(pop-frame &kb &fd)')  # This should use &fd state to get level
         self.fs.pop()
       
     def treat_step(self,
@@ -1015,11 +1005,11 @@ if __name__ == '__main__':
         default=None,
         help='output file for logging MeTTa commands (default mettamath.metta)')
     parser.add_argument(
-        '-t', '--transform-metta',
+        '--bc-output',
         dest='transformed_metta_file',
         type=str,
         default=None,
-        help='output transformed statements for MeTTa')
+        help='Output file for backward chainer MeTTa format (e.g., "!(add-atom &md (: ⟨0⟩ Const))") for pattern matching/reasoning')
     parser.add_argument(
         '--only-metta-log',
         dest='skip_verification',
@@ -1049,13 +1039,19 @@ if __name__ == '__main__':
         dest='petta',
         action='store_true',
         default=False,
-        help='generate MeTTa for PeTTa: use tagged atoms (kb/stack) instead of spaces (&kb/&stack), import mmverify-utils_petta')
+        help='generate MeTTa for PeTTa: use spaces (&kb/&stack) and import mmverify-utils_petta')
     parser.add_argument(
         '--petta-lib-path',
         dest='petta_lib_path',
         type=str,
         default='../lib',
         help='path to PeTTa lib directory containing lib_he.metta (default: ../lib)')
+    parser.add_argument(
+        '--petta-utils-import',
+        dest='petta_utils_import',
+        type=str,
+        default='../mmverify-utils_petta',
+        help='import path for mmverify-utils_petta.metta relative to generated file (default: ../mmverify-utils_petta)')
     args = parser.parse_args()
     verbosity = args.verbosity
     db_file = args.database
@@ -1079,6 +1075,7 @@ if __name__ == '__main__':
     if args.petta:
         petta_mode = True
         petta_lib_path = args.petta_lib_path
+        petta_utils_import = args.petta_utils_import
 
     # Handle --as-mm2 flag (implies --inline-library)
     if args.as_mm2:
