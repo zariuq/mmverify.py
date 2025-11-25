@@ -4,7 +4,6 @@
 
 ; Test 1: Basic add_e - add essential hypothesis
 !(println! "Test 1: Basic add_e")
-!(bind! &kb1 (new-space))
 !(add_e &kb1 "e1" ("wff" ("implies" "p" "q")) 0)
 !(test (collapse (match &kb1 ((Label $l) EHyp (FSDepth $d) ((Statement $s) (Type "$e"))) ($l $s $d)))
        (("e1" ("wff" ("implies" "p" "q")) 0)))
@@ -16,7 +15,6 @@
 
 ; Test 3: Add second essential hypothesis, verify EList updated
 !(println! "Test 3: Multiple essential hypotheses, EList updated")
-!(bind! &kb2 (new-space))
 !(add_e &kb2 "e1" ("wff" ("implies" "p" "q")) 0)
 !(add_e &kb2 "e2" ("wff" "p") 0)
 !(test (collapse (match &kb2 (EList (FSDepth 0) $el) $el))
@@ -24,7 +22,6 @@
 
 ; Test 4: Multiple essential hypotheses at same level
 !(println! "Test 4: Multiple labels at same level")
-!(bind! &kb3 (new-space))
 !(add_e &kb3 "e1" ("wff" ("implies" "p" "q")) 0)
 !(add_e &kb3 "e2" ("wff" "p") 0)
 !(add_e &kb3 "e3" ("wff" "q") 0)
@@ -33,7 +30,6 @@
 
 ; Test 5: Different levels create separate ELists
 !(println! "Test 5: Different levels have separate ELists")
-!(bind! &kb4 (new-space))
 !(add_e &kb4 "e1" ("wff" "p") 0)
 !(add_e &kb4 "e2" ("wff" "q") 1)
 !(test (collapse (match &kb4 (EList (FSDepth 0) $el) $el))
@@ -43,7 +39,6 @@
 
 ; Test 6: EList appends in order
 !(println! "Test 6: EList maintains order")
-!(bind! &kb5 (new-space))
 !(add_e &kb5 "e1" ("wff" "p") 0)
 !(add_e &kb5 "e2" ("wff" "q") 0)
 !(add_e &kb5 "e3" ("wff" "r") 0)

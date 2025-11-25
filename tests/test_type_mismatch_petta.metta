@@ -8,8 +8,6 @@
 ;
 ; Expected: PeTTa should return an Error indicating type mismatch
 
-!(bind! &stack (new-space))
-!(bind! &kb (new-space))
 !(bind! &sp (new-state -1))
 !(bind! &fd (new-state 0))
 !(import! &self ../mmverify-utils_petta)

@@ -25,13 +25,11 @@
        ((Cons a (Cons b Nil)) (Cons c (Cons b Nil))))
 
 !(println! "Test 5: add_mand_var adds mandatory variables")
-!(bind! &hkb1 (new-space))
 !(add-atom &hkb1 (Var x (FSDepth 0) (Type "$v")))
 !(add_mand_var &hkb1 x)
 !(test (collapse (match &hkb1 (MandVar $v) $v)) (x))
 
 !(println! "Test 6: assign_f_hyps filters by mandatory vars")
-!(bind! &hkb2 (new-space))
 !(add-atom &hkb2 (Var x (FSDepth 0) (Type "$v")))
 !(add-atom &hkb2 (Var y (FSDepth 0) (Type "$v")))
 !(add-atom &hkb2 (MandVar x))

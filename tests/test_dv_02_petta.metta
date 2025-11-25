@@ -4,8 +4,6 @@
 
 !(println! "=== Test DV 02: Different vars with DV declared ===")
 
-!(bind! &kb (new-space))
-!(bind! &stack (new-space))
 !(bind! &sp (new-state 0))
 
 ; Setup: constants and variables

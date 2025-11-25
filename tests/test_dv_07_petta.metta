@@ -4,8 +4,6 @@
 
 !(println! "=== Test DV 07: Three-way DV with x repeated ===")
 
-!(bind! &kb (new-space))
-!(bind! &stack (new-space))
 !(bind! &sp (new-state 0))
 
 !(add_c &kb "wff")

@@ -4,7 +4,6 @@
 !(println! "")
 
 !(println! "Test 1: add_mand_var adds variable to MandVar set")
-!(bind! &kb1 (new-space))
 !(add_v &kb1 x 0)
 ; Adding a variable that exists adds MandVar entry (returns true from add-atom)
 !(test (add_mand_var &kb1 x) true)
@@ -12,7 +11,6 @@
 !(test (collapse (match &kb1 (MandVar $v) $v)) (x))
 
 !(println! "Test 2: add_mand_var skips non-variables")
-!(bind! &kb2 (new-space))
 !(add_c &kb2 c)
 ; Adding a constant does nothing (no Var found, returns ())
 !(test (add_mand_var &kb2 c) ())
@@ -20,7 +18,6 @@
 !(test (collapse (match &kb2 (MandVar $v) $v)) ())
 
 !(println! "Test 3: add_mand_var skips already-added variables")
-!(bind! &kb3 (new-space))
 !(add_v &kb3 x 0)
 !(add-atom &kb3 (MandVar x))
 ; Adding again does nothing (already present, inner case returns ())

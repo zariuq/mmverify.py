@@ -4,7 +4,6 @@
 !(println! "")
 
 !(println! "Test 1: pop-frame removes entries at current level")
-!(bind! &kb1 (new-space))
 !(bind! &fd1 (new-state 0))
 !(push-frame &fd1)
 ; Add variables at level 1
@@ -18,7 +17,6 @@
 !(test (collapse (match &kb1 (Var "y" (FSDepth 1) (Type "$v")) found)) ())
 
 !(println! "Test 2: pop-frame removes DV constraints at current level")
-!(bind! &kb2 (new-space))
 !(bind! &fd2 (new-state 0))
 !(push-frame &fd2)
 !(add_v &kb2 "a" 1)
@@ -30,7 +28,6 @@
 !(test (collapse (match &kb2 (DVar ("a" "b") (FSDepth 1) (Type "$d")) found)) ())
 
 !(println! "Test 3: pop-frame preserves lower levels")
-!(bind! &kb3 (new-space))
 !(bind! &fd3 (new-state 0))
 ; Add at level 0
 !(add_v &kb3 "x" 0)
@@ -48,7 +45,6 @@
 !(test (collapse (match &kb3 (Var "z" (FSDepth 2) (Type "$v")) found)) ())
 
 !(println! "Test 4: pop-frame decrements frame depth")
-!(bind! &kb4 (new-space))
 !(bind! &fd4 (new-state 0))
 !(test (get-state &fd4) 0)
 !(push-frame &fd4)
@@ -61,7 +57,6 @@
 !(test (get-state &fd4) 0)
 
 !(println! "Test 5: Multiple push/pop sequence")
-!(bind! &kb5 (new-space))
 !(bind! &fd5 (new-state 0))
 ; Level 0: constant
 !(add_c &kb5 "0")
@@ -82,7 +77,6 @@
 !(test (match &kb5 (Constant "0" (Type "$c")) found) found)
 
 !(println! "Test 6: pop-frame with floating hypotheses")
-!(bind! &kb6 (new-space))
 !(bind! &fd6 (new-state 0))
 !(push-frame &fd6)
 !(add_c &kb6 "term")
@@ -97,7 +91,6 @@
 !(test (collapse (match &kb6 (FList (FSDepth 1) $f) found)) ())
 
 !(println! "Test 7: pop-frame with essential hypotheses")
-!(bind! &kb7 (new-space))
 !(bind! &fd7 (new-state 0))
 !(push-frame &fd7)
 !(add_e &kb7 "min" ("|-" "P") 1)

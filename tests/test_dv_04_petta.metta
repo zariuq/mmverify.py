@@ -4,8 +4,6 @@
 
 !(println! "=== Test DV 04: Complex proof with 4 vars ===")
 
-!(bind! &kb (new-space))
-!(bind! &stack (new-space))
 !(bind! &sp (new-state 0))
 
 !(add_c &kb "wff")

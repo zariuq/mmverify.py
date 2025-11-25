@@ -4,8 +4,6 @@
 
 !(println! "=== Test DV 01: Same var twice with DV constraint ===")
 
-!(bind! &kb (new-space))
-!(bind! &stack (new-space))
 !(bind! &sp (new-state 0))
 !(bind! &fd (new-state 0))
 

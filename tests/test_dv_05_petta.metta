@@ -4,8 +4,6 @@
 
 !(println! "=== Test DV 05: Same var x in both parts ===")
 
-!(bind! &kb (new-space))
-!(bind! &stack (new-space))
 !(bind! &sp (new-state 0))
 
 !(add_c &kb "wff")

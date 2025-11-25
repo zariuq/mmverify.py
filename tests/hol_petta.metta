@@ -1,7 +1,5 @@
 !(import! &self ../mmverify-utils_petta)
 
-!(bind! &kb (new-space))
-!(bind! &stack (new-space))
 !(bind! &sp (new-state -1))
 !(bind! &fd (new-state 0))
 

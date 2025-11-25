@@ -4,8 +4,6 @@
 
 !(println! "=== Test DV 08: No DV constraint required ===")
 
-!(bind! &kb (new-space))
-!(bind! &stack (new-space))
 !(bind! &sp (new-state 0))
 
 !(add_c &kb "wff")

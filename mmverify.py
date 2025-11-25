@@ -157,9 +157,8 @@ def initialize_metta():
     # Define these only when MeTTa is being run or its commands logged.
     if run_metta or metta_log_file:
         if petta_mode:
-            # PeTTa mode: use spaces (&kb, &stack) created in mmverify-utils_petta
-            mettarl('!(bind! &stack (new-space))')  # Stack in treat_proof
-            mettarl('!(bind! &kb (new-space))')     # Labels
+            # PeTTa mode: use static spaces (&kb, &stack) directly - no bind! needed
+            # Spaces are just atoms - they work without any initialization
             mettarl('!(bind! &sp (new-state -1))')  # Stack pointer state (-1 to detect errors)
             mettarl('!(bind! &fd (new-state 0))')   # Frame depth state
             # Import PeTTa-specific library (mmverify-utils_petta imports lib_he itself)

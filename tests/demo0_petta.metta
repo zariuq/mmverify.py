@@ -1,7 +1,5 @@
 !(bind! &sp (new-state 0))
 !(bind! &fd (new-state 0))
-!(bind! &kb (new-space))
-!(bind! &stack (new-space))
 !(import! &self ../../PeTTa/lib/lib_he)
 !(import! &self mmverify-utils_petta)
 !(push-frame &fd)

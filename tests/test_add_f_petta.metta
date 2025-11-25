@@ -4,7 +4,6 @@
 
 ; Test 1: Add floating hypothesis successfully
 !(println! "Test 1: Add FHyp successfully")
-!(bind! &kb1 (new-space))
 !(add-atom &kb1 (Constant "class" (Type "$c")))
 !(add-atom &kb1 (Var "x" (FSDepth 0) (Type "$v")))
 !(add_f &kb1 "vx" "class" "x" 0)
@@ -18,7 +17,6 @@
 
 ; Test 3: Add second floating hypothesis, verify FList updated
 !(println! "Test 3: Second FHyp updates FList")
-!(bind! &kb2 (new-space))
 !(add-atom &kb2 (Constant "class" (Type "$c")))
 !(add-atom &kb2 (Constant "wff" (Type "$c")))
 !(add-atom &kb2 (Var "x" (FSDepth 0) (Type "$v")))
@@ -30,21 +28,18 @@
 
 ; Test 4: Error - variable not declared
 !(println! "Test 4: Error - var not declared")
-!(bind! &kb3 (new-space))
 !(add-atom &kb3 (Constant "class" (Type "$c")))
 !(test (add_f &kb3 "vx" "class" "z" 0)
        (Error (Var "z") "Var in $f not declared."))
 
 ; Test 5: Error - typecode not declared
 !(println! "Test 5: Error - typecode not declared")
-!(bind! &kb4 (new-space))
 !(add-atom &kb4 (Var "x" (FSDepth 0) (Type "$v")))
 !(test (add_f &kb4 "vx" "foo" "x" 0)
        (Error (Constant "foo") "Typecode in $f not declared."))
 
 ; Test 6: Error - variable already typed
 !(println! "Test 6: Error - var already typed")
-!(bind! &kb5 (new-space))
 !(add-atom &kb5 (Constant "class" (Type "$c")))
 !(add-atom &kb5 (Var "x" (FSDepth 0) (Type "$v")))
 !(add_f &kb5 "vx" "class" "x" 0)
@@ -53,7 +48,6 @@
 
 ; Test 7: Different levels create separate FLists
 !(println! "Test 7: Different levels = separate FLists")
-!(bind! &kb6 (new-space))
 !(add-atom &kb6 (Constant "class" (Type "$c")))
 !(add-atom &kb6 (Var "x" (FSDepth 0) (Type "$v")))
 !(add-atom &kb6 (Var "y" (FSDepth 0) (Type "$v")))

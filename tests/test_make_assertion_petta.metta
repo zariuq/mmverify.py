@@ -6,11 +6,9 @@
 ; ========== Basic Tests ==========
 
 !(println! "Test 1: Empty frame - constants only, no variables")
-!(bind! &kb1 (new-space))
 !(test (make_assertion &kb1 ("term" "0")) ((DVars ()) (FHyps ()) (EHyps ()) (Statement ("term" "0"))))
 
 !(println! "Test 2: weq - Two f-hyps (using workflow functions)")
-!(bind! &kb2 (new-space))
 !(add-atom &kb2 (Constant "term" (Type "$c")))
 !(add_v &kb2 "t" 1)
 !(add_v &kb2 "r" 1)
@@ -19,14 +17,12 @@
 !(test (make_assertion &kb2 ("wff" "t" "=" "r")) ((DVars ()) (FHyps (("term" "t") ("term" "r"))) (EHyps ()) (Statement ("wff" "t" "=" "r"))))
 
 !(println! "Test 3: a2 - One f-hyp (using workflow functions)")
-!(bind! &kb3 (new-space))
 !(add-atom &kb3 (Constant "term" (Type "$c")))
 !(add_v &kb3 "t" 1)
 !(add_f &kb3 "vt" "term" "t" 1)
 !(test (make_assertion &kb3 ("|-" "t" "+" "0" "=" "t")) ((DVars ()) (FHyps (("term" "t"))) (EHyps ()) (Statement ("|-" "t" "+" "0" "=" "t"))))
 
 !(println! "Test 4: a1 - Three f-hyps (using workflow functions)")
-!(bind! &kb4 (new-space))
 !(add-atom &kb4 (Constant "term" (Type "$c")))
 !(add_v &kb4 "t" 1)
 !(add_v &kb4 "r" 1)
@@ -38,7 +34,6 @@
    ((DVars ()) (FHyps (("term" "t") ("term" "r") ("term" "s"))) (EHyps ()) (Statement ("|-" "t" "=" "r" "->" "t" "=" "s" "->" "r" "=" "s"))))
 
 !(println! "Test 5: mp - With e-hyps (modus ponens, using workflow functions)")
-!(bind! &kb5 (new-space))
 !(add-atom &kb5 (Constant "wff" (Type "$c")))
 !(add_v &kb5 "P" 1)
 !(add_v &kb5 "Q" 1)
@@ -52,7 +47,6 @@
 ; ========== Advanced Tests ==========
 
 !(println! "Test 6: tpl - Intermediate complexity (from demo0.mm, using workflow functions)")
-!(bind! &kb6 (new-space))
 !(add-atom &kb6 (Constant "term" (Type "$c")))
 !(add_v &kb6 "t" 1)
 !(add_v &kb6 "r" 1)
@@ -62,7 +56,6 @@
    ((DVars ()) (FHyps (("term" "t") ("term" "r"))) (EHyps ()) (Statement ("term" "t" "+" "r"))))
 
 !(println! "Test 7: wim - wff implication (from demo0.mm, using workflow functions)")
-!(bind! &kb7 (new-space))
 !(add-atom &kb7 (Constant "wff" (Type "$c")))
 !(add_v &kb7 "P" 1)
 !(add_v &kb7 "Q" 1)
@@ -72,7 +65,6 @@
    ((DVars ()) (FHyps (("wff" "P") ("wff" "Q"))) (EHyps ()) (Statement ("wff" "P" "->" "Q"))))
 
 !(println! "Test 8: th1 - Reflexivity proof (from demo0.mm, using workflow functions)")
-!(bind! &kb8 (new-space))
 !(add-atom &kb8 (Constant "term" (Type "$c")))
 !(add_v &kb8 "t" 1)
 !(add_f &kb8 "vt" "term" "t" 1)
@@ -82,7 +74,6 @@
 ; ========== DV Constraint Tests ==========
 
 !(println! "Test 9: DV constraints - both variables mandatory (using workflow functions)")
-!(bind! &kb9 (new-space))
 !(add-atom &kb9 (Constant "setvar" (Type "$c")))
 !(add_v &kb9 "x" 1)
 !(add_v &kb9 "y" 1)
@@ -93,7 +84,6 @@
    ((DVars (("x" "y"))) (FHyps (("setvar" "x") ("setvar" "y"))) (EHyps ()) (Statement ("|-" "x" "!=" "y"))))
 
 !(println! "Test 10: DV filtering - only one mandatory var (using workflow functions)")
-!(bind! &kb10 (new-space))
 !(add-atom &kb10 (Constant "setvar" (Type "$c")))
 !(add_v &kb10 "x" 1)
 !(add_v &kb10 "y" 1)
@@ -107,7 +97,6 @@
 ; ========== Multi-level Frame Tests ==========
 
 !(println! "Test 11: Multiple frame levels - depth ordering (using workflow functions)")
-!(bind! &kb11 (new-space))
 !(add-atom &kb11 (Constant "wff" (Type "$c")))
 !(add_v &kb11 "ph" 1)
 !(add_v &kb11 "ps" 2)
@@ -119,7 +108,6 @@
    ((DVars ()) (FHyps (("wff" "ph") ("wff" "ps"))) (EHyps (("wff" "ph") ("wff" "ps"))) (Statement ("and" "ph" "ps"))))
 
 !(println! "Test 12: Non-mandatory var filtering in f-hyps (using workflow functions)")
-!(bind! &kb12 (new-space))
 !(add-atom &kb12 (Constant "setvar" (Type "$c")))
 !(add_v &kb12 "x" 1)
 !(add_v &kb12 "y" 1)

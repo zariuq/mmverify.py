@@ -5,8 +5,6 @@
 !(println! "")
 
 !(println! "Test 1: tze - assertion with no hypotheses")
-!(bind! &takb1 (new-space))
-!(bind! &tast1 (new-space))
 !(bind! &tasp1 (new-state 1))
 ; Initial stack: ((Num 0) ("term" "t"))
 !(add-atom &tast1 ((Num 0) ("term" "t")))
@@ -17,8 +15,6 @@
 !(test (get-state &tasp1) 1)
 
 !(println! "Test 2: tpl - assertion with two FHyps (mini proof trace)")
-!(bind! &takb2 (new-space))
-!(bind! &tast2 (new-space))
 !(bind! &tasp2 (new-state 0))
 ; Mini proof trace: build stack using treat_hypothesis
 !(add-atom &takb2 (ActiveHyp "vt"))
@@ -32,8 +28,6 @@
 !(test (get-state &tasp2) 2)
 
 !(println! "Test 3: weq - assertion with two FHyps producing wff")
-!(bind! &takb3 (new-space))
-!(bind! &tast3 (new-space))
 !(bind! &tasp3 (new-state 2))
 ; Initial stack
 !(add-atom &tast3 ((Num 0) ("term" "(" "t" "+" "0" ")")))
@@ -45,8 +39,6 @@
 !(test (get-state &tasp3) 2)
 
 !(println! "Test 4: a2 - assertion with one FHyp producing |- statement")
-!(bind! &takb4 (new-space))
-!(bind! &tast4 (new-space))
 !(bind! &tasp4 (new-state 0))
 ; Previous assertion results
 !(add-atom &tast4 ((Num 0) ("wff" "(" "t" "+" "0" ")" "=" "t")))
@@ -61,8 +53,6 @@
 !(test (get-state &tasp4) 3)
 
 !(println! "Test 5: Complex substitution - multiple variables")
-!(bind! &takb5 (new-space))
-!(bind! &tast5 (new-space))
 !(bind! &tasp5 (new-state 0))
 ; Build all three floating hypotheses
 !(add-atom &takb5 (ActiveHyp "vx"))
@@ -79,8 +69,6 @@
 !(test (get-state &tasp5) 3)
 
 !(println! "Test 6: Error - stack underflow")
-!(bind! &takb6 (new-space))
-!(bind! &tast6 (new-space))
 !(bind! &tasp6 (new-state 0))
 ; Build only one floating hypothesis
 !(add-atom &takb6 (ActiveHyp "vt"))
@@ -91,8 +79,6 @@
   (Error ((label "bad") (npop 2)) "Stack underflow: proof step requires too many hypotheses"))
 
 !(println! "Test 7: Assertion with EHyp verification (mp)")
-!(bind! &takb7 (new-space))
-!(bind! &tast7 (new-space))
 !(bind! &tasp7 (new-state 0))
 ; Build floating hypotheses
 !(add-atom &takb7 (ActiveHyp "vP"))
@@ -112,8 +98,6 @@
 !(test (get-state &tasp7) 4)
 
 !(println! "Test 8: Realistic scenario - building up proof stack")
-!(bind! &takb8 (new-space))
-!(bind! &tast8 (new-space))
 !(bind! &tasp8 (new-state 0))
 ; Start with floating hypothesis
 !(add-atom &takb8 (ActiveHyp "vt"))
@@ -129,8 +113,6 @@
 !(test (get-state &tasp8) 2)
 
 !(println! "Test 9: npop calculation with both FHyps and EHyps")
-!(bind! &takb9 (new-space))
-!(bind! &tast9 (new-space))
 !(bind! &tasp9 (new-state 0))
 ; Build 3 floating hypotheses
 !(add-atom &takb9 (ActiveHyp "vA"))
@@ -153,8 +135,6 @@
 !(test (get-state &tasp9) 5)
 
 !(println! "Test 10: Empty statement result")
-!(bind! &takb10 (new-space))
-!(bind! &tast10 (new-space))
 !(bind! &tasp10 (new-state 0))
 ; Assertion with no FHyps/EHyps and empty statement
 !(treat_assertion &takb10 &tast10 &tasp10 "empty"

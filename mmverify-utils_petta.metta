@@ -14,6 +14,15 @@
 (= (matchc $space $pattern $query)
    (collapse (matchf $space $pattern $query)))
 
+;; empty-space - remove all atoms from a space
+;; CRITICAL: DO NOT COMMENT OUT - causes stack accumulation bug!
+;; See test_stack_cleanup_petta.metta for regression test
+(= (empty-space $space)
+   (matchc $space $atom (remove-atom $space $atom)))
+
+;; Broken version for testing (stack not cleaned):
+;; (= (empty-space $space) ())
+
 ;; process_fhyps - process floating hypotheses sequentially, stop on first error
 ;; Returns True on success, (Error ...) on first failure
 ;; NOTE: Cannot use (empty) because PeTTa non-determinism causes multiple evaluations
@@ -416,6 +425,7 @@
                                  ($_4 (collapse (match $stack ((Num $n) $s) (if (>= $n $sp_val) (remove-atom $stack ((Num $n) $s)) ()))))
                                  ($new_conclusion (let $nc (once (apply_subst $subst $statement))
                                                     (let $_5 (add-atom $stack ((Num $sp_val) $nc)) $nc)))
+                                 ($_cleanup (delete-space $subst))
                                ) ()))))))))))))))
 
 ;; treat_hypothesis - process hypothesis during proof verification (new-space version)
@@ -482,6 +492,7 @@
           ($_4 (map-atom $proof $label (treat_step_with_errors $kb $stack $sp $errors $label)))
           ($_5 (remove-patternc $kb (ActiveHyp $_)))
           ($error_list (collapse (match $errors $e $e)))
+          ($_cleanup (delete-space $errors))
         )
         (if (== $error_list ()) () (car-atom $error_list)))))
 
@@ -493,16 +504,20 @@
         (((Error $info $msg)
            (Error $info $msg))
          (()
-           (let*
-             (
-               ($stack_expr (collapse (match $stack ((Num $n) $f) $f)))
-               ($_1 (if (== () $stack_expr) (Error (assertion: $conclusion) "Empty stack at end of proof.") ()))
-               ($_2 (if (> (size-atom $stack_expr) 1) (Error ((assertion: $conclusion) (stack: $stack_expr)) "Stack has more than one entry at end of proof.") ()))
-               ($stack_top (car-atom $stack_expr))
-               ($_3 (println! (Comparing: $stack_top "==" $conclusion)))
-               ($_4 (if (== $conclusion $stack_top) () (Error ((assertion: $conclusion) (stack: $stack_expr)) "Stack entry does not match proved assertion.")))
-               ($_5 (println! "Correct proof!"))
-             ) $stack_top))))))
+           (let $stack_expr (collapse (match $stack ((Num $n) $f) $f))
+             ; Check for empty stack
+             (if (== () $stack_expr)
+                 (Error (assertion: $conclusion) "Empty stack at end of proof.")
+                 ; Check for multiple items on stack
+                 (if (> (size-atom $stack_expr) 1)
+                     (Error ((assertion: $conclusion) (stack: $stack_expr)) "Stack has more than one entry at end of proof.")
+                     ; Get stack top and verify it matches conclusion
+                     (let $stack_top (car-atom $stack_expr)
+                       (let* (($_print (println! (Comparing: $stack_top "==" $conclusion))))
+                         (if (== $conclusion $stack_top)
+                             (let* (($_success (println! "Correct proof!")))
+                               $stack_top)
+                             (Error ((assertion: $conclusion) (stack: $stack_expr)) "Stack entry does not match proved assertion."))))))))))))
 
 ;; add_p - add a proof to the knowledge base (new-space version)
 (= (add_p $kb $stack $sp $label $stmt $proof $verify_proofs)
@@ -512,15 +527,18 @@
       ($_1 (println! (Verifying conclusion ($label) $stmt with proof $proof)))
       ($verify_result (if $verify_proofs (verify $kb $stack $sp $proof $stmt) ()))
     )
-    ; Check if verification produced an error - if so, return it without adding to KB
+    ; Check if verify returned an error using case match
     (case $verify_result
       (((Error $info $msg)
-         (Error $info $msg))
+         ; Error case - print error and return it without adding to KB
+         (let ($_print (println! (PROOF FAILED: $label - $verify_result)))
+           $verify_result))
        ($_
+         ; Success case - add proof to KB
          (let*
            (
              ($_2 (println! ("make_assertion" $label - $stmt)))
              (( (DVars $dvs) (FHyps $f_hyps) (EHyps $e_hyps) (Statement $stmt) ) (make_assertion $kb $stmt))
              ($_3 (println! ("gathered assertion data:" $dvs $f_hyps $e_hyps $stmt)))
            )
-           (let $_4 (add-atom $kb ( (Label $label) Proof ( (DVars $dvs) (FHyps $f_hyps) (EHyps $e_hyps) (Statement $stmt) (Type "$p") (ProofSequence $proof) ))) $verify_result)))))))
+           (add-atom $kb ( (Label $label) Proof ( (DVars $dvs) (FHyps $f_hyps) (EHyps $e_hyps) (Statement $stmt) (Type "$p") (ProofSequence $proof) )))))))))
