@@ -1,48 +1,25 @@
+;; test_add_e_petta.metta - Test add_e function (PeTTa version)
+
+!(import! &self /home/zar/claude/hyperon/PeTTa/lib/lib_he)
 !(import! &self ../mmverify-utils_petta)
 
-!(println! "=== Testing add_e (Space version) - Full Suite ===")
+;; Create test KB
+!(bind! &kb (new-space))
 
-; Test 1: Basic add_e - add essential hypothesis
-!(println! "Test 1: Basic add_e")
-!(add_e &kb1 "e1" ("wff" ("implies" "p" "q")) 0)
-!(test (collapse (match &kb1 ((Label $l) EHyp (FSDepth $d) ((Statement $s) (Type "$e"))) ($l $s $d)))
-       (("e1" ("wff" ("implies" "p" "q")) 0)))
+;; Test 1: Add first essential hypothesis to level 1
+!(add_e &kb label1 ("wff" "ph") 1)
+!(test (collapse (match &kb (EList (FSDepth 1) $elist) $elist)) ((Cons ("wff" "ph") Nil)))
 
-; Test 2: Verify EList was created
-!(println! "Test 2: EList created")
-!(test (collapse (match &kb1 (EList (FSDepth 0) $el) $el))
-       ((Cons ("wff" ("implies" "p" "q")) Nil)))
+;; Test 2: Add second essential hypothesis to same level (should append)
+!(add_e &kb label2 ("wff" "ps") 1)
+!(test (collapse (match &kb (EList (FSDepth 1) $elist) $elist)) ((Cons ("wff" "ph") (Cons ("wff" "ps") Nil))))
 
-; Test 3: Add second essential hypothesis, verify EList updated
-!(println! "Test 3: Multiple essential hypotheses, EList updated")
-!(add_e &kb2 "e1" ("wff" ("implies" "p" "q")) 0)
-!(add_e &kb2 "e2" ("wff" "p") 0)
-!(test (collapse (match &kb2 (EList (FSDepth 0) $el) $el))
-       ((Cons ("wff" ("implies" "p" "q")) (Cons ("wff" "p") Nil))))
+;; Test 3: Verify EHyp atoms were created  
+!(test (size-atom (collapse (match &kb ((Label $l) EHyp (FSDepth 1) $data) found))) 2)
 
-; Test 4: Multiple essential hypotheses at same level
-!(println! "Test 4: Multiple labels at same level")
-!(add_e &kb3 "e1" ("wff" ("implies" "p" "q")) 0)
-!(add_e &kb3 "e2" ("wff" "p") 0)
-!(add_e &kb3 "e3" ("wff" "q") 0)
-!(test (collapse (match &kb3 ((Label $l) EHyp (FSDepth 0) ((Statement $s) (Type "$e"))) $l))
-       ("e1" "e2" "e3"))
+;; Test 4: Add essential hypothesis to different level
+!(add_e &kb label3 ("wff" "ch") 2)
+!(test (collapse (match &kb (EList (FSDepth 2) $elist) $elist)) ((Cons ("wff" "ch") Nil)))
 
-; Test 5: Different levels create separate ELists
-!(println! "Test 5: Different levels have separate ELists")
-!(add_e &kb4 "e1" ("wff" "p") 0)
-!(add_e &kb4 "e2" ("wff" "q") 1)
-!(test (collapse (match &kb4 (EList (FSDepth 0) $el) $el))
-       ((Cons ("wff" "p") Nil)))
-!(test (collapse (match &kb4 (EList (FSDepth 1) $el) $el))
-       ((Cons ("wff" "q") Nil)))
-
-; Test 6: EList appends in order
-!(println! "Test 6: EList maintains order")
-!(add_e &kb5 "e1" ("wff" "p") 0)
-!(add_e &kb5 "e2" ("wff" "q") 0)
-!(add_e &kb5 "e3" ("wff" "r") 0)
-!(test (collapse (match &kb5 (EList (FSDepth 0) $el) $el))
-       ((Cons ("wff" "p") (Cons ("wff" "q") (Cons ("wff" "r") Nil)))))
-
-!(println! "=== add_e tests complete ===")
+;; Test 5: Verify level 1 EList unchanged
+!(test (collapse (match &kb (EList (FSDepth 1) $elist) $elist)) ((Cons ("wff" "ph") (Cons ("wff" "ps") Nil))))

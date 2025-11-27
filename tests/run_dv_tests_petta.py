@@ -79,8 +79,9 @@ class PeTTaTestRunner:
             print(f"\n{BLUE}Running: {test_name}{RESET}")
             print(f"  Expected: {'FAIL' if expected_fail else 'PASS'}")
 
-        # Command to run PeTTa
+        # Command to run PeTTa (need to use bash explicitly)
         cmd = [
+            "bash",
             str(self.petta_runner_path),
             str(test_path),
             "--silent" # Suppress MORK init: done and other PeTTa internal prints
@@ -88,11 +89,14 @@ class PeTTaTestRunner:
 
         start_time = time.time()
         try:
+            # Run from PeTTa directory so run.sh can find src/main.pl
+            petta_dir = self.petta_runner_path.parent
             result = subprocess.run(
                 cmd,
                 capture_output=True,
                 text=True,
-                timeout=120 # Increased timeout for PeTTa tests
+                timeout=120, # Increased timeout for PeTTa tests
+                cwd=petta_dir
             )
             output = result.stdout + result.stderr
             duration = time.time() - start_time

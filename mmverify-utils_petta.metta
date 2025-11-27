@@ -87,9 +87,9 @@
 (= (add_dv_pair_if_fresh $kb $x $y $level)
   (if (== $x $y) ()
     (let ($ox $oy) (orient_pair $x $y)
-      (case (collapse (match $kb (DVar ($ox $oy) (FSDepth $level) (Type "$d")) found))
-        (((found) ())
-         (() (add-atom $kb (DVar ($ox $oy) (FSDepth $level) (Type "$d")))))))))
+      (unify $kb (DVar ($ox $oy) (FSDepth $level) (Type "$d"))
+        ()
+        (add-atom $kb (DVar ($ox $oy) (FSDepth $level) (Type "$d")))))))
 
 ; Look up disjoint variables (which are oriented)
 (= (lookup_d $kb $x $y) (let ($x' $y') (orient_pair $x $y) (unify $kb (DVar ($x' $y') $_ (Type "$d")) True False)))
@@ -307,10 +307,7 @@
 
 ;; apply_subst_tok - apply substitution to single token
 (= (apply_subst_tok $subst $tok)
-   (let $res (collapse (match $subst ($tok $sub) $sub))
-     (if (== $res ())
-         $tok
-         (car-atom $res))))
+  (let $res (unify $subst ($tok $sub) $sub $tok) $res))
 
 ;; apply_subst - apply substitution to statement
 (= (apply_subst $subst $stmt)
@@ -339,7 +336,7 @@
         (== $x $y)
         (not (lookup_d $kb $x $y)))
       (Error ($x $y) "Disjoint variable violation.")
-      (let true (println! ("no dv error:" $x $y)) true)))
+      ()))
 
 ;; Check all pairs from x_vars × y_vars using superpose
 ;; Returns True if all pass, or Error on first failure
@@ -514,8 +511,8 @@
     (case $verify_result
       (((Error $info $msg)
          ; Error case - print error and return it without adding to KB
-         (let ($_print (println! (PROOF FAILED: $label - $verify_result)))
-           $verify_result))
+         (prog1 $verify_result
+           (println! ("PROOF FAILED:" $label $verify_result))))
        ((success $stack_top)
          ; Success case - add proof to KB
          (let*
