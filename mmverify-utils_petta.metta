@@ -330,36 +330,47 @@
 (= (find_vars $kb $stmt)
   (filter-atom $stmt $tok (unify $kb (Var $tok $_ (Type "$v")) True False)))
 
-;; doesn't work either
+;; dv_check - check that two variables from different substitutions are distinct
+;; For $d x y, we need vars(x_subst) ∩ vars(y_subst) = ∅
+;; This means: if same variable appears in both, FAIL
+;; Returns true on success, (Error ...) on failure
 (= (dv_check $kb $x $y)
-  (if (or
-        (== $x $y)
-        (not (lookup_d $kb $x $y)))
+  (if (== $x $y)
       (Error ($x $y) "Disjoint variable violation.")
-      ()))
+      true))
 
-;; Check all pairs from x_vars × y_vars using superpose
-;; Returns True if all pass, or Error on first failure
+;; Check all pairs from x_vars × y_vars
+;; Returns true if all pass, or (Error ...) on first failure
+;; Uses collapse to make deterministic - collects all results and checks for errors
 (= (check_dv_pairs $kb $x_vars $y_vars)
-  (let $x (superpose $x_vars)
-    (let $y (superpose $y_vars)
-      (dv_check $kb $x $y))))
+  (let $results (collapse
+                  (let $x (superpose $x_vars)
+                    (let $y (superpose $y_vars)
+                      (dv_check $kb $x $y))))
+    ; Find first error in results using expression list format
+    (check_dv_results $results)))
+
+;; Helper to find first Error in expression list (not Cons/Nil)
+;; Expression list is like (true true true) or ((Error x y) true true)
+(= (check_dv_results $results)
+  (if (== $results ())
+      true  ; empty list = all passed
+      (let ($head $tail) (decons-atom $results)
+        (case $head
+          (((Error $info $msg) (Error $info $msg))  ; found error, return it
+           ($_ (check_dv_results $tail)))))))
 
 ;; Empty DV list means no constraints to check - success
 (= (check_dvs $kb $subst ())
-  True)
+  true)
 
 ;; Check each DV pair in the list
 (= (check_dvs $kb $subst $dvs0)
   (let $d (superpose $dvs0)
     (let* (
       (($d1 $d2) $d)
-      (true (println! ("received: " $d)))
-      (true (println! ("subst is: " (collapse (get-atoms $subst)))))
       ($x_vars (match $subst ($d1 $sub1) (find_vars $kb $sub1)))
-      (true (println! ("checked substs x: " $x_vars)))
       ($y_vars (match $subst ($d2 $sub2) (find_vars $kb $sub2)))
-      (true (println! ("checked subts y: " $y_vars)))
     ) (check_dv_pairs $kb $x_vars $y_vars))))
 
 
