@@ -1,6 +1,16 @@
 ;; mmverify-utils_petta_fresh.metta - Clean reconstruction
 !(import! &self ../../PeTTa/lib/lib_he)
 
+;; exec - wrapper for fail-fast execution with error handling
+;; Halts execution on Error, returns the evaluated value otherwise
+(: exec (-> Atom %Undefined%))
+(= (exec $prog)
+  (case (catch (eval $prog))
+    (((Error $type $context)
+        (let true (println! ("ERROR:" (Error $type $context))) 
+          (callPredicate halt)))
+     ($Else $Else))))
+
 ; Note, nested match statements inside of defined functions don't work with variable binding in PeTTa.
 ; (= (matchc $space $pattern $query) (collapse (match $space $pattern $query)))
 

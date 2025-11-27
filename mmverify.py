@@ -61,7 +61,11 @@ transform_log: list[str] = []
 
 # Run and optionally log a MeTTa command
 def mettarl(cmd: str):
-    """Execute a MeTTa command and store it when logging is enabled."""
+    """Execute a MeTTa command and store it when logging is enabled.
+    In PeTTa mode, wraps add_* commands in exec() for fail-fast execution."""
+    # In PeTTa mode, wrap add_* commands in exec() for fail-fast error handling
+    if petta_mode and cmd.startswith('!(add_'):
+        cmd = f'!(exec ({cmd[2:-1]}))'  # !(add_x ...) -> !(exec (add_x ...))
     if metta_log_file:
         metta_log.append(cmd)
     if run_metta:
@@ -69,15 +73,10 @@ def mettarl(cmd: str):
     return []
 
 # Log a transformed MeTTa statement if transformation logging is enabled
-<<<<<<< Updated upstream
-def log_bc_transform(stmt: str) -> None:
-    """Record a backward chainer MeTTa command for later output."""
-=======
 # Note that this is to transform MM into a form of MeTTa good for chaining!
 # Not the verification.
-def log_transform(stmt: str) -> None:
-    """Record a transformed MeTTa command for later output."""
->>>>>>> Stashed changes
+def log_bc_transform(stmt: str) -> None:
+    """Record a backward chainer MeTTa command for later output."""
     if transformed_metta_file:
         transform_log.append(stmt)
 
