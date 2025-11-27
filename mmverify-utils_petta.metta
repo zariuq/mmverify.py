@@ -65,27 +65,15 @@
 
 ;; add_c
 (= (add_c $kb $tok)
-  (case (collapse (match $kb (Constant $tok (Type "$c")) found))
-    (((found)
-       (Error (Constant $tok) "Constant already declared."))
-     (()
-       (case (collapse (match $kb (Var $tok $_ (Type "$v")) found))
-         (((found)
-            (Error (Var $tok) "Trying to declare as a constant an active variable."))
-          (()
-            (add-atom $kb (Constant $tok (Type "$c"))))))))))
+  (unify $kb (Constant $tok (Type "$c")) (Error (Constant $tok) "Constant already declared.")
+    (unify $kb (Var $tok $_ (Type "$v")) (Error (Var $tok) "Trying to declare as a constant an active variable.")
+      (add-atom $kb (Constant $tok (Type "$c"))))))
 
 ;; add_v
 (= (add_v $kb $tok $level)
-  (case (collapse (match $kb (Var $tok $_ (Type "$v")) found))
-    (((found)
-       (Error (Var $tok) "Var already declared and active."))
-     (()
-       (case (collapse (match $kb (Constant $tok (Type "$c")) found))
-         (((found)
-            (Error (Constant $tok) "Var already declared as constant."))
-          (()
-            (add-atom $kb (Var $tok (FSDepth $level) (Type "$v"))))))))))
+  (unify $kb (Var $tok $_ (Type "$v")) (Error (Var $tok) "Var already declared and active.")
+    (unify $kb (Constant $tok (Type "$c")) (Error (Constant $tok) "Var already declared as constant.")
+      (add-atom $kb (Var $tok (FSDepth $level) (Type "$v"))))))
 
 ;; String comparison
 (= (string< $x $y) (@< $x $y))
@@ -102,6 +90,9 @@
       (case (collapse (match $kb (DVar ($ox $oy) (FSDepth $level) (Type "$d")) found))
         (((found) ())
          (() (add-atom $kb (DVar ($ox $oy) (FSDepth $level) (Type "$d")))))))))
+
+; Look up disjoint variables (which are oriented)
+(= (lookup_d $kb $x $y) (let ($x' $y') (orient_pair $x $y) (unify $kb (DVar ($x' $y') $_ (Type "$d")) True False)))
 
 ;; add_d
 (= (add_d $kb $varlist $level)
@@ -308,8 +299,9 @@
     ) (if (== $entry0 $typecode)
         (let*
           (
-            ($_1 (add-atom $subst ($var $entry1:)))
+            (true (add-atom $subst ($var $entry1:)))
             ($_2 (adjust-state-additive $sp 1))
+            ; (true (println! ("added to subst:" $entry1:)))
           ) ($var $entry1:))
         (Error ((sp $sp_val) (entry $entry) (typecode $typecode) (var $var)) "Proof stack entry does not match floating hypothesis."))))
 
@@ -337,51 +329,42 @@
         (adjust-state-additive $sp 1)
         (Error ((sp $sp_val) (entry $entry) (ehyp $ehyp) (subst_h $subst_h)) "Proof stack entry does not match essential hypothesis."))))
 
-;; find_vars - find all variables in an expression
-;; Uses Cons list iteration to avoid nested match issues in PeTTa
-(= (find-vars-cons $kb Nil) Nil)
-(= (find-vars-cons $kb (Cons $head $tail))
-   (let $rest (find-vars-cons $kb $tail)
-     (let $check (collapse (match $kb (Var $head $_ (Type "$v")) found))
-       (if (== $check (found))
-           (Cons $head $rest)
-           $rest))))
+;; Find all tokens in a statement that are variables
+(= (find_vars $kb $stmt)
+  (filter-atom $stmt $tok (unify $kb (Var $tok $_ (Type "$v")) True False)))
 
-(= (find_vars $kb $expr)
-  (from-list (find-vars-cons $kb (to-list $expr))))
-
-;; dv_check - check if two variables from substitutions satisfy DV constraints
-;; From mmverify.py line 812: if x0 == y0 or not lookup_d(x0, y0): raise error
-;; So: ERROR if x == y OR if no DVar(x, y) exists in current scope
-;; SUCCESS only if x != y AND DVar(x, y) is declared
-;; Returns (Error ...) for violation, or (empty) for success
-;; Use (empty) so case+Empty pattern works in PeTTa
+;; doesn't work either
 (= (dv_check $kb $x $y)
-  (if (== $x $y)
-    (Error ($x $y) "Disjoint variable violation: same variable in both substitutions")
-    (let ($ox $oy) (orient_pair $x $y)
-      (case (collapse (match $kb (DVar ($ox $oy) $_ (Type "$d")) found))
-        (((found) (empty))
-         (() (Error (disjoint ($x $y)) "Disjoint variable constraint not declared")))))))
+  (if (or
+        (== $x $y)
+        (not (lookup_d $kb $x $y)))
+      (Error ($x $y) "Disjoint variable violation.")
+      (let true (println! ("no dv error:" $x $y)) true)))
 
-;; check_dv_pairs - check all pairs from two variable lists
-;; Uses superpose so each successful check (empty) disappears, only errors remain
+;; Check all pairs from x_vars × y_vars using superpose
+;; Returns True if all pass, or Error on first failure
 (= (check_dv_pairs $kb $x_vars $y_vars)
   (let $x (superpose $x_vars)
     (let $y (superpose $y_vars)
       (dv_check $kb $x $y))))
 
-;; check_dvs - check all disjoint variable constraints
-;; Uses superpose so each successful check (empty) disappears, only errors remain
-;; Returns True for empty dvs, (Error ...) or (empty) for non-empty dvs
-;; IMPORTANT: Must handle empty dvs0 specially since (superpose ()) fails in PeTTa
+;; Empty DV list means no constraints to check - success
+(= (check_dvs $kb $subst ())
+  True)
+
+;; Check each DV pair in the list
 (= (check_dvs $kb $subst $dvs0)
-  (if (== (size-atom $dvs0) 0)
-      True  ; No DV constraints to check - success
-      (let ($d1 $d2) (superpose $dvs0)
-        (let $x_vars (match $subst ($d1 $sub1) (find_vars $kb $sub1))
-          (let $y_vars (match $subst ($d2 $sub2) (find_vars $kb $sub2))
-            (check_dv_pairs $kb $x_vars $y_vars))))))
+  (let $d (superpose $dvs0)
+    (let* (
+      (($d1 $d2) $d)
+      (true (println! ("received: " $d)))
+      (true (println! ("subst is: " (collapse (get-atoms $subst)))))
+      ($x_vars (match $subst ($d1 $sub1) (find_vars $kb $sub1)))
+      (true (println! ("checked substs x: " $x_vars)))
+      ($y_vars (match $subst ($d2 $sub2) (find_vars $kb $sub2)))
+      (true (println! ("checked subts y: " $y_vars)))
+    ) (check_dv_pairs $kb $x_vars $y_vars))))
+
 
 ;; NOTE: verify_dvs, has-dv-error, find-error-in-cons removed
 ;; Now using case (check_dvs ...) + Empty pattern directly in treat_assertion
@@ -458,7 +441,7 @@
                   (((($t $d)) ($t $d))
                    (() (Error (label $label) "No statement information found for label"))))))))
         ($stack_len (case (collapse (match $stack ((Num $n) $s) $n)) ( ( () 0 ) ( $nums (+ 1 (max-atom $nums))) )))
-        ($_2 (println! ($Type $label data: $Data)))
+        (true (println! ($Type $label data: $Data)))
       )
       (let $result
         (case $Type
@@ -468,7 +451,7 @@
             (Assertion (treat_assertion $kb $stack $sp $label $Data $stack_len))
             (Proof (treat_assertion $kb $stack $sp $label $Data $stack_len))
           ))
-        (let $_3 (println! (stack ($label): (collapse (match $stack $s $s))))
+        (let true (println! (stack ($label): (collapse (match $stack $s $s))))
           $result))))
 
 ;; treat_step_with_errors - treat step and record errors in error space
@@ -489,7 +472,7 @@
           ($_1 (empty-space $stack))
           ($_2 (collapse (match $kb ((Label $label) FHyp $FSDepth $Data) (add-atom $kb (ActiveHyp $label)))))
           ($_3 (collapse (match $kb ((Label $label) EHyp $FSDepth $Data) (add-atom $kb (ActiveHyp $label)))))
-          ($_4 (map-atom $proof $label (treat_step_with_errors $kb $stack $sp $errors $label)))
+          ($_4 (collapse (map-atom $proof $label (treat_step_with_errors $kb $stack $sp $errors $label))))
           ($_5 (remove-patternc $kb (ActiveHyp $_)))
           ($error_list (collapse (match $errors $e $e)))
           ($_cleanup (delete-space $errors))
@@ -516,7 +499,7 @@
                        (let* (($_print (println! (Comparing: $stack_top "==" $conclusion))))
                          (if (== $conclusion $stack_top)
                              (let* (($_success (println! "Correct proof!")))
-                               $stack_top)
+                               (success $stack_top))
                              (Error ((assertion: $conclusion) (stack: $stack_expr)) "Stack entry does not match proved assertion."))))))))))))
 
 ;; add_p - add a proof to the knowledge base (new-space version)
@@ -533,7 +516,7 @@
          ; Error case - print error and return it without adding to KB
          (let ($_print (println! (PROOF FAILED: $label - $verify_result)))
            $verify_result))
-       ($_
+       ((success $stack_top)
          ; Success case - add proof to KB
          (let*
            (

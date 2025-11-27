@@ -69,8 +69,15 @@ def mettarl(cmd: str):
     return []
 
 # Log a transformed MeTTa statement if transformation logging is enabled
+<<<<<<< Updated upstream
 def log_bc_transform(stmt: str) -> None:
     """Record a backward chainer MeTTa command for later output."""
+=======
+# Note that this is to transform MM into a form of MeTTa good for chaining!
+# Not the verification.
+def log_transform(stmt: str) -> None:
+    """Record a transformed MeTTa command for later output."""
+>>>>>>> Stashed changes
     if transformed_metta_file:
         transform_log.append(stmt)
 
