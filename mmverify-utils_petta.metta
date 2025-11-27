@@ -51,8 +51,9 @@
 ;; Explicit frame management for elegant bijection
 ;; TODO: Future work - pass &fd state and use get-state to avoid explicit level params
 
+;; push-frame / pop-frame - return () for clean output
 (= (push-frame $fd)
-  (adjust-state-additive $fd 1))
+  (let $_ (adjust-state-additive $fd 1) ()))
 
 (= (pop-frame $kb $fd)
   (let $level (get-state $fd)
@@ -61,19 +62,20 @@
       ($_1 (remove-patternc $kb (EList (FSDepth $level) $elist)))
       ($_2 (remove-patternc $kb (FList (FSDepth $level) $flist)))
       ($_3 (remove-patternc $kb ($1 $2 (FSDepth $level) $Data)))
-    ) (adjust-state-additive $fd -1))))
+      ($_4 (adjust-state-additive $fd -1))
+    ) ())))
 
-;; add_c
+;; add_c - returns () on success, Error on failure
 (= (add_c $kb $tok)
   (unify $kb (Constant $tok (Type "$c")) (Error (Constant $tok) "Constant already declared.")
     (unify $kb (Var $tok $_ (Type "$v")) (Error (Var $tok) "Trying to declare as a constant an active variable.")
-      (add-atom $kb (Constant $tok (Type "$c"))))))
+      (let $_ (add-atom $kb (Constant $tok (Type "$c"))) ()))))
 
-;; add_v
+;; add_v - returns () on success, Error on failure
 (= (add_v $kb $tok $level)
   (unify $kb (Var $tok $_ (Type "$v")) (Error (Var $tok) "Var already declared and active.")
     (unify $kb (Constant $tok (Type "$c")) (Error (Constant $tok) "Var already declared as constant.")
-      (add-atom $kb (Var $tok (FSDepth $level) (Type "$v"))))))
+      (let $_ (add-atom $kb (Var $tok (FSDepth $level) (Type "$v"))) ()))))
 
 ;; String comparison
 (= (string< $x $y) (@< $x $y))
@@ -94,11 +96,12 @@
 ; Look up disjoint variables (which are oriented)
 (= (lookup_d $kb $x $y) (let ($x' $y') (orient_pair $x $y) (unify $kb (DVar ($x' $y') $_ (Type "$d")) True False)))
 
-;; add_d
+;; add_d - discard map-atom results to avoid n×n output noise
 (= (add_d $kb $varlist $level)
-  (map-atom $varlist $x
-    (map-atom $varlist $y
-      (add_dv_pair_if_fresh $kb $x $y $level))))
+  (let $_ (map-atom $varlist $x
+            (map-atom $varlist $y
+              (add_dv_pair_if_fresh $kb $x $y $level)))
+    ()))
 
 ;; List Utils
 (= (to-list $expr)
@@ -185,7 +188,7 @@
                              (()
                                (add-atom $kb (FList (FSDepth $level) $flist_entry))))))
                    )
-                   (add-atom $kb ((Label $label) FHyp (FSDepth $level) ((Typecode $typecode) (FVar $var) (Type "$f")))))))))
+                   (let $_ (add-atom $kb ((Label $label) FHyp (FSDepth $level) ((Typecode $typecode) (FVar $var) (Type "$f")))) ()))))))
           (()
             (Error (Constant $typecode) "Typecode in $f not declared.")))))
      (()
@@ -205,7 +208,7 @@
               (()
                 (add-atom $kb (EList (FSDepth $level) $elist_entry))))))
     )
-      (add-atom $kb ((Label $label) EHyp (FSDepth $level) ((Statement $stmt) (Type "$e"))))))
+      (let $_ (add-atom $kb ((Label $label) EHyp (FSDepth $level) ((Statement $stmt) (Type "$e")))) ())))
 
 ;; collect_lists_by_depth - collect lists from unordered data by depth level
 (= (collect_lists_by_depth $unordered_list $current $max $ordered_list)
@@ -215,13 +218,15 @@
       (collect_lists_by_depth $unordered_list (+ 1 $current) $max (mappend $ordered_list $current_list)))))
 
 ;; add_mand_var - add mandatory variable marker (new-space version)
+;; Uses if-guards to avoid nested case non-determinism
 (= (add_mand_var $kb $tok)
-  (case (collapse (match $kb (Var $tok $_ (Type "$v")) found))
-    (((found)
-       (case (collapse (match $kb (MandVar $tok) found))
-         (((found) ())
-          (() (add-atom $kb (MandVar $tok))))))
-     (() ()))))
+  (let $is_var (collapse (match $kb (Var $tok $_ (Type "$v")) found))
+    (if (== $is_var ())
+        ()  ; not a var, do nothing
+        (let $already (collapse (match $kb (MandVar $tok) found))
+          (if (== $already ())
+              (let $_ (add-atom $kb (MandVar $tok)) ())  ; add and return ()
+              ())))))
 
 ;; assign_f_hyps - filter f-hypotheses by mandatory variables (new-space version)
 (= (assign_f_hyps $kb Nil) Nil)
@@ -243,9 +248,10 @@
    (collapse (let $pattern (match $space $pattern $pattern) (remove-atom $space $pattern))))
 
 ;; add_a - add assertion to knowledge base (new-space version)
+;; add_a - returns () on success
 (= (add_a $kb $label $stmt)
   (let ((DVars $dvs) (FHyps $f_hyps) (EHyps $e_hyps) (Statement $s)) (make_assertion $kb $stmt)
-    (add-atom $kb ((Label $label) Assertion ((DVars $dvs) (FHyps $f_hyps) (EHyps $e_hyps) (Statement $s) (Type "$a"))))))
+    (let $_ (add-atom $kb ((Label $label) Assertion ((DVars $dvs) (FHyps $f_hyps) (EHyps $e_hyps) (Statement $s) (Type "$a")))) ())))
 
 ;; make_assertion - build assertion frame from statement (new-space version)
 (= (make_assertion $kb $stmt)
@@ -330,14 +336,15 @@
 (= (find_vars $kb $stmt)
   (filter-atom $stmt $tok (unify $kb (Var $tok $_ (Type "$v")) True False)))
 
-;; dv_check - check that two variables from different substitutions are distinct
-;; For $d x y, we need vars(x_subst) ∩ vars(y_subst) = ∅
-;; This means: if same variable appears in both, FAIL
+;; dv_check - check that two variables from different substitutions satisfy DV constraint
+;; For $d x y, we need every var in subst(x) to be declared $d with every var in subst(y)
 ;; Returns true on success, (Error ...) on failure
 (= (dv_check $kb $x $y)
   (if (== $x $y)
-      (Error ($x $y) "Disjoint variable violation.")
-      true))
+      (Error ($x $y) "Disjoint variable violation - same variable.")
+      (if (lookup_d $kb $x $y)
+          true
+          (Error ($x $y) "Disjoint variable violation - not declared."))))
 
 ;; Check all pairs from x_vars × y_vars
 ;; Returns true if all pass, or (Error ...) on first failure
@@ -360,18 +367,20 @@
           (((Error $info $msg) (Error $info $msg))  ; found error, return it
            ($_ (check_dv_results $tail)))))))
 
-;; Empty DV list means no constraints to check - success
-(= (check_dvs $kb $subst ())
-  true)
-
-;; Check each DV pair in the list
+;; Check DV constraints in a list
+;; Uses collapse to make deterministic - collect all results and find first error
+;; Single clause with guard handles both empty and non-empty cases
 (= (check_dvs $kb $subst $dvs0)
-  (let $d (superpose $dvs0)
-    (let* (
-      (($d1 $d2) $d)
-      ($x_vars (match $subst ($d1 $sub1) (find_vars $kb $sub1)))
-      ($y_vars (match $subst ($d2 $sub2) (find_vars $kb $sub2)))
-    ) (check_dv_pairs $kb $x_vars $y_vars))))
+  (if (== $dvs0 ())
+      true  ; empty list = no constraints to check
+      (let $results (collapse
+                      (let $d (superpose $dvs0)
+                        (let* (
+                          (($d1 $d2) $d)
+                          ($x_vars (match $subst ($d1 $sub1) (find_vars $kb $sub1)))
+                          ($y_vars (match $subst ($d2 $sub2) (find_vars $kb $sub2)))
+                        ) (check_dv_pairs $kb $x_vars $y_vars))))
+        (check_dv_results $results))))
 
 
 ;; NOTE: verify_dvs, has-dv-error, find-error-in-cons removed
@@ -511,12 +520,13 @@
                              (Error ((assertion: $conclusion) (stack: $stack_expr)) "Stack entry does not match proved assertion."))))))))))))
 
 ;; add_p - add a proof to the knowledge base (new-space version)
+;; Returns () on success, (Error ...) on failure
 (= (add_p $kb $stack $sp $label $stmt $proof $verify_proofs)
   (let*
     (
       ($_0 (println! ""))
       ($_1 (println! (Verifying conclusion ($label) $stmt with proof $proof)))
-      ($verify_result (if $verify_proofs (verify $kb $stack $sp $proof $stmt) ()))
+      ($verify_result (if $verify_proofs (verify $kb $stack $sp $proof $stmt) (skip-verify)))
     )
     ; Check if verify returned an error using case match
     (case $verify_result
@@ -525,11 +535,17 @@
          (prog1 $verify_result
            (println! ("PROOF FAILED:" $label $verify_result))))
        ((success $stack_top)
-         ; Success case - add proof to KB
+         ; Success case - add proof to KB, return ()
          (let*
            (
              ($_2 (println! ("make_assertion" $label - $stmt)))
              (( (DVars $dvs) (FHyps $f_hyps) (EHyps $e_hyps) (Statement $stmt) ) (make_assertion $kb $stmt))
              ($_3 (println! ("gathered assertion data:" $dvs $f_hyps $e_hyps $stmt)))
+             ($_4 (add-atom $kb ( (Label $label) Proof ( (DVars $dvs) (FHyps $f_hyps) (EHyps $e_hyps) (Statement $stmt) (Type "$p") (ProofSequence $proof) ))))
            )
-           (add-atom $kb ( (Label $label) Proof ( (DVars $dvs) (FHyps $f_hyps) (EHyps $e_hyps) (Statement $stmt) (Type "$p") (ProofSequence $proof) )))))))))
+           ()))
+       ((skip-verify)
+         ; Verification skipped, just add proof to KB
+         (let ((DVars $dvs) (FHyps $f_hyps) (EHyps $e_hyps) (Statement $s)) (make_assertion $kb $stmt)
+           (let $_ (add-atom $kb ( (Label $label) Proof ( (DVars $dvs) (FHyps $f_hyps) (EHyps $e_hyps) (Statement $s) (Type "$p") (ProofSequence $proof) )))
+             ())))))))
