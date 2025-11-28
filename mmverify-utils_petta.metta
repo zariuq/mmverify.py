@@ -475,42 +475,50 @@
      (() (Error (label $label) "The label is the label of a nonactive hypothesis.")))))
 
 ;; treat_step - dispatch proof step to appropriate handler (new-space version)
-;; Returns (Error ...) on error, () on success
+;; Returns (Error ...) on error, () on success, (incomplete) for ? step
 (= (treat_step $kb $stack $sp $label)
-    (let*
-      (
-        (true (printif! (»»» treating label $label)))
-        (($Type $Data)
-           (case (collapse (match $kb ((Label $label) $Type $Data) ($Type $Data)))
-             (((($t $d)) ($t $d))
-              (()
-                (case (collapse (match $kb ((Label $label) $Type (FSDepth $level) $Data) ($Type $Data)))
-                  (((($t $d)) ($t $d))
-                   (() (Error (label $label) "No statement information found for label"))))))))
-        ($stack_len (case (collapse (match $stack ((Num $n) $s) $n)) ( ( () 0 ) ( $nums (+ 1 (max-atom $nums))) )))
-        (true (printif! ($Type $label data: $Data)))
-      )
-      (let $result
-        (case $Type
+    ;; Handle ? (unknown/incomplete step) - per Metamath spec, accept with warning
+    ;; Check both symbol ? and string "?" since Prolog->MeTTa conversion may vary
+    (if (or (== $label ?) (== $label "?"))
+        (progn
+          (println! "WARNING: ? (unknown step) in proof - marking as incomplete")
+          (incomplete))
+        (let*
           (
-            (FHyp (treat_hypothesis $kb $stack $label $Type $Data $stack_len))
-            (EHyp (treat_hypothesis $kb $stack $label $Type $Data $stack_len))
-            (Assertion (treat_assertion $kb $stack $sp $label $Data $stack_len))
-            (Proof (treat_assertion $kb $stack $sp $label $Data $stack_len))
-          ))
-        (let true (printif! (stack ($label): (collapse (match $stack $s $s))))
-          $result))))
+            (true (printif! (»»» treating label $label)))
+            (($Type $Data)
+               (case (collapse (match $kb ((Label $label) $Type $Data) ($Type $Data)))
+                 (((($t $d)) ($t $d))
+                  (()
+                    (case (collapse (match $kb ((Label $label) $Type (FSDepth $level) $Data) ($Type $Data)))
+                      (((($t $d)) ($t $d))
+                       (() (Error (label $label) "No statement information found for label"))))))))
+            ($stack_len (case (collapse (match $stack ((Num $n) $s) $n)) ( ( () 0 ) ( $nums (+ 1 (max-atom $nums))) )))
+            (true (printif! ($Type $label data: $Data)))
+          )
+          (let $result
+            (case $Type
+              (
+                (FHyp (treat_hypothesis $kb $stack $label $Type $Data $stack_len))
+                (EHyp (treat_hypothesis $kb $stack $label $Type $Data $stack_len))
+                (Assertion (treat_assertion $kb $stack $sp $label $Data $stack_len))
+                (Proof (treat_assertion $kb $stack $sp $label $Data $stack_len))
+              ))
+            (let true (printif! (stack ($label): (collapse (match $stack $s $s))))
+              $result)))))
 
-;; treat_step_with_errors - treat step and record errors in error space
+;; treat_step_with_errors - treat step and record errors/incomplete markers in error space
 (= (treat_step_with_errors $kb $stack $sp $errors $label)
     (let $result (treat_step $kb $stack $sp $label)
       (case $result
         (((Error $info $msg)
            (add-atom $errors (Error $info $msg)))
+         ((incomplete)
+           (add-atom $errors (incomplete)))
          ($_ ())))))
 
 ;; treat_normal_proof - process a proof sequence (new-space version)
-;; Returns first (Error ...) if any step fails, () on success
+;; Returns first (Error ...) if any step fails, (incomplete) if ? found, () on success
 (= (treat_normal_proof $kb $stack $sp $proof)
     (let $errors (new-space)
       (let*
@@ -521,18 +529,25 @@
           ($_3 (collapse (match $kb ((Label $label) EHyp $FSDepth $Data) (add-atom $kb (ActiveHyp $label)))))
           ($_4 (collapse (map-atom $proof $label (treat_step_with_errors $kb $stack $sp $errors $label))))
           ($_5 (remove-patternc $kb (ActiveHyp $_)))
-          ($error_list (collapse (match $errors $e $e)))
+          ;; Query errors space directly instead of using filter-atom
+          ($real_errors (collapse (match $errors (Error $i $m) (Error $i $m))))
+          ($incomplete_markers (collapse (match $errors (incomplete) (incomplete))))
           ($_cleanup (delete-space $errors))
         )
-        (if (== $error_list ()) () (car-atom $error_list)))))
+        ;; Return first real error if any, else (incomplete) if present, else ()
+        (if (> (size-atom $real_errors) 0)
+            (car-atom $real_errors)
+            (if (> (size-atom $incomplete_markers) 0) (incomplete) ())))))
 
 ;; verify - verify proof yields expected conclusion (new-space version)
-;; Returns (Error ...) on failure, stack_top on success
+;; Returns (Error ...) on failure, (incomplete) if ? found, (success $stack_top) on success
 (= (verify $kb $stack $sp $proof $conclusion)
     (let $proof_result (treat_normal_proof $kb $stack $sp $proof)
       (case $proof_result
         (((Error $info $msg)
            (Error $info $msg))
+         ((incomplete)
+           (incomplete))
          (()
            (let $stack_expr (collapse (match $stack ((Num $n) $f) $f))
              ; Check for empty stack
@@ -571,6 +586,15 @@
 (= (add_p_dispatch $kb $label $stmt $proof (Error $info $msg))
    (prog1 (Error $info $msg)
      (println! ("PROOF FAILED:" $label (Error $info $msg)))))
+
+;; Handle incomplete proofs (containing ?) - add with warning, return ()
+(= (add_p_dispatch $kb $label $stmt $proof (incomplete))
+   (let $assertion_data (make_assertion $kb $stmt)
+     (let ((DVars $dvs) (FHyps $f_hyps) (EHyps $e_hyps) (Statement $s)) $assertion_data
+       (progn
+         (println! ("WARNING: Incomplete proof for" $label "- adding as unverified"))
+         (add-atom $kb ( (Label $label) Proof ( (DVars $dvs) (FHyps $f_hyps) (EHyps $e_hyps) (Statement $s) (Type "$p") (ProofSequence $proof) (Incomplete True) )))
+         ()))))
 
 (= (add_p_dispatch $kb $label $stmt $proof (success $stack_top))
    (let $assertion_data (make_assertion $kb $stmt)
