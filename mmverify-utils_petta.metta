@@ -125,10 +125,11 @@
 (= (lookup_d $kb $x $y) (let ($x' $y') (orient_pair $x $y) (unify $kb (DVar ($x' $y') $_ (Type "$d")) True False)))
 
 ;; add_d - discard map-atom results to avoid n×n output noise
+;; CRITICAL: wrap in collapse to prevent non-determinism forking
 (= (add_d $kb $varlist $level)
-  (let $_ (map-atom $varlist $x
-            (map-atom $varlist $y
-              (add_dv_pair_if_fresh $kb $x $y $level)))
+  (let $_ (collapse (map-atom $varlist $x
+            (collapse (map-atom $varlist $y
+              (add_dv_pair_if_fresh $kb $x $y $level)))))
     ()))
 
 ;; List Utils
@@ -291,9 +292,10 @@
       ($e_max_level (if (== $e_levels (())) 0 (max-atom $e_levels)))
       ($e_hyps_list (collect_lists_by_depth $e_hyps_lists 1 $e_max_level Nil))
       ;; Build mandatory vars from e_hyps tokens and statement tokens
+      ;; CRITICAL: wrap map-atom in collapse to avoid non-determinism forking in let*
       ($e_hyps_toks (from-list (flatten-list $e_hyps_list)))
-      ($_1 (map-atom $e_hyps_toks $tok (add_mand_var $kb $tok)))
-      ($_2 (map-atom $stmt $tok (add_mand_var $kb $tok)))
+      ($_1 (collapse (map-atom $e_hyps_toks $tok (add_mand_var $kb $tok))))
+      ($_2 (collapse (map-atom $stmt $tok (add_mand_var $kb $tok))))
       ($mand_vars (collapse (match $kb (MandVar $var) $var)))
       ;; Collect disjoint variable pairs where both vars are mandatory
       ($dvs (collapse (match $kb (DVar ($x $y) $_ (Type "$d"))
