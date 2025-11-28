@@ -549,33 +549,33 @@
                                (success $stack_top))
                              (Error ((assertion: $conclusion) (stack: $stack_expr)) "Stack entry does not match proved assertion."))))))))))))
 
+
 ;; add_p - add a proof to the knowledge base (new-space version)
 ;; Returns () on success, (Error ...) on failure
+;; NOTE: Uses pattern matching dispatch because PeTTa case doesn't reliably match (success $x) patterns
 (= (add_p $kb $stack $sp $label $stmt $proof $verify_proofs)
-  (let*
-    (
-      (true (printif! ""))
-      (true (printif! (Verifying conclusion ($label) $stmt with proof $proof)))
-      ($verify_result (if $verify_proofs (verify $kb $stack $sp $proof $stmt) (skip-verify)))
-    )
-    ; Check if verify returned an error using case match
-    (case $verify_result
-      (((Error $info $msg)
-         ; Error case - print error and return it without adding to KB
-         (prog1 $verify_result
-           (println! ("PROOF FAILED:" $label $verify_result))))
-       ((success $stack_top)
-         ; Success case - add proof to KB, return ()
-         (let*
-           (
-             (true (printif! ("make_assertion" $label - $stmt)))
-             (( (DVars $dvs) (FHyps $f_hyps) (EHyps $e_hyps) (Statement $stmt) ) (make_assertion $kb $stmt))
-             (true (printif! ("gathered assertion data:" $dvs $f_hyps $e_hyps $stmt)))
-             ($_4 (add-atom $kb ( (Label $label) Proof ( (DVars $dvs) (FHyps $f_hyps) (EHyps $e_hyps) (Statement $stmt) (Type "$p") (ProofSequence $proof) ))))
-           )
-           ()))
-       ((skip-verify)
-         ; Verification skipped, just add proof to KB
-         (let ((DVars $dvs) (FHyps $f_hyps) (EHyps $e_hyps) (Statement $s)) (make_assertion $kb $stmt)
-           (let $_ (add-atom $kb ( (Label $label) Proof ( (DVars $dvs) (FHyps $f_hyps) (EHyps $e_hyps) (Statement $s) (Type "$p") (ProofSequence $proof) )))
-             ())))))))
+  (progn
+    (printif! "")
+    (printif! (Verifying conclusion ($label) $stmt with proof $proof))
+    (let $verify_result (if $verify_proofs (verify $kb $stack $sp $proof $stmt) (skip-verify))
+      (add_p_dispatch $kb $label $stmt $proof $verify_result))))
+
+;; Helper to dispatch based on verify result - uses pattern matching
+(= (add_p_dispatch $kb $label $stmt $proof (skip-verify))
+   (let $assertion_data (make_assertion $kb $stmt)
+     (let ((DVars $dvs) (FHyps $f_hyps) (EHyps $e_hyps) (Statement $s)) $assertion_data
+       (progn
+         (add-atom $kb ( (Label $label) Proof ( (DVars $dvs) (FHyps $f_hyps) (EHyps $e_hyps) (Statement $s) (Type "$p") (ProofSequence $proof) )))
+         ()))))
+
+(= (add_p_dispatch $kb $label $stmt $proof (Error $info $msg))
+   (prog1 (Error $info $msg)
+     (println! ("PROOF FAILED:" $label (Error $info $msg)))))
+
+(= (add_p_dispatch $kb $label $stmt $proof (success $stack_top))
+   (let $assertion_data (make_assertion $kb $stmt)
+     (let ((DVars $dvs) (FHyps $f_hyps) (EHyps $e_hyps) (Statement $s)) $assertion_data
+       (progn
+         (add-atom $kb ( (Label $label) Proof ( (DVars $dvs) (FHyps $f_hyps) (EHyps $e_hyps) (Statement $s) (Type "$p") (ProofSequence $proof) )))
+         ()))))
+
