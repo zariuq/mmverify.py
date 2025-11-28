@@ -1,4 +1,4 @@
-;; mmverify-utils_petta_fresh.metta - Clean reconstruction
+;; mmverify-utils_petta.metta - Clean reconstruction
 !(import! &self ../../PeTTa/lib/lib_he)
 
 ;; exec - wrapper for fail-fast execution with error handling
@@ -161,13 +161,13 @@
        (match-atom $tail $pattern $rewrite)
        (empty))))
 
-;; match-atom' catches Empty to avoid pruning branches
+;; match-atom' - deterministic (first match only), catches Empty
 (= (match-atom' $expr $pattern $rewrite)
-   (case (match-atom $expr $pattern $rewrite) ( (Empty () ) ( $q $q ) )))
+   (once (case (match-atom $expr $pattern $rewrite) ( (Empty () ) ( $q $q ) ))))
 
-;; match-atom'' with custom Empty default
+;; match-atom'' - deterministic (first match only), with custom Empty default
 (= (match-atom'' $expr $pattern $rewrite $Empty)
-   (case (match-atom $expr $pattern $rewrite) ( (Empty $Empty) ( $q $q ) )))
+   (once (case (match-atom $expr $pattern $rewrite) ( (Empty $Empty) ( $q $q ) ))))
 
 ;; update-atom
 (= (update-atom $space $atom $update_pattern)
@@ -269,8 +269,8 @@
     (
       ;; Collect e_hyps from all frame levels
       ($e_hyps_lists (collapse (match $kb (EList (FSDepth $level) $elist) ($level $elist))))
-      ($e_levels (collapse (match-atom' $e_hyps_lists ($l $_) $l)))
-      ($e_max_level (if (== $e_levels (())) 0 (max-atom $e_levels)))
+      ($e_levels (collapse (match-atom $e_hyps_lists ($l $_) $l)))
+      ($e_max_level (if (== $e_levels ()) 0 (max-atom $e_levels)))
       ($e_hyps_list (collect_lists_by_depth $e_hyps_lists 1 $e_max_level Nil))
       ;; Build mandatory vars from e_hyps tokens and statement tokens
       ($e_hyps_toks (from-list (flatten-list $e_hyps_list)))
@@ -286,8 +286,8 @@
                       ()))))))
       ;; Collect f_hyps from all frame levels
       ($f_hyps_lists (collapse (match $kb (FList (FSDepth $level) $flist) ($level $flist))))
-      ($f_levels (collapse (match-atom' $f_hyps_lists ($l $_) $l)))
-      ($f_max_level (if (== $f_levels (())) 0 (max-atom $f_levels)))
+      ($f_levels (collapse (match-atom $f_hyps_lists ($l $_) $l)))
+      ($f_max_level (if (== $f_levels ()) 0 (max-atom $f_levels)))
       ($f_hyps_list (collect_lists_by_depth $f_hyps_lists 1 $f_max_level Nil))
       ($f_hyps (assign_f_hyps $kb $f_hyps_list))
       ;; Cleanup mandatory vars
@@ -507,7 +507,7 @@
         (if (== $error_list ()) () (car-atom $error_list)))))
 
 ;; verify - verify proof yields expected conclusion (new-space version)
-;; Returns (Error ...) on failure, stack_top on success
+;; Returns (Error ...) on failure, success on success
 (= (verify $kb $stack $sp $proof $conclusion)
     (let $proof_result (treat_normal_proof $kb $stack $sp $proof)
       (case $proof_result
@@ -526,36 +526,32 @@
                        (let* (($_print (println! (Comparing: $stack_top "==" $conclusion))))
                          (if (== $conclusion $stack_top)
                              (let* (($_success (println! "Correct proof!")))
-                               (success $stack_top))
+                               success)
                              (Error ((assertion: $conclusion) (stack: $stack_expr)) "Stack entry does not match proved assertion."))))))))))))
 
 ;; add_p - add a proof to the knowledge base (new-space version)
 ;; Returns () on success, (Error ...) on failure
+;; NOTE: Uses progn with if statements because case pattern matching on success doesn't work in PeTTa
 (= (add_p $kb $stack $sp $label $stmt $proof $verify_proofs)
   (let*
     (
-      ($_0 (println! ""))
-      ($_1 (println! (Verifying conclusion ($label) $stmt with proof $proof)))
-      ($verify_result (if $verify_proofs (verify $kb $stack $sp $proof $stmt) (skip-verify)))
+      ($verify_result (if $verify_proofs (verify $kb $stack $sp $proof $stmt) skip-verify))
+      ($is_success (== $verify_result success))
+      ($is_skip (== $verify_result skip-verify))
     )
-    ; Check if verify returned an error using case match
-    (case $verify_result
-      (((Error $info $msg)
-         ; Error case - print error and return it without adding to KB
-         (prog1 $verify_result
-           (println! ("PROOF FAILED:" $label $verify_result))))
-       ((success $stack_top)
-         ; Success case - add proof to KB, return ()
-         (let*
-           (
-             ($_2 (println! ("make_assertion" $label - $stmt)))
-             (( (DVars $dvs) (FHyps $f_hyps) (EHyps $e_hyps) (Statement $stmt) ) (make_assertion $kb $stmt))
-             ($_3 (println! ("gathered assertion data:" $dvs $f_hyps $e_hyps $stmt)))
-             ($_4 (add-atom $kb ( (Label $label) Proof ( (DVars $dvs) (FHyps $f_hyps) (EHyps $e_hyps) (Statement $stmt) (Type "$p") (ProofSequence $proof) ))))
-           )
-           ()))
-       ((skip-verify)
-         ; Verification skipped, just add proof to KB
-         (let ((DVars $dvs) (FHyps $f_hyps) (EHyps $e_hyps) (Statement $s)) (make_assertion $kb $stmt)
-           (let $_ (add-atom $kb ( (Label $label) Proof ( (DVars $dvs) (FHyps $f_hyps) (EHyps $e_hyps) (Statement $s) (Type "$p") (ProofSequence $proof) )))
-             ())))))))
+    (progn
+      ;; Success case
+      (if $is_success
+          (let ((DVars $dvs) (FHyps $f_hyps) (EHyps $e_hyps) (Statement $s)) (make_assertion $kb $stmt)
+            (add-atom $kb ((Label $label) Proof ((DVars $dvs) (FHyps $f_hyps) (EHyps $e_hyps) (Statement $s) (Type "$p") (ProofSequence $proof)))))
+          ())
+      ;; Skip case
+      (if $is_skip
+          (let ((DVars $dvs) (FHyps $f_hyps) (EHyps $e_hyps) (Statement $s)) (make_assertion $kb $stmt)
+            (let $_ (add-atom $kb ((Label $label) Proof ((DVars $dvs) (FHyps $f_hyps) (EHyps $e_hyps) (Statement $s) (Type "$p") (ProofSequence $proof))))
+              ()))
+          ())
+      ;; Error case
+      (if (and (not $is_success) (not $is_skip))
+          (let $_ (println! ("PROOF FAILED:" $label $verify_result)) $verify_result)
+          ()))))

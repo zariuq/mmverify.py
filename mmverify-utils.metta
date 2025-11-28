@@ -22,7 +22,7 @@
     ()))
 
 ;; Super-handy function for matching atoms in an expression.
-; (: match-atom (-> Expression Atom Atom %Undefined$))
+; (: match-atom (-> Expression Atom Atom %Undefined%))
 ; (= (match-atom $expr $pattern $rewrite)
 ;    (if-decons-expr $expr $head $tail (let $pattern $head $rewrite) (empty)))
 ; (= (match-atom $expr $pattern $rewrite)
@@ -44,10 +44,10 @@
        (empty))))
 
 ;; I think match-atom was pruning the branch of the let*-statement, thus catching Empty helps.
-(: match-atom' (-> Expression Atom Atom %Undefined$))
+(: match-atom' (-> Expression Atom Atom %Undefined%))
 (= (match-atom' $expr $pattern $rewrite) (case (match-atom $expr $pattern $rewrite) ( (Empty () ) ( $q $q ) )))
 
-(: match-atom'' (-> Expression Atom Atom Atom %Undefined$))
+(: match-atom'' (-> Expression Atom Atom Atom %Undefined%))
 (= (match-atom'' $expr $pattern $rewrite $Empty) (case (match-atom $expr $pattern $rewrite) ( (Empty $Empty) ( $q $q ) )))
 
 (= (update-atom $space $atom $update_pattern)
