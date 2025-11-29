@@ -581,6 +581,35 @@
                (cons-atom (car-atom $label_result) $rest_labels)))
          $rest_labels)))  ; variable not in stmt, skip
 
+;; get-mand-ehyp-stmts - get ALL essential hypothesis STATEMENTS from ALL frames in scope
+;; For compressed proofs, we need the actual e-hyp statements to find their variables
+;; Returns list of e-hyp statements in frame order (level 1 first, then level 2, etc.)
+(= (get-mand-ehyp-stmts $kb)
+   (let*
+     (
+       ;; Collect all e-hyps with their frame depth from all levels
+       ($e_hyps_lists (collapse (match $kb (EList (FSDepth $level) $elist) ($level $elist))))
+       ($e_levels (collapse (match-atom' $e_hyps_lists ($l $_) $l)))
+       ($e_max_level (if (== $e_levels (())) 0 (max-atom $e_levels)))
+     )
+     ;; Return the e-hyp statements directly (they're already in $e_hyps_lists)
+     (collect_lists_by_depth $e_hyps_lists 1 $e_max_level Nil)))
+
+;; find-vars-in-stmts - find all variables that appear in a list of statements
+(= (find-vars-in-stmts $kb Nil $acc) $acc)
+(= (find-vars-in-stmts $kb (Cons $stmt $rest) $acc)
+   (let $stmt_vars (find_vars $kb $stmt)
+     (find-vars-in-stmts $kb $rest (merge-vars $acc $stmt_vars))))
+
+;; merge-vars - merge two variable lists, removing duplicates
+(= (merge-vars () $vars2) $vars2)
+(= (merge-vars $vars1 ()) $vars1)
+(= (merge-vars $vars1 $vars2)
+   (let ($h $t) (decons-atom $vars1)
+     (if (var-in-list $h $vars2)
+         (merge-vars $t $vars2)  ; already in vars2, skip
+         (cons-atom $h (merge-vars $t $vars2)))))  ; add to result
+
 ;; get-mand-ehyp-labels - get ALL essential hypothesis labels from ALL frames in scope
 ;; For compressed proofs, ALL e-hyps in scope are included (not filtered by statement variables)
 ;; Returns list of e-hyp labels in frame order (level 1 first, then level 2, etc.)
@@ -649,16 +678,37 @@
          ($_1 (empty-space $stack))
          ($_2 (collapse (match $kb ((Label $label) FHyp $FSDepth $Data) (add-atom $kb (ActiveHyp $label)))))
          ($_3 (collapse (match $kb ((Label $label) EHyp $FSDepth $Data) (add-atom $kb (ActiveHyp $label)))))
-         ;; Get mandatory hyps for compressed proof: f-hyps + e-hyps (like Python's plabels)
-         ($fhyp_labels (get-mand-hyp-labels $kb $stmt))
+         ;; BUGFIX: Get mandatory hyps from active frame, NOT from calling theorem's statement
+         ;; Mandatory hyps are ALL active f-hyps + ALL active e-hyps (in order)
+         ;; This matches the Metamath spec and other verifiers (metamath.exe, knife)
+         ;; Get f-hyps list (all active f-hyps with typecode and var)
+         ($f_hyps_lists (collapse (match $kb (FList (FSDepth $level) $flist) ($level $flist))))
+         ($f_levels (collapse (match-atom' $f_hyps_lists ($l $_) $l)))
+         ($f_max_level (if (== $f_levels (())) 0 (max-atom $f_levels)))
+         ($f_hyps_list (collect_lists_by_depth $f_hyps_lists 1 $f_max_level Nil))
+         ;; Get e-hyp statements to find their variables
+         ($ehyp_stmts (get-mand-ehyp-stmts $kb))
+         ;; Find all variables in e-hyps
+         ($ehyp_vars (find-vars-in-stmts $kb $ehyp_stmts ()))
+         ;; Find variables in conclusion
+         ($stmt_vars (find_vars $kb $stmt))
+         ;; Merge to get all needed variables (fixes both original bug and idi bug)
+         ($all_vars (merge-vars $ehyp_vars $stmt_vars))
+         ;; Get f-hyp labels for those variables only
+         ($fhyp_labels (get-fhyp-labels-for-vars $kb $f_hyps_list $all_vars))
+         (true (printif! (DEBUG fhyp_labels: $fhyp_labels)))
          ($ehyp_labels (get-mand-ehyp-labels $kb))
+         (true (printif! (DEBUG ehyp_labels: $ehyp_labels)))
          ;; Concatenate f-hyp labels + e-hyp labels (order matters!)
          ;; Both return expression format (a b c ...), use from-list + mappend + to-list
          ($mand_hyps (from-list (mappend (to-list $fhyp_labels) (to-list $ehyp_labels))))
          ($num_mand (size-atom $mand_hyps))
          ($num_labels (size-atom $labels))
-         ;; DEBUG removed - was: (true (println! (DEBUG fhyp_labels: $fhyp_labels ehyp_labels: $ehyp_labels mand_hyps: $mand_hyps num_mand: $num_mand labels: $labels num_labels: $num_labels stmt: $stmt)))
-         (true (printif! (Mand hyps: $mand_hyps num: $num_mand labels: $labels num: $num_labels)))
+         ;; DEBUG: uncomment to debug mandatory hypothesis computation
+         ;; (true (println! (DEBUG syl: fhyp_labels: $fhyp_labels)))
+         ;; (true (println! (DEBUG syl: ehyp_labels: $ehyp_labels)))
+         ;; (true (println! (DEBUG syl: mand_hyps: $mand_hyps num: $num_mand)))
+         ;; (true (println! (DEBUG syl: labels: $labels num: $num_labels)))
          ;; Process each step
          ($_4 (process-compressed-steps $kb $stack $sp $errors $steps $mand_hyps $labels () $num_mand $num_labels))
          ($_5 (remove-patternc $kb (ActiveHyp $_)))
