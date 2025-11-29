@@ -430,6 +430,10 @@
         ($le (size-atom $ehyps))
         ($npop (+ $lf $le))
         ($sp_val (- $stack_len $npop))
+        ($stack_contents (collapse (match $stack ((Num $n) $s) ($n $s))))
+        (true (println! (DEBUG treat_assertion label: $label stack_len: $stack_len npop: $npop sp_val: $sp_val)))
+        (true (println! (DEBUG stack contents: $stack_contents)))
+        (true (println! (DEBUG fhyps: $fhyps ehyps: $ehyps)))
       )
       (if (< $sp_val 0)
           (Error ((label $label) (npop $npop)) "Stack underflow: proof step requires too many hypotheses")
@@ -539,10 +543,176 @@
             (car-atom $real_errors)
             (if (> (size-atom $incomplete_markers) 0) (incomplete) ())))))
 
+;; ============ Compressed Proof Support ============
+
+;; get-mand-hyp-labels - get mandatory hypotheses for a statement
+;; Returns list of labels for f-hyps in the right order
+(= (get-mand-hyp-labels $kb $stmt)
+   (let*
+     (
+       ;; Collect all f-hyps with their frame depth from all levels
+       ($f_hyps_lists (collapse (match $kb (FList (FSDepth $level) $flist) ($level $flist))))
+       ($f_levels (collapse (match-atom' $f_hyps_lists ($l $_) $l)))
+       ($f_max_level (if (== $f_levels (())) 0 (max-atom $f_levels)))
+       ($f_hyps_list (collect_lists_by_depth $f_hyps_lists 1 $f_max_level Nil))
+       ;; Find which variables are in the statement
+       ($stmt_vars (find_vars $kb $stmt))
+     )
+     ;; Filter f-hyps to those whose variable is in the statement, get labels
+     (get-fhyp-labels-for-vars $kb $f_hyps_list $stmt_vars)))
+
+;; var-in-list - check if variable is in list
+(= (var-in-list $v ()) False)
+(= (var-in-list $v $vars)
+   (let ($head $tail) (decons-atom $vars)
+     (if (== $v $head)
+         True
+         (var-in-list $v $tail))))
+
+;; get-fhyp-labels-for-vars - get labels of f-hyps for given variables
+(= (get-fhyp-labels-for-vars $kb Nil $vars) ())
+(= (get-fhyp-labels-for-vars $kb (Cons ($tc $var) $rest) $vars)
+   (let $rest_labels (get-fhyp-labels-for-vars $kb $rest $vars)
+     (if (var-in-list $var $vars)
+         ;; Variable is in vars - find its label
+         (let $label_result (collapse (match $kb ((Label $l) FHyp $_ ((Typecode $tc) (FVar $var) (Type "$f"))) $l))
+           (if (== $label_result ())
+               $rest_labels  ; no label found, skip
+               (cons-atom (car-atom $label_result) $rest_labels)))
+         $rest_labels)))  ; variable not in stmt, skip
+
+;; get-mand-ehyp-labels - get ALL essential hypothesis labels from ALL frames in scope
+;; For compressed proofs, ALL e-hyps in scope are included (not filtered by statement variables)
+;; Returns list of e-hyp labels in frame order (level 1 first, then level 2, etc.)
+(= (get-mand-ehyp-labels $kb)
+   (let*
+     (
+       ;; Collect all e-hyps with their frame depth from all levels
+       ($e_hyps_lists (collapse (match $kb (EList (FSDepth $level) $elist) ($level $elist))))
+       ($e_levels (collapse (match-atom' $e_hyps_lists ($l $_) $l)))
+       ($e_max_level (if (== $e_levels (())) 0 (max-atom $e_levels)))
+       ($e_hyps_list (collect_lists_by_depth $e_hyps_lists 1 $e_max_level Nil))
+     )
+     ;; Get labels for all e-hyps (each e-hyp is a statement in a list)
+     (get-ehyp-labels-for-stmts $kb $e_hyps_list)))
+
+;; get-ehyp-labels-for-stmts - get labels for e-hyps given their statements
+(= (get-ehyp-labels-for-stmts $kb Nil) ())
+(= (get-ehyp-labels-for-stmts $kb (Cons $stmt $rest))
+   (let $rest_labels (get-ehyp-labels-for-stmts $kb $rest)
+     ;; Find label for this e-hyp statement
+     (let $label_result (collapse (match $kb ((Label $l) EHyp $_ ((Statement $stmt) (Type "$e"))) $l))
+       (if (== $label_result ())
+           $rest_labels  ; no label found, skip
+           (cons-atom (car-atom $label_result) $rest_labels)))))
+
+;; append-element - append a single element to an expression (NOT prepend!)
+;; Used for saved list in compressed proofs where order matters
+;; Python: saved_stmts.append(stmt) - we need same behavior
+(= (append-element $expr $elem)
+   (from-list (mappend (to-list $expr) (Cons $elem Nil))))
+
+;; expand-compressed-step - expand a single compressed step
+;; Takes: index, mandatory hyp labels, explicit labels, saved proofs
+;; Returns: (label saved_proofs) or (save saved_proofs) or (Error ...)
+(= (expand-compressed-step $idx $mand_hyps $labels $saved $num_mand $num_labels)
+   (if (== $idx -1)
+       ;; Z marker - save current stack top
+       (save $saved)
+       (if (or (== $idx "?") (== $idx ?))
+           ;; Incomplete proof marker (check both string "?" and symbol ?)
+           (incomplete-marker $saved)
+           (let $num_total (+ $num_mand $num_labels)
+             (if (< $idx $num_mand)
+                 ;; Index into mandatory hyps
+                 (let $label (index-atom $mand_hyps $idx)
+                   ($label $saved))
+                 (if (< $idx $num_total)
+                     ;; Index into explicit labels
+                     (let $label_idx (- $idx $num_mand)
+                       (let $label (index-atom $labels $label_idx)
+                         ($label $saved)))
+                     ;; Reference to saved proof - push the saved statement
+                     (let $save_idx (- $idx $num_total)
+                       (if (>= $save_idx (size-atom $saved))
+                           (Error ((idx $idx) (save_idx $save_idx) (saved_len (size-atom $saved))) "Compressed proof save index out of bounds")
+                           (let $saved_stmt (index-atom $saved $save_idx)
+                             ((push-saved $saved_stmt) $saved))))))))))
+
+;; treat_compressed_proof - process a compressed proof
+;; Returns () on success, (Error ...) on failure, (incomplete) if ? found
+(= (treat_compressed_proof $kb $stack $sp $labels $steps $stmt)
+   (let $errors (new-space)
+     (let*
+       (
+         (true (printif! (Got Compressed Proof: labels $labels steps $steps)))
+         ($_1 (empty-space $stack))
+         ($_2 (collapse (match $kb ((Label $label) FHyp $FSDepth $Data) (add-atom $kb (ActiveHyp $label)))))
+         ($_3 (collapse (match $kb ((Label $label) EHyp $FSDepth $Data) (add-atom $kb (ActiveHyp $label)))))
+         ;; Get mandatory hyps for compressed proof: f-hyps + e-hyps (like Python's plabels)
+         ($fhyp_labels (get-mand-hyp-labels $kb $stmt))
+         ($ehyp_labels (get-mand-ehyp-labels $kb))
+         ;; Concatenate f-hyp labels + e-hyp labels (order matters!)
+         ;; Both return expression format (a b c ...), use from-list + mappend + to-list
+         ($mand_hyps (from-list (mappend (to-list $fhyp_labels) (to-list $ehyp_labels))))
+         ($num_mand (size-atom $mand_hyps))
+         ($num_labels (size-atom $labels))
+         ;; DEBUG removed - was: (true (println! (DEBUG fhyp_labels: $fhyp_labels ehyp_labels: $ehyp_labels mand_hyps: $mand_hyps num_mand: $num_mand labels: $labels num_labels: $num_labels stmt: $stmt)))
+         (true (printif! (Mand hyps: $mand_hyps num: $num_mand labels: $labels num: $num_labels)))
+         ;; Process each step
+         ($_4 (process-compressed-steps $kb $stack $sp $errors $steps $mand_hyps $labels () $num_mand $num_labels))
+         ($_5 (remove-patternc $kb (ActiveHyp $_)))
+         ($real_errors (collapse (match $errors (Error $i $m) (Error $i $m))))
+         ($incomplete_markers (collapse (match $errors (incomplete) (incomplete))))
+         ($_cleanup (delete-space $errors))
+       )
+       (if (> (size-atom $real_errors) 0)
+           (car-atom $real_errors)
+           (if (> (size-atom $incomplete_markers) 0) (incomplete) ())))))
+
+;; process-compressed-steps - process compressed proof steps iteratively
+(= (process-compressed-steps $kb $stack $sp $errors () $mand $labels $saved $nm $nl) ())
+(= (process-compressed-steps $kb $stack $sp $errors $steps $mand $labels $saved $nm $nl)
+   (let ($idx $rest) (decons-atom $steps)
+     (let $expanded (expand-compressed-step $idx $mand $labels $saved $nm $nl)
+       (case $expanded
+         (((Error $i $m) (add-atom $errors (Error $i $m)))
+          ((save $saved2)
+            ;; Z: save current stack top (highest indexed element)
+            (let $stack_items (collapse (match $stack ((Num $n) $f) ($n $f)))
+              (if (== $stack_items ())
+                  (add-atom $errors (Error (Z-save) "Cannot save: empty stack"))
+                  ;; Find the maximum index and get that element
+                  (let $max_idx (max-atom (collapse (match-atom' $stack_items ($i $_) $i)))
+                    (let $top_stmt (collapse (match-atom' $stack_items ($max_idx $s) $s))
+                      ;; CRITICAL: Python appends to saved list, we must do the same!
+                      ;; Using cons-atom would prepend, breaking index-atom access
+                      (let $new_saved (append-element $saved (car-atom $top_stmt))
+                        (process-compressed-steps $kb $stack $sp $errors $rest $mand $labels $new_saved $nm $nl)))))))
+          ((incomplete-marker $saved2)
+            ;; ? mark - incomplete proof
+            (progn
+              (add-atom $errors (incomplete))
+              (process-compressed-steps $kb $stack $sp $errors $rest $mand $labels $saved2 $nm $nl)))
+          (((push-saved $stmt) $saved2)
+            ;; Push saved statement onto stack - treat as a hypothesis-free axiom (like Python)
+            ;; In Python: treat_step(('$a', (set(), [], [], stmt)), stack)
+            ;; This means: an assertion with no dv, no f-hyps, no e-hyps, just the statement
+            (let $stack_len (case (collapse (match $stack ((Num $n) $s) $n)) ( ( () 0 ) ( $nums (+ 1 (max-atom $nums))) ))
+              (progn
+                (add-atom $stack ((Num $stack_len) $stmt))
+                (process-compressed-steps $kb $stack $sp $errors $rest $mand $labels $saved2 $nm $nl))))
+          (($label $saved2)
+            ;; Normal label - treat it
+            (progn
+              (treat_step_with_errors $kb $stack $sp $errors $label)
+              (process-compressed-steps $kb $stack $sp $errors $rest $mand $labels $saved2 $nm $nl))))))))
+
 ;; verify - verify proof yields expected conclusion (new-space version)
 ;; Returns (Error ...) on failure, (incomplete) if ? found, (success $stack_top) on success
+;; Handles both normal proofs (list of labels) and compressed proofs (compressed $labels $steps)
 (= (verify $kb $stack $sp $proof $conclusion)
-    (let $proof_result (treat_normal_proof $kb $stack $sp $proof)
+   (let $proof_result (verify-dispatch $kb $stack $sp $proof $conclusion)
       (case $proof_result
         (((Error $info $msg)
            (Error $info $msg))
@@ -563,6 +733,20 @@
                              (let* ((true (printif! "Correct proof!")))
                                (success $stack_top))
                              (Error ((assertion: $conclusion) (stack: $stack_expr)) "Stack entry does not match proved assertion."))))))))))))
+
+;; verify-dispatch - route to normal or compressed proof handling
+;; Check if proof starts with 'compressed' symbol
+(= (verify-dispatch $kb $stack $sp $proof $conclusion)
+   (if (== (size-atom $proof) 0)
+       (treat_normal_proof $kb $stack $sp $proof)
+       (let ($head $rest) (decons-atom $proof)
+         (if (== $head compressed)
+             ;; Compressed proof: (compressed labels steps)
+             (let ($labels $rest2) (decons-atom $rest)
+               (let ($steps $_) (decons-atom $rest2)
+                 (treat_compressed_proof $kb $stack $sp $labels $steps $conclusion)))
+             ;; Normal proof
+             (treat_normal_proof $kb $stack $sp $proof)))))
 
 
 ;; add_p - add a proof to the knowledge base (new-space version)
