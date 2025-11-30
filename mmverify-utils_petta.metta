@@ -645,12 +645,13 @@
 ;; expand-compressed-step - expand a single compressed step
 ;; Takes: index, mandatory hyp labels, explicit labels, saved proofs
 ;; Returns: (label saved_proofs) or (save saved_proofs) or (Error ...)
+;; Handles both old format (-1 for save) and new DAG format (save atom)
 (= (expand-compressed-step $idx $mand_hyps $labels $saved $num_mand $num_labels)
    (if (== $idx -1)
-       ;; Z marker - save current stack top
+       ;; Z marker (save current stack top)
        (save $saved)
-       (if (or (== $idx "?") (== $idx ?))
-           ;; Incomplete proof marker (check both string "?" and symbol ?)
+       (if (or (== $idx -2) (== $idx "?") (== $idx ?))
+           ;; Incomplete proof marker (-2 from DAG, or "?" / ? from old format)
            (incomplete-marker $saved)
            (let $num_total (+ $num_mand $num_labels)
              (if (< $idx $num_mand)
@@ -786,18 +787,24 @@
                              (Error ((assertion: $conclusion) (stack: $stack_expr)) "Stack entry does not match proved assertion."))))))))))))
 
 ;; verify-dispatch - route to normal or compressed proof handling
-;; Check if proof starts with 'compressed' symbol
+;; Check if proof starts with 'compressed' or 'compressed_dag' symbol
 (= (verify-dispatch $kb $stack $sp $proof $conclusion)
    (if (== (size-atom $proof) 0)
        (treat_normal_proof $kb $stack $sp $proof)
        (let ($head $rest) (decons-atom $proof)
          (if (== $head compressed)
-             ;; Compressed proof: (compressed labels steps)
+             ;; Old compressed format: (compressed labels steps)
              (let ($labels $rest2) (decons-atom $rest)
                (let ($steps $_) (decons-atom $rest2)
                  (treat_compressed_proof $kb $stack $sp $labels $steps $conclusion)))
-             ;; Normal proof
-             (treat_normal_proof $kb $stack $sp $proof)))))
+             (if (== $head compressed_dag)
+                 ;; New DAG format from Prolog: (compressed_dag labels dag_steps)
+                 ;; dag_steps contain: integers, save, incomplete
+                 (let ($labels $rest2) (decons-atom $rest)
+                   (let ($dag_steps $_) (decons-atom $rest2)
+                     (treat_compressed_proof $kb $stack $sp $labels $dag_steps $conclusion)))
+                 ;; Normal proof
+                 (treat_normal_proof $kb $stack $sp $proof))))))
 
 
 ;; add_p - add a proof to the knowledge base (new-space version)
