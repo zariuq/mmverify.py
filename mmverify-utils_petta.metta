@@ -418,6 +418,7 @@
 
 ;; ============ Proof Verification ============
 
+
 ;; treat_assertion - process assertion during proof verification (new-space version)
 (= (treat_assertion $kb $stack $sp $label $Data $stack_len)
     (let*
