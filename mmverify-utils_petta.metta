@@ -681,13 +681,16 @@
      (find-vars-in-stmts $kb $rest (merge-vars $acc $stmt_vars))))
 
 ;; merge-vars - merge two variable lists, removing duplicates
-(= (merge-vars () $vars2) $vars2)
-(= (merge-vars $vars1 ()) $vars1)
+;; BUGFIX: Use single clause with if/case to prevent multiple clause matches causing non-determinism
 (= (merge-vars $vars1 $vars2)
-   (let ($h $t) (decons-atom $vars1)
-     (if (var-in-list $h $vars2)
-         (merge-vars $t $vars2)  ; already in vars2, skip
-         (cons-atom $h (merge-vars $t $vars2)))))  ; add to result
+   (if (== $vars1 ())
+       $vars2  ; First empty, return second (even if also empty)
+       (if (== $vars2 ())
+           $vars1  ; Second empty (and first not empty)
+           (let ($h $t) (decons-atom $vars1)
+             (if (var-in-list $h $vars2)
+                 (merge-vars $t $vars2)  ; already in vars2, skip
+                 (cons-atom $h (merge-vars $t $vars2)))))))  ; add to result
 
 ;; get-mand-ehyp-labels - get ALL essential hypothesis labels from ALL frames in scope
 ;; For compressed proofs, ALL e-hyps in scope are included (not filtered by statement variables)
