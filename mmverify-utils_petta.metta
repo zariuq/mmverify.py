@@ -44,6 +44,13 @@
       (add-atom &self (= (maybe-store-theorem-incomplete! $kb $label $dvs $fhyps $ehyps $s $proof)
                         (add-atom $kb ((Label $label) Theorem ((DVars $dvs) (FHyps $fhyps) (EHyps $ehyps) (Statement $s) (Type "$p") (Incomplete True))))))))
 
+;; ============ Stack Tracking States ============
+;; Maintain stack invariants to avoid O(N) scans per step
+;; &sl: stack length (number of items on stack)
+;; &top: top-of-stack statement (for fast save in compressed proofs)
+!(bind! &sl (new-state 0))
+!(bind! &top (new-state Empty))
+
 ;; exec - wrapper for fail-fast execution with error handling
 ;; Halts execution on Error, returns the evaluated value otherwise
 (: exec (-> Atom %Undefined%))
@@ -491,11 +498,10 @@
         ($le (size-atom $ehyps))
         ($npop (+ $lf $le))
         ($sp_val (- $stack_len $npop))
-        ($stack_contents (collapse (match $stack ((Num $n) $s) ($n $s))))
-        ;; DEBUG: Uncomment to debug assertion processing
-        ;; (true (println! (DEBUG treat_assertion label: $label stack_len: $stack_len npop: $npop sp_val: $sp_val)))
-        ;; (true (println! (DEBUG stack contents: $stack_contents)))
-        ;; (true (println! (DEBUG fhyps: $fhyps ehyps: $ehyps)))
+        ;; DEBUG: Only compute stack_contents when logging is enabled
+        (true (printif! (DEBUG treat_assertion label: $label stack_len: $stack_len npop: $npop sp_val: $sp_val)))
+        (true (printif! (DEBUG stack contents: (collapse (match $stack ((Num $n) $s) ($n $s))))))
+        (true (printif! (DEBUG fhyps: $fhyps ehyps: $ehyps)))
       )
       (if (< $sp_val 0)
           (Error ((label $label) (npop $npop)) "Stack underflow: proof step requires too many hypotheses")
@@ -521,11 +527,15 @@
                                  ($_4 (collapse (match $stack ((Num $n) $s) (if (>= $n $sp_val) (remove-atom $stack ((Num $n) $s)) ()))))
                                  ($new_conclusion (let $nc (once (apply_subst $subst $statement))
                                                     (let $_5 (add-atom $stack ((Num $sp_val) $nc)) $nc)))
+                                 ;; Update stack tracking states after pushing conclusion
+                                 ($_sl_update (change-state! &sl (+ $sp_val 1)))
+                                 ($_top_update (change-state! &top $new_conclusion))
                                  ($_cleanup (delete-space $subst))
                                ) ()))))))))))))))
 
 ;; treat_hypothesis - process hypothesis during proof verification (new-space version)
 ;; Pushes FHyp or EHyp onto the stack if the label is an active hypothesis
+;; Updates &sl (stack length) and &top (top of stack) states
 (= (treat_hypothesis $kb $stack $label $Type $Data $stack_len)
   (case (collapse (match $kb (ActiveHyp $label) found))
     (((found)
@@ -534,10 +544,17 @@
             (let* (
               ($typecode (match-atom' $Data (Typecode $t) $t))
               ($var (match-atom' $Data (FVar $v) $v))
-            ) (add-atom $stack ((Num $stack_len) ($typecode $var)))))
+              ($stmt ($typecode $var))
+            ) (progn
+                (add-atom $stack ((Num $stack_len) $stmt))
+                (adjust-state-additive &sl 1)
+                (change-state! &top $stmt))))
           (EHyp
             (let $stmt (match-atom' $Data (Statement $s) $s)
-              (add-atom $stack ((Num $stack_len) $stmt)))))))
+              (progn
+                (add-atom $stack ((Num $stack_len) $stmt))
+                (adjust-state-additive &sl 1)
+                (change-state! &top $stmt)))))))
      (() (Error (label $label) "The label is the label of a nonactive hypothesis.")))))
 
 ;; treat_step - dispatch proof step to appropriate handler (new-space version)
@@ -559,7 +576,8 @@
                     (case (collapse (match $kb ((Label $label) $Type (FSDepth $level) $Data) ($Type $Data)))
                       (((($t $d)) ($t $d))
                        (() (Error (label $label) "No statement information found for label"))))))))
-            ($stack_len (case (collapse (match $stack ((Num $n) $s) $n)) ( ( () 0 ) ( $nums (+ 1 (max-atom $nums))) )))
+            ;; Use state instead of scanning stack - O(1) instead of O(N)
+            ($stack_len (get-state &sl))
             (true (printif! ($Type $label data: $Data)))
           )
           (let $result
@@ -608,6 +626,9 @@
         (
           (true (printif! (Got Proof: $proof)))
           ($_1 (empty-space $stack))
+          ;; Reset stack tracking states
+          ($_1b (change-state! &sl 0))
+          ($_1c (change-state! &top Empty))
           ($_2 (collapse (match $kb ((Label $label) FHyp $FSDepth $Data) (add-atom $kb (ActiveHyp $label)))))
           ($_3 (collapse (match $kb ((Label $label) EHyp $FSDepth $Data) (add-atom $kb (ActiveHyp $label)))))
           ($_4 (process_proof_steps $kb $stack $sp $errors $proof))
@@ -765,6 +786,9 @@
        (
          (true (printif! (Got Compressed Proof: labels $labels steps $steps)))
          ($_1 (empty-space $stack))
+         ;; Reset stack tracking states
+         ($_1b (change-state! &sl 0))
+         ($_1c (change-state! &top Empty))
          ($_2 (collapse (match $kb ((Label $label) FHyp $FSDepth $Data) (add-atom $kb (ActiveHyp $label)))))
          ($_3 (collapse (match $kb ((Label $label) EHyp $FSDepth $Data) (add-atom $kb (ActiveHyp $label)))))
          ;; BUGFIX: Get mandatory hyps from active frame, NOT from calling theorem's statement
@@ -817,17 +841,14 @@
        (case $expanded
          (((Error $i $m) (add-atom $errors (Error $i $m)))
           ((save $saved2)
-            ;; Z: save current stack top (highest indexed element)
-            (let $stack_items (collapse (match $stack ((Num $n) $f) ($n $f)))
-              (if (== $stack_items ())
+            ;; Z: save current stack top - use &top state (O(1) instead of O(stack_size))
+            (let $top_stmt (get-state &top)
+              (if (== $top_stmt Empty)
                   (add-atom $errors (Error (Z-save) "Cannot save: empty stack"))
-                  ;; Find the maximum index and get that element
-                  (let $max_idx (max-atom (collapse (match-atom' $stack_items ($i $_) $i)))
-                    (let $top_stmt (collapse (match-atom' $stack_items ($max_idx $s) $s))
-                      ;; CRITICAL: Python appends to saved list, we must do the same!
-                      ;; Using cons-atom would prepend, breaking index-atom access
-                      (let $new_saved (append-element $saved (car-atom $top_stmt))
-                        (process-compressed-steps $kb $stack $sp $errors $rest $mand $labels $new_saved $nm $nl)))))))
+                  ;; CRITICAL: Python appends to saved list, we must do the same!
+                  ;; Using cons-atom would prepend, breaking index-atom access
+                  (let $new_saved (append-element $saved $top_stmt)
+                    (process-compressed-steps $kb $stack $sp $errors $rest $mand $labels $new_saved $nm $nl)))))
           ((incomplete-marker $saved2)
             ;; ? mark - incomplete proof
             (progn
@@ -837,9 +858,12 @@
             ;; Push saved statement onto stack - treat as a hypothesis-free axiom (like Python)
             ;; In Python: treat_step(('$a', (set(), [], [], stmt)), stack)
             ;; This means: an assertion with no dv, no f-hyps, no e-hyps, just the statement
-            (let $stack_len (case (collapse (match $stack ((Num $n) $s) $n)) ( ( () 0 ) ( $nums (+ 1 (max-atom $nums))) ))
+            (let $stack_len (get-state &sl)
               (progn
                 (add-atom $stack ((Num $stack_len) $stmt))
+                ;; Update stack tracking states
+                (adjust-state-additive &sl 1)
+                (change-state! &top $stmt)
                 (process-compressed-steps $kb $stack $sp $errors $rest $mand $labels $saved2 $nm $nl))))
           (($label $saved2)
             ;; Normal label - treat it
