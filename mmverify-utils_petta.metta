@@ -731,11 +731,17 @@
    (if (or (== $idx -1) (== $idx save))
        ;; Z marker (save current stack top) - both -1 (old) and save atom (DAG)
        (save $saved)
-       (if (or (== $idx "?") (== $idx ?) (== $idx incomplete))
-           ;; Incomplete proof marker - "?" / ? (old) or incomplete atom (DAG)
-           (incomplete-marker $saved)
+       ;; Check if it's an incomplete marker BEFORE doing any arithmetic
+       ;; Must check type first to avoid "Arithmetic: ? / 0 is not a function" error
+       (if (== (get-metatype $idx) Symbol)
+           ;; It's a symbol - check if it's ? or incomplete
+           (if (or (== $idx ?) (== $idx incomplete))
+               (incomplete-marker $saved)
+               ;; Unknown symbol - error
+               (Error ((idx $idx)) "Unknown symbol in compressed proof (expected number, ?, incomplete, or save)"))
+           ;; It's NOT a symbol (it's a number) - do arithmetic operations
            (let $num_total (+ $num_mand $num_labels)
-             (if (< $idx $num_mand)
+                 (if (< $idx $num_mand)
                  ;; Index into mandatory hyps
                  (let $label (index-atom $mand_hyps $idx)
                    ($label $saved))
