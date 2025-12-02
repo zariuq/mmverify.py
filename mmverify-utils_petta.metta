@@ -124,13 +124,32 @@
 ; Look up disjoint variables (which are oriented)
 (= (lookup_d $kb $x $y) (let ($x' $y') (orient_pair $x $y) (unify $kb (DVar ($x' $y') $_ (Type "$d")) True False)))
 
-;; add_d - discard map-atom results to avoid n×n output noise
-;; CRITICAL: wrap in collapse to prevent non-determinism forking
+;; add_d - tail-recursive DV pair processing (was quadratic with map-atom)
+;; Outer loop: iterate over varlist for x
+;; Inner loop: for each x, iterate over varlist for y
+;; Uses collapse per iteration to force deterministic execution
 (= (add_d $kb $varlist $level)
-  (let $_ (collapse (map-atom $varlist $x
-            (collapse (map-atom $varlist $y
-              (add_dv_pair_if_fresh $kb $x $y $level)))))
-    ()))
+   (add_d_outer $kb $varlist $varlist $level))
+
+;; Outer loop: base case
+(= (add_d_outer $kb () $varlist $level)
+   ())
+
+;; Outer loop: process one x, recurse
+(= (add_d_outer $kb $xs $varlist $level)
+   (let ($x $rest_x) (decons-atom $xs)
+     (let $_ (collapse (add_d_inner $kb $x $varlist $level))
+       (add_d_outer $kb $rest_x $varlist $level))))  ;; tail call
+
+;; Inner loop: base case
+(= (add_d_inner $kb $x () $level)
+   ())
+
+;; Inner loop: process one (x,y) pair, recurse
+(= (add_d_inner $kb $x $ys $level)
+   (let ($y $rest_y) (decons-atom $ys)
+     (let $_ (add_dv_pair_if_fresh $kb $x $y $level)
+       (add_d_inner $kb $x $rest_y $level))))  ;; tail call
 
 ;; List Utils
 (= (to-list $expr)
@@ -246,6 +265,22 @@
     (let $current_list (match-atom'' $unordered_list ($current $list) $list Nil)
       (collect_lists_by_depth $unordered_list (+ 1 $current) $max (mappend $ordered_list $current_list)))))
 
+;; process_mand_vars - tail-recursive processing of mandatory variable tokens
+;; Processes each token with collapse to force deterministic execution
+(= (process_mand_vars $kb $tokens)
+   (process_mand_vars_tail $kb $tokens))
+
+;; Base case: empty token list
+(= (process_mand_vars_tail $kb ())
+   ())
+
+;; Recursive case: process one token, recurse on rest
+(= (process_mand_vars_tail $kb $tokens)
+   (let ($tok $rest) (decons-atom $tokens)
+     (progn
+       (collapse (add_mand_var $kb $tok))
+       (process_mand_vars_tail $kb $rest))))  ;; tail call
+
 ;; add_mand_var - add mandatory variable marker (new-space version)
 ;; Uses if-guards to avoid nested case non-determinism
 (= (add_mand_var $kb $tok)
@@ -292,10 +327,10 @@
       ($e_max_level (if (== $e_levels (())) 0 (max-atom $e_levels)))
       ($e_hyps_list (collect_lists_by_depth $e_hyps_lists 1 $e_max_level Nil))
       ;; Build mandatory vars from e_hyps tokens and statement tokens
-      ;; CRITICAL: wrap map-atom in collapse to avoid non-determinism forking in let*
+      ;; Use tail-recursive processing to avoid building intermediate results tuple
       ($e_hyps_toks (from-list (flatten-list $e_hyps_list)))
-      ($_1 (collapse (map-atom $e_hyps_toks $tok (add_mand_var $kb $tok))))
-      ($_2 (collapse (map-atom $stmt $tok (add_mand_var $kb $tok))))
+      ($_1 (process_mand_vars $kb $e_hyps_toks))
+      ($_2 (process_mand_vars $kb $stmt))
       ($mand_vars (collapse (match $kb (MandVar $var) $var)))
       ;; Collect disjoint variable pairs where both vars are mandatory
       ($dvs (collapse (match $kb (DVar ($x $y) $_ (Type "$d"))
@@ -432,9 +467,10 @@
         ($npop (+ $lf $le))
         ($sp_val (- $stack_len $npop))
         ($stack_contents (collapse (match $stack ((Num $n) $s) ($n $s))))
-        (true (println! (DEBUG treat_assertion label: $label stack_len: $stack_len npop: $npop sp_val: $sp_val)))
-        (true (println! (DEBUG stack contents: $stack_contents)))
-        (true (println! (DEBUG fhyps: $fhyps ehyps: $ehyps)))
+        ;; DEBUG: Uncomment to debug assertion processing
+        ;; (true (println! (DEBUG treat_assertion label: $label stack_len: $stack_len npop: $npop sp_val: $sp_val)))
+        ;; (true (println! (DEBUG stack contents: $stack_contents)))
+        ;; (true (println! (DEBUG fhyps: $fhyps ehyps: $ehyps)))
       )
       (if (< $sp_val 0)
           (Error ((label $label) (npop $npop)) "Stack underflow: proof step requires too many hypotheses")
@@ -522,6 +558,23 @@
            (add-atom $errors (incomplete)))
          ($_ ())))))
 
+;; process_proof_steps - tail-recursive proof step processing
+;; Processes each step with collapse to force deterministic execution
+;; Errors are recorded in $errors space as side effects
+(= (process_proof_steps $kb $stack $sp $errors $proof)
+   (process_proof_steps_tail $kb $stack $sp $errors $proof))
+
+;; Base case: empty proof
+(= (process_proof_steps_tail $kb $stack $sp $errors ())
+   ())
+
+;; Recursive case: process one step, recurse on rest
+(= (process_proof_steps_tail $kb $stack $sp $errors $proof)
+   (let ($label $rest) (decons-atom $proof)
+     (progn
+       (collapse (treat_step_with_errors $kb $stack $sp $errors $label))
+       (process_proof_steps_tail $kb $stack $sp $errors $rest))))  ;; tail call
+
 ;; treat_normal_proof - process a proof sequence (new-space version)
 ;; Returns first (Error ...) if any step fails, (incomplete) if ? found, () on success
 (= (treat_normal_proof $kb $stack $sp $proof)
@@ -532,7 +585,7 @@
           ($_1 (empty-space $stack))
           ($_2 (collapse (match $kb ((Label $label) FHyp $FSDepth $Data) (add-atom $kb (ActiveHyp $label)))))
           ($_3 (collapse (match $kb ((Label $label) EHyp $FSDepth $Data) (add-atom $kb (ActiveHyp $label)))))
-          ($_4 (collapse (map-atom $proof $label (treat_step_with_errors $kb $stack $sp $errors $label))))
+          ($_4 (process_proof_steps $kb $stack $sp $errors $proof))
           ($_5 (remove-patternc $kb (ActiveHyp $_)))
           ;; Query errors space directly instead of using filter-atom
           ($real_errors (collapse (match $errors (Error $i $m) (Error $i $m))))
