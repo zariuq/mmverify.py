@@ -723,13 +723,13 @@
 ;; expand-compressed-step - expand a single compressed step
 ;; Takes: index, mandatory hyp labels, explicit labels, saved proofs
 ;; Returns: (label saved_proofs) or (save saved_proofs) or (Error ...)
-;; Handles both old format (-1 for save) and new DAG format (save atom)
+;; Handles both old format (-1 for save, "?" for incomplete) and new DAG format (save/incomplete atoms)
 (= (expand-compressed-step $idx $mand_hyps $labels $saved $num_mand $num_labels)
-   (if (== $idx -1)
-       ;; Z marker (save current stack top)
+   (if (or (== $idx -1) (== $idx save))
+       ;; Z marker (save current stack top) - both -1 (old) and save atom (DAG)
        (save $saved)
-       (if (or (== $idx -2) (== $idx "?") (== $idx ?))
-           ;; Incomplete proof marker (-2 from DAG, or "?" / ? from old format)
+       (if (or (== $idx "?") (== $idx ?) (== $idx incomplete))
+           ;; Incomplete proof marker - "?" / ? (old) or incomplete atom (DAG)
            (incomplete-marker $saved)
            (let $num_total (+ $num_mand $num_labels)
              (if (< $idx $num_mand)
