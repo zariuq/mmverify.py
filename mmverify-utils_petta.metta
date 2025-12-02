@@ -19,6 +19,31 @@
     (add-atom &self (= (printif! $msg) (println! $msg)))
     (add-atom &self (= (printif! $msg) true)))
 
+;;; Check for --store-proofs flag in command line args
+;;; By default, proof storage is OFF (like mmverify.py). Use --store-proofs to enable storing proofs in &kb.
+(= (has-store-proofs-flag $args)
+   (if (== (size-atom $args) 0)
+       false
+       (let ($first $rest) (decons-atom $args)
+         (if (== $first --store-proofs)
+             true
+             (has-store-proofs-flag $rest)))))
+
+;;; Dynamically define maybe-store-theorem! based on --store-proofs flag
+;;; If --store-proofs: Store full theorem including ProofSequence
+;;; Otherwise: Store theorem without ProofSequence (saves memory, like mmverify.py)
+!(if (has-store-proofs-flag (get_cmdline_args))
+    (progn
+      (add-atom &self (= (maybe-store-theorem! $kb $label $dvs $fhyps $ehyps $s $proof)
+                        (add-atom $kb ((Label $label) Theorem ((DVars $dvs) (FHyps $fhyps) (EHyps $ehyps) (Statement $s) (Type "$p") (ProofSequence $proof))))))
+      (add-atom &self (= (maybe-store-theorem-incomplete! $kb $label $dvs $fhyps $ehyps $s $proof)
+                        (add-atom $kb ((Label $label) Theorem ((DVars $dvs) (FHyps $fhyps) (EHyps $ehyps) (Statement $s) (Type "$p") (ProofSequence $proof) (Incomplete True)))))))
+    (progn
+      (add-atom &self (= (maybe-store-theorem! $kb $label $dvs $fhyps $ehyps $s $proof)
+                        (add-atom $kb ((Label $label) Theorem ((DVars $dvs) (FHyps $fhyps) (EHyps $ehyps) (Statement $s) (Type "$p"))))))
+      (add-atom &self (= (maybe-store-theorem-incomplete! $kb $label $dvs $fhyps $ehyps $s $proof)
+                        (add-atom $kb ((Label $label) Theorem ((DVars $dvs) (FHyps $fhyps) (EHyps $ehyps) (Statement $s) (Type "$p") (Incomplete True))))))))
+
 ;; exec - wrapper for fail-fast execution with error handling
 ;; Halts execution on Error, returns the evaluated value otherwise
 (: exec (-> Atom %Undefined%))
@@ -543,7 +568,7 @@
                 (FHyp (treat_hypothesis $kb $stack $label $Type $Data $stack_len))
                 (EHyp (treat_hypothesis $kb $stack $label $Type $Data $stack_len))
                 (Assertion (treat_assertion $kb $stack $sp $label $Data $stack_len))
-                (Proof (treat_assertion $kb $stack $sp $label $Data $stack_len))
+                (Theorem (treat_assertion $kb $stack $sp $label $Data $stack_len))
               ))
             (let true (printif! (stack ($label): (collapse (match $stack $s $s))))
               $result)))))
@@ -875,7 +900,7 @@
    (let $assertion_data (make_assertion $kb $stmt)
      (let ((DVars $dvs) (FHyps $f_hyps) (EHyps $e_hyps) (Statement $s)) $assertion_data
        (progn
-         (add-atom $kb ( (Label $label) Proof ( (DVars $dvs) (FHyps $f_hyps) (EHyps $e_hyps) (Statement $s) (Type "$p") (ProofSequence $proof) )))
+         (maybe-store-theorem! $kb $label $dvs $f_hyps $e_hyps $s $proof)
          ()))))
 
 (= (add_p_dispatch $kb $label $stmt $proof (Error $info $msg))
@@ -888,13 +913,13 @@
      (let ((DVars $dvs) (FHyps $f_hyps) (EHyps $e_hyps) (Statement $s)) $assertion_data
        (progn
          (println! ("WARNING: Incomplete proof for" $label "- adding as unverified"))
-         (add-atom $kb ( (Label $label) Proof ( (DVars $dvs) (FHyps $f_hyps) (EHyps $e_hyps) (Statement $s) (Type "$p") (ProofSequence $proof) (Incomplete True) )))
+         (maybe-store-theorem-incomplete! $kb $label $dvs $f_hyps $e_hyps $s $proof)
          ()))))
 
 (= (add_p_dispatch $kb $label $stmt $proof (success $stack_top))
    (let $assertion_data (make_assertion $kb $stmt)
      (let ((DVars $dvs) (FHyps $f_hyps) (EHyps $e_hyps) (Statement $s)) $assertion_data
        (progn
-         (add-atom $kb ( (Label $label) Proof ( (DVars $dvs) (FHyps $f_hyps) (EHyps $e_hyps) (Statement $s) (Type "$p") (ProofSequence $proof) )))
+         (maybe-store-theorem! $kb $label $dvs $f_hyps $e_hyps $s $proof)
          ()))))
 
